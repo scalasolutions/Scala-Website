@@ -88,6 +88,41 @@ export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({
   ticket: one(tickets, { fields: [ticketMessages.ticketId], references: [tickets.id] }),
 }));
 
+// 5. Expenses Table
+export const expenses = pgTable('expenses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  category: text('category').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  date: timestamp('date').notNull().defaultNow(),
+  payer: text('payer').notNull().default('company'), // 'company' | 'fredrick' | 'nicholas'
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 6. Capital Injections Table
+export const capitalInjections = pgTable('capital_injections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  founderName: text('founder_name').notNull(), // 'fredrick' | 'nicholas'
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  date: timestamp('date').notNull().defaultNow(),
+  description: text('description'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 7. Payouts Table
+export const payouts = pgTable('payouts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  founderName: text('founder_name').notNull(), // 'fredrick' | 'nicholas'
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  date: timestamp('date').notNull().defaultNow(),
+  description: text('description'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Types
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
@@ -97,3 +132,9 @@ export type Ticket = typeof tickets.$inferSelect;
 export type NewTicket = typeof tickets.$inferInsert;
 export type TicketMessage = typeof ticketMessages.$inferSelect;
 export type NewTicketMessage = typeof ticketMessages.$inferInsert;
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = typeof expenses.$inferInsert;
+export type CapitalInjection = typeof capitalInjections.$inferSelect;
+export type NewCapitalInjection = typeof capitalInjections.$inferInsert;
+export type Payout = typeof payouts.$inferSelect;
+export type NewPayout = typeof payouts.$inferInsert;

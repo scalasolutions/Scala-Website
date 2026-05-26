@@ -23,7 +23,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  LogOut
+  LogOut,
+  Coins
 } from 'lucide-react';
 import { 
   getClients, 
@@ -37,9 +38,10 @@ interface SidebarItemProps {
   icon: React.ReactNode;
   label: string;
   active: boolean;
+  badge?: React.ReactNode;
 }
 
-function SidebarItem({ href, icon, label, active }: SidebarItemProps) {
+function SidebarItem({ href, icon, label, active, badge }: SidebarItemProps) {
   return (
     <Link 
       href={href} 
@@ -53,7 +55,8 @@ function SidebarItem({ href, icon, label, active }: SidebarItemProps) {
         {icon}
       </div>
       <span className="text-sm">{label}</span>
-      {active && (
+      {badge && <div className="ml-auto shrink-0 z-10 flex items-center">{badge}</div>}
+      {active && !badge && (
         <span className="absolute right-4 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ boxShadow: '0 0 8px #CEF84E' }}></span>
       )}
     </Link>
@@ -185,7 +188,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
     { href: '/admin/clients', icon: <Users size={18} />, label: 'Clients' },
     { href: '/admin/invoices', icon: <Receipt size={18} />, label: 'Invoices' },
-    { href: '/admin/tickets', icon: <Ticket size={18} />, label: 'Support Tickets' },
+    { href: '/admin/finance', icon: <Coins size={18} />, label: 'Finance' },
+    { 
+      href: '/admin/tickets', 
+      icon: <Ticket size={18} />, 
+      label: 'Support Tickets',
+      badge: (
+        <div className="relative overflow-hidden px-1.5 py-0.5 rounded-[3px] border border-yellow-500/35 flex items-center select-none bg-[repeating-linear-gradient(-45deg,#eab308,#eab308_3px,#000_3px,#000_6px)] shadow-xs shrink-0 scale-90">
+          <span className="bg-black px-1.5 py-0.25 text-[7px] font-black font-mono text-yellow-400 rounded-[1.5px] uppercase tracking-tighter">
+            Soon
+          </span>
+        </div>
+      )
+    },
   ];
 
   return (
@@ -215,6 +230,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               icon={item.icon} 
               label={item.label} 
               active={pathname.startsWith(item.href)} 
+              badge={item.badge}
             />
           ))}
         </nav>
@@ -270,6 +286,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     icon={item.icon} 
                     label={item.label} 
                     active={pathname.startsWith(item.href)} 
+                    badge={item.badge}
                   />
                 </div>
               ))}

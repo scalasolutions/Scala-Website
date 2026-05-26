@@ -284,12 +284,19 @@ export default function TicketsPage() {
   });
 
   return (
-    <div className="space-y-8 h-[calc(100vh-10rem)] flex flex-col overflow-hidden animate-fade-up">
+    <div className="space-y-8 h-[calc(100vh-10rem)] flex flex-col overflow-hidden animate-fade-up relative">
       
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Support Tickets</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold tracking-tight">Support Tickets</h1>
+            <div className="relative overflow-hidden px-2.5 py-0.5 rounded border border-yellow-500/40 flex items-center justify-center select-none bg-[repeating-linear-gradient(-45deg,#eab308,#eab308_6px,#000_6px,#000_12px)] shadow-[0_2px_8px_rgba(0,0,0,0.3)] shrink-0 transform -rotate-2">
+              <span className="bg-black px-2 py-0.5 text-[9px] font-black tracking-widest font-mono text-yellow-400 rounded border border-yellow-500/20 uppercase shadow-sm">
+                Coming Soon
+              </span>
+            </div>
+          </div>
           <p className="text-sm text-muted-foreground mt-1">Review, assign, and respond to clients support tickets.</p>
         </div>
         <button 

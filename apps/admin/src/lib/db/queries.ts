@@ -701,3 +701,285 @@ export async function updateTicketStatus(id: string, status: 'open' | 'in_progre
   }
   return null;
 }
+
+// ============================================================================
+// Finance & Split Ledger Data & Queries
+// ============================================================================
+
+export interface MockExpense {
+  id: string;
+  title: string;
+  category: string;
+  amount: number;
+  date: Date;
+  payer: 'company' | 'fredrick' | 'nicholas';
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MockCapitalInjection {
+  id: string;
+  founderName: 'fredrick' | 'nicholas';
+  amount: number;
+  date: Date;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MockPayout {
+  id: string;
+  founderName: 'fredrick' | 'nicholas';
+  amount: number;
+  date: Date;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+let mockExpenses: MockExpense[] = [
+  {
+    id: 'exp1-1111-1111-1111-111111111111',
+    title: 'Vercel Pro Subscription',
+    category: 'Hosting & Cloud',
+    amount: 320000,
+    date: new Date('2026-05-02T10:00:00Z'),
+    payer: 'company',
+    notes: 'Monthly hosting plan for production app aliases',
+    createdAt: new Date('2026-05-02T10:00:00Z'),
+    updatedAt: new Date('2026-05-02T10:00:00Z'),
+  },
+  {
+    id: 'exp2-2222-2222-2222-222222222222',
+    title: 'OpenAI API Token Usage',
+    category: 'API & Software',
+    amount: 650000,
+    date: new Date('2026-05-10T14:30:00Z'),
+    payer: 'fredrick',
+    notes: 'LLM credits for AI invoice autofill features',
+    createdAt: new Date('2026-05-10T14:30:00Z'),
+    updatedAt: new Date('2026-05-10T14:30:00Z'),
+  },
+  {
+    id: 'exp3-3333-3333-3333-333333333333',
+    title: 'Google Workspace Licenses',
+    category: 'Office & Admin',
+    amount: 180000,
+    date: new Date('2026-05-14T09:00:00Z'),
+    payer: 'company',
+    notes: 'Two team email addresses for founders',
+    createdAt: new Date('2026-05-14T09:00:00Z'),
+    updatedAt: new Date('2026-05-14T09:00:00Z'),
+  },
+  {
+    id: 'exp4-4444-4444-4444-444444444444',
+    title: 'Domain renew scala-solutions.com',
+    category: 'Hosting & Cloud',
+    amount: 220000,
+    date: new Date('2026-05-18T11:00:00Z'),
+    payer: 'nicholas',
+    notes: '2-year domain lock registration fee',
+    createdAt: new Date('2026-05-18T11:00:00Z'),
+    updatedAt: new Date('2026-05-18T11:00:00Z'),
+  },
+  {
+    id: 'exp5-5555-5555-5555-555555555555',
+    title: 'Contractor UI Asset Pack Designs',
+    category: 'Contractor & Outsource',
+    amount: 1500000,
+    date: new Date('2026-05-22T16:00:00Z'),
+    payer: 'company',
+    notes: 'Outsourced graphics for landing page templates',
+    createdAt: new Date('2026-05-22T16:00:00Z'),
+    updatedAt: new Date('2026-05-22T16:00:00Z'),
+  }
+];
+
+let mockCapitalInjections: MockCapitalInjection[] = [
+  {
+    id: 'inj1-1111-1111-1111-111111111111',
+    founderName: 'fredrick',
+    amount: 10000000,
+    date: new Date('2026-04-01T09:00:00Z'),
+    description: 'Initial Seed Capital Injection for Treasury',
+    createdAt: new Date('2026-04-01T09:00:00Z'),
+    updatedAt: new Date('2026-04-01T09:00:00Z'),
+  },
+  {
+    id: 'inj2-2222-2222-2222-222222222222',
+    founderName: 'nicholas',
+    amount: 10000000,
+    date: new Date('2026-04-01T09:00:00Z'),
+    description: 'Initial Seed Capital Injection for Treasury',
+    createdAt: new Date('2026-04-01T09:00:00Z'),
+    updatedAt: new Date('2026-04-01T09:00:00Z'),
+  },
+  {
+    id: 'inj3-3333-3333-3333-333333333333',
+    founderName: 'fredrick',
+    amount: 650000,
+    date: new Date('2026-05-10T14:30:00Z'),
+    description: 'Out-of-pocket payment: OpenAI API Token Usage',
+    createdAt: new Date('2026-05-10T14:30:00Z'),
+    updatedAt: new Date('2026-05-10T14:30:00Z'),
+  },
+  {
+    id: 'inj4-4444-4444-4444-444444444444',
+    founderName: 'nicholas',
+    amount: 220000,
+    date: new Date('2026-05-18T11:00:00Z'),
+    description: 'Out-of-pocket payment: Domain renew scala-solutions.com',
+    createdAt: new Date('2026-05-18T11:00:00Z'),
+    updatedAt: new Date('2026-05-18T11:00:00Z'),
+  }
+];
+
+let mockPayouts: MockPayout[] = [
+  {
+    id: 'pay1-1111-1111-1111-111111111111',
+    founderName: 'fredrick',
+    amount: 2500000,
+    date: new Date('2026-05-15T15:00:00Z'),
+    description: 'Mid-month profit share distribution draw',
+    createdAt: new Date('2026-05-15T15:00:00Z'),
+    updatedAt: new Date('2026-05-15T15:00:00Z'),
+  },
+  {
+    id: 'pay2-2222-2222-2222-222222222222',
+    founderName: 'nicholas',
+    amount: 2000000,
+    date: new Date('2026-05-15T16:00:00Z'),
+    description: 'Mid-month profit share distribution draw',
+    createdAt: new Date('2026-05-15T16:00:00Z'),
+    updatedAt: new Date('2026-05-15T16:00:00Z'),
+  }
+];
+
+// --- EXPENSES ---
+export async function getExpenses() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.expenses.findMany({
+        orderBy: [desc(schema.expenses.date)]
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockExpenses].sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+export async function createExpense(data: schema.NewExpense) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.expenses).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newExpense: MockExpense = {
+    id: crypto.randomUUID(),
+    title: data.title,
+    category: data.category,
+    amount: data.amount,
+    date: data.date ? new Date(data.date) : new Date(),
+    payer: data.payer as any || 'company',
+    notes: data.notes || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockExpenses.push(newExpense);
+  return newExpense;
+}
+
+export async function deleteExpense(id: string) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.delete(schema.expenses).where(eq(schema.expenses.id, id)).returning();
+      return results[0] || null;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  const idx = mockExpenses.findIndex(exp => exp.id === id);
+  if (idx !== -1) {
+    const deleted = mockExpenses[idx];
+    mockExpenses = mockExpenses.filter(exp => exp.id !== id);
+    return deleted;
+  }
+  return null;
+}
+
+// --- CAPITAL INJECTIONS ---
+export async function getCapitalInjections() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.capitalInjections.findMany({
+        orderBy: [desc(schema.capitalInjections.date)]
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockCapitalInjections].sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+export async function createCapitalInjection(data: schema.NewCapitalInjection) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.capitalInjections).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newInjection: MockCapitalInjection = {
+    id: crypto.randomUUID(),
+    founderName: data.founderName as any,
+    amount: data.amount,
+    date: data.date ? new Date(data.date) : new Date(),
+    description: data.description || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockCapitalInjections.push(newInjection);
+  return newInjection;
+}
+
+// --- PAYOUTS ---
+export async function getPayouts() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.payouts.findMany({
+        orderBy: [desc(schema.payouts.date)]
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockPayouts].sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+export async function createPayout(data: schema.NewPayout) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.payouts).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newPayout: MockPayout = {
+    id: crypto.randomUUID(),
+    founderName: data.founderName as any,
+    amount: data.amount,
+    date: data.date ? new Date(data.date) : new Date(),
+    description: data.description || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockPayouts.push(newPayout);
+  return newPayout;
+}
