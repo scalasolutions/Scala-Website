@@ -38,45 +38,104 @@ const PAGE_STYLE: React.CSSProperties = {
 // ── Print CSS ────────────────────────────────────────────────
 const PRINT_CSS = `
   @media print {
-    body, html, main, #__next, [data-reactroot] {
-      background-color: white !important;
-      color: black !important;
-      background-image: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      height: auto !important;
-      overflow: visible !important;
+    @page {
+      size: auto;
+      margin: 0mm;
     }
-    body > *:not(.fixed) { display: none !important; }
-    .fixed:not(#invoice-pages-wrapper) { display: none !important; }
-    .print\\:hidden { display: none !important; }
-    #invoice-pages-wrapper {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 100% !important;
+
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    /* Hide all layout elements that are not part of the invoice pages */
+    aside, 
+    header, 
+    #admin-top-header, 
+    .print\\:hidden,
+    main > div.absolute {
+      display: none !important;
+    }
+
+    /* Reset the specific outer layout containers so they don't clip or restrict the page height */
+    html, body {
       height: auto !important;
+      min-height: auto !important;
+      overflow: visible !important;
       margin: 0 !important;
       padding: 0 !important;
       background: white !important;
-      visibility: visible !important;
+      background-color: white !important;
+    }
+
+    /* Target the exact dashboard layout parents by matching their unique hierarchy */
+    div.flex.h-screen.bg-background.overflow-hidden,
+    div.flex-1.flex.flex-col.min-w-0.overflow-hidden,
+    main.flex-1.overflow-y-auto,
+    div.max-w-6xl.mx-auto {
+      display: block !important;
+      position: static !important;
+      height: auto !important;
+      min-height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      width: 100% !important;
+      max-width: none !important;
+    }
+
+    /* Style the preview container and remove vertical height restrictions */
+    div.animate-fade-up.flex.flex-col,
+    div.relative.w-full.flex.justify-center {
+      display: block !important;
+      position: static !important;
+      height: auto !important;
+      min-height: auto !important;
+      overflow: visible !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* Position the pages wrapper in the center of the print flow at actual 100% size */
+    #invoice-pages-wrapper {
+      position: relative !important;
+      width: 800px !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      transform: none !important;
       display: flex !important;
       flex-direction: column !important;
-      transform: none !important;
       gap: 0 !important;
+      background: white !important;
+      visibility: visible !important;
     }
+
+    /* Perfect A4 styling for each page */
     .invoice-print-page {
-      width: 100% !important;
-      height: auto !important;
-      min-height: 100vh !important;
+      width: 800px !important;
+      height: 1130px !important;
+      min-height: 1130px !important;
+      max-height: 1130px !important;
       border-radius: 0 !important;
       box-shadow: none !important;
       border: none !important;
-      margin: 0 !important;
-      overflow: visible !important;
-      page-break-after: always;
+      margin: 0 auto !important;
+      padding: 56px 64px !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      position: relative !important;
+      page-break-after: always !important;
+      page-break-inside: avoid !important;
+      background: white !important;
     }
-    .invoice-print-page:last-child { page-break-after: auto; }
+
+    .invoice-print-page:last-child {
+      page-break-after: avoid !important;
+    }
   }
 `;
 
@@ -99,6 +158,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
   const outerPagesRef = useRef<HTMLDivElement>(null);
 
+  const effectiveScale = scale * zoomLevel;
+
   // Auto-fit scale on mount / resize
   useEffect(() => {
     const computeScale = () => {
@@ -114,10 +175,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
   // Reset zoom and scroll to top when invoice changes
   useEffect(() => {
-    setZoomLevel(2);
-    setCurrentPage(0);
+    const timer = setTimeout(() => {
+      setZoomLevel(2);
+      setCurrentPage(0);
+    }, 0);
     const mainEl = document.querySelector('main');
     if (mainEl) mainEl.scrollTop = 0;
+    return () => clearTimeout(timer);
   }, [invoice]);
 
   // Track current page from scroll position
@@ -165,8 +229,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const parsedItems = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
   const clientRefCode = getClientRefCode(companyName || clientName, invoice.invoiceNumber);
   const formattedDate = formatDateClean(invoice.createdAt || invoice.issuedAt || new Date());
-
-  const effectiveScale = scale * zoomLevel;
 
   const sharedPageProps = {
     companyName: companyName || clientName,
