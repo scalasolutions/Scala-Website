@@ -223,11 +223,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-4 border-t border-sidebar-border">
           <div className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30">
             <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold border border-primary/20">
-              FY
+              S
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">Fredrick Yang</p>
-              <p className="text-xs text-muted-foreground truncate">Anak Web Owner</p>
+              <p className="text-sm font-semibold truncate">Scala Solutions</p>
+              <p className="text-xs text-muted-foreground truncate">Scala</p>
             </div>
             <button 
               onClick={() => signOut({ callbackUrl: '/login' })}
@@ -279,11 +279,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="p-4 border-t border-sidebar-border">
               <div className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30">
                 <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                  FY
+                  S
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">Fredrick Yang</p>
-                  <p className="text-xs text-muted-foreground truncate">Anak Web Owner</p>
+                  <p className="text-sm font-semibold truncate">Scala Solutions</p>
+                  <p className="text-xs text-muted-foreground truncate">Scala</p>
                 </div>
                 <button 
                   onClick={() => signOut({ callbackUrl: '/login' })}
@@ -431,9 +431,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold border border-primary/10">
-                FY
+                S
               </div>
-              <span className="text-xs font-medium hidden sm:block font-semibold">Fredrick Yang</span>
+              <span className="text-xs font-medium hidden sm:block font-semibold">Scala Solutions</span>
             </div>
           </div>
         </header>
