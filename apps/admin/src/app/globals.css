@@ -1,0 +1,235 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+  
+  /* Slate/Lime Light-first Palette by default */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  
+  /* Custom high-contrast darker neon lime brand color for Light Mode: #6fa100 */
+  --primary: #6fa100;
+  --primary-foreground: #ffffff;
+  
+  --secondary: #e2e8f0;
+  --secondary-foreground: #0f172a;
+  
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  
+  --accent: #6fa100;
+  --accent-foreground: #ffffff;
+  
+  --destructive: #ef4444;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #6fa100;
+  
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #6fa100;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #6fa100;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #6fa100;
+}
+
+html.dark {
+  --background: #090a0f;
+  --foreground: #f8fafc;
+  
+  --card: #11131c;
+  --card-foreground: #f8fafc;
+  
+  --popover: #11131c;
+  --popover-foreground: #f8fafc;
+  
+  /* Custom vibrant neon lime brand color for Dark Mode: #CEF84E */
+  --primary: #CEF84E;
+  --primary-foreground: #090a0f;
+  
+  --secondary: #1e2130;
+  --secondary-foreground: #f8fafc;
+  
+  --muted: #151824;
+  --muted-foreground: #94a3b8;
+  
+  --accent: #CEF84E;
+  --accent-foreground: #090a0f;
+  
+  --destructive: #ef4444;
+  --border: #1e2130;
+  --input: #1e2130;
+  --ring: #CEF84E;
+  
+  --sidebar: #0b0d14;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #CEF84E;
+  --sidebar-primary-foreground: #090a0f;
+  --sidebar-accent: #151824;
+  --sidebar-accent-foreground: #CEF84E;
+  --sidebar-border: #151824;
+  --sidebar-ring: #CEF84E;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html, body {
+    @apply h-full scroll-smooth;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* --- Dynamic UI & Premium Effects --- */
+
+/* Glowing border effect */
+.glow-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.glow-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  padding: 1px;
+  background: linear-gradient(to bottom right, rgba(206, 248, 78, 0.15), transparent, transparent, rgba(206, 248, 78, 0.05));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glow-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(206, 248, 78, 0.05);
+}
+
+/* Staggered lists & entries fade-up animation */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Stagger delays */
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 60ms; }
+.stagger-3 { animation-delay: 120ms; }
+.stagger-4 { animation-delay: 180ms; }
+.stagger-5 { animation-delay: 240ms; }
+.stagger-6 { animation-delay: 300ms; }
+
+/* Dynamic active nav sidebar item style */
+.nav-active-indicator {
+  position: relative;
+}
+.nav-active-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 50%;
+  border-radius: 0 4px 4px 0;
+  background: var(--primary);
+  box-shadow: 0 0 10px rgba(206, 248, 78, 0.5);
+}
+
+/* Press active button feedback */
+.active-press:active {
+  transform: scale(0.98);
+}
+
+/* Remove default dropdown arrow and any background SVGs across all modern and legacy browsers */
+select {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: none !important;
+}
+
+/* For Internet Explorer and older Edge */
+select::-ms-expand {
+  display: none !important;
+}
+
+/* Invoice preview mode — hide the top header bar for maximum canvas space */
+html.invoice-preview-active #admin-top-header {
+  display: none;
+}
+
