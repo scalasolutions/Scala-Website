@@ -155,6 +155,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const [zoomLevel, setZoomLevel] = useState(2);
   const [scale, setScale] = useState(1);
   const [currentPage, setCurrentPage] = useState(0);
+  const [preparedBy, setPreparedBy] = useState<'nicholas' | 'fredrick' | 'both'>('nicholas');
 
   const outerPagesRef = useRef<HTMLDivElement>(null);
 
@@ -336,45 +337,76 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             discountType={invoice.discountType}
             discountValue={invoice.discountValue}
           />
-          <InvoiceCoverPage {...sharedPageProps} pageNumber={2} />
+          <InvoiceCoverPage {...sharedPageProps} pageNumber={2} preparedBy={preparedBy} />
           <InvoiceTCPage1  {...sharedPageProps} pageNumber={3} />
           <InvoiceTCPage2  {...sharedPageProps} pageNumber={4} />
         </div>
       </div>
 
-      {/* ── Sticky page navigator ─────────────────────────────────
-          Floats at vertical bottom-right of the scroll container viewport.
-          Shows numbered pills; active page is highlighted.
-      ── */}
+      {/* ── Sticky right controls panel (Signature Selector & Page Navigator) ── */}
       <div
-        className="sticky bottom-6 self-end mr-5 z-20 print:hidden flex flex-col gap-1.5 bg-card border border-border rounded-2xl p-1.5 shadow-xl pointer-events-auto"
-        style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+        className="sticky bottom-6 self-end mr-[15px] z-20 print:hidden flex flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
       >
-        {PAGE_LABELS.map((label, i) => (
-          <button
-            key={i}
-            onClick={() => scrollToPage(i)}
-            title={`Go to ${label}`}
-            className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-all duration-200 cursor-pointer group ${
-              currentPage === i
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            }`}
-          >
-            {/* Page number badge */}
-            <span
-              className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 transition-all ${
+        {/* Prepared By Selector */}
+        <div 
+          className="group bg-card border border-border rounded-2xl p-3 shadow-xl flex flex-col gap-2 transition-all duration-300"
+          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+        >
+          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/80 pb-1 mb-0.5">
+            Prepared By
+          </span>
+          <div className="flex flex-col gap-0 group-hover:gap-1 transition-all duration-300">
+            {[
+              { id: 'nicholas', label: 'Nicholas' },
+              { id: 'fredrick', label: 'Fredrick' },
+              { id: 'both', label: 'Both' }
+            ].map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setPreparedBy(opt.id as any)}
+                className={`w-full px-2.5 rounded-lg text-left text-[10px] font-black transition-all duration-300 origin-top flex items-center ${
+                  preparedBy === opt.id
+                    ? 'bg-primary text-primary-foreground py-1.5 h-7 min-h-[28px]'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-7 group-hover:min-h-[28px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-1.5 group-hover:pointer-events-auto'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Page Navigator */}
+        <div
+          className="group bg-card border border-border rounded-2xl p-1.5 shadow-xl flex flex-col gap-0 group-hover:gap-1.5 transition-all duration-300"
+          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+        >
+          {PAGE_LABELS.map((label, i) => (
+            <button
+              key={i}
+              onClick={() => scrollToPage(i)}
+              title={`Go to ${label}`}
+              className={`flex items-center gap-2 px-2.5 rounded-xl text-left transition-all duration-300 group/nav ${
                 currentPage === i
-                  ? 'bg-white/20 text-primary-foreground'
-                  : 'bg-muted text-muted-foreground group-hover:text-foreground'
+                  ? 'bg-primary text-primary-foreground py-2 h-9 min-h-[36px]'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-9 group-hover:min-h-[36px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-2 group-hover:pointer-events-auto'
               }`}
             >
-              {i + 1}
-            </span>
-            {/* Label — only on wider screens */}
-            <span className="hidden lg:block text-[11px] font-bold pr-0.5">{label}</span>
-          </button>
-        ))}
+              {/* Page number badge */}
+              <span
+                className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 transition-all ${
+                  currentPage === i
+                    ? 'bg-white/20 text-primary-foreground'
+                    : 'bg-muted text-muted-foreground group-hover/nav:text-foreground'
+                }`}
+              >
+                {i + 1}
+              </span>
+              {/* Label — only on wider screens */}
+              <span className="hidden lg:block text-[11px] font-bold pr-0.5">{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
