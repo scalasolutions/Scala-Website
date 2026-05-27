@@ -288,3 +288,213 @@ html.invoice-preview-active #admin-top-header {
   display: none;
 }
 
+/* Typewriter cursor blink — hard on/off, not a fade, so it reads as a caret. */
+@keyframes cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cursor-blink {
+  animation: cursor-blink 1s steps(1, end) infinite;
+}
+
+/* Lime glow for headline accent text — soft halo plus a tighter inner glow.
+   Tuned light so the lime reads as a confident accent, not a beacon. */
+.text-glow-lime {
+  text-shadow:
+    0 0 12px rgba(206, 248, 78, 0.22),
+    0 0 32px rgba(206, 248, 78, 0.13);
+}
+html.dark .text-glow-lime {
+  text-shadow:
+    0 0 14px rgba(206, 248, 78, 0.26),
+    0 0 40px rgba(206, 248, 78, 0.15);
+}
+
+/* --- Marquee (infinite horizontal scroll) ---
+   Used for the "trusted by" logo strip. Track is duplicated in JSX so the
+   loop is seamless. Pauses on hover for accessibility. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 38s linear infinite;
+}
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 8%,
+    #000 92%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 8%,
+    #000 92%,
+    transparent 100%
+  );
+}
+.marquee-track:hover { animation-play-state: paused; }
+
+/* --- Scroll reveal ---
+   Element starts hidden + offset; `.in-view` (toggled via IntersectionObserver
+   in `useReveal`) animates to its resting state. Falls back to visible if JS
+   never runs. */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* --- Animated grid pattern ---
+   Subtle dot/line grid used as a hero background — sized in vmin so it scales
+   with the viewport. Layered with the lime glow above. */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--foreground) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 6%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+.bg-grid-mask {
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 80%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 80%);
+}
+
+/* --- Cursor spotlight ---
+   The hero canvas reads `--mx` / `--my` (pixel offsets) and `--mo` (0..1 opacity)
+   set by MouseSpotlight. We render a radial gradient at the cursor — strong
+   enough to feel responsive, subtle enough to keep the brand calm. */
+.spotlight {
+  background: radial-gradient(
+    400px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(206, 248, 78, calc(0.18 * var(--mo, 0))),
+    transparent 60%
+  );
+  transition: background 60ms linear;
+}
+
+/* --- Tilt-on-hover card lift ---
+   Subtle lift + lime border highlight; used on the bento "what we do" tiles. */
+.lift-card {
+  position: relative;
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 300ms ease-out, border-color 300ms ease-out;
+}
+.lift-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  box-shadow: 0 18px 50px -20px rgba(206, 248, 78, 0.22);
+}
+
+/* --- Accordion smoothing ---
+   `<details>` has no built-in transition; we animate the open state's content
+   with a fade-down so it doesn't pop. */
+@keyframes accordion-down {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+details[open] > .accordion-body {
+  animation: accordion-down 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
+details[open] > summary .accordion-chev {
+  transform: rotate(45deg);
+}
+.accordion-chev {
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- Auto-floating decorative blob ---
+   A slow vertical drift; used for the hero floating "stat card" accent. */
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+.float-y { animation: float-y 5.5s ease-in-out infinite; }
+
+/* --- Carousel slide fade ---
+   Each testimonial swap is a soft cross-fade rather than a hard cut. */
+@keyframes fade-soft {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-soft { animation: fade-soft 400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* --- Process step graphics ------------------------------------------------
+   The three "How we work" cards each have a bespoke SVG/HTML illustration
+   that reflects the step. Animations run continuously so a user can land on
+   any card and immediately see motion; the parent fades the graphic down
+   when its step is not active. */
+
+/* Discover — radar / sonar */
+@keyframes radar-pulse {
+  0%   { transform: scale(0.3); opacity: 0.9; }
+  80%  { opacity: 0; }
+  100% { transform: scale(4); opacity: 0; }
+}
+.radar-pulse {
+  transform-origin: 100px 100px;
+  transform-box: fill-box;
+  animation: radar-pulse 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.radar-sweep { animation: radar-sweep 4.5s linear infinite; }
+
+@keyframes radar-blip {
+  0%, 60%, 100% { opacity: 0; transform: scale(0.4); }
+  68%, 85%      { opacity: 1; transform: scale(1.4); filter: drop-shadow(0 0 6px #CEF84E); }
+}
+.radar-blip {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: radar-blip 4.5s ease-in-out infinite;
+}
+
+/* Build — modular tiles assembling */
+@keyframes build-tile-in {
+  0%, 4%   { opacity: 0; transform: scale(0.7) translateY(10px); }
+  12%, 88% { opacity: 1; transform: scale(1) translateY(0); }
+  96%, 100%{ opacity: 0; transform: scale(0.7) translateY(10px); }
+}
+.build-tile {
+  transform-origin: center;
+  animation: build-tile-in 7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+/* Launch — trajectory trail and twinkling stars */
+@keyframes launch-trail-draw {
+  0%       { stroke-dashoffset: 200; opacity: 0; }
+  10%, 80% { opacity: 1; }
+  80%      { stroke-dashoffset: 0; }
+  100%     { stroke-dashoffset: -200; opacity: 0; }
+}
+.launch-trail {
+  stroke-dasharray: 200;
+  animation: launch-trail-draw 6s ease-in-out infinite;
+}
+@keyframes launch-star {
+  0%, 100% { opacity: 0.25; transform: scale(0.7); }
+  50%      { opacity: 1; transform: scale(1.2); }
+}
+.launch-star {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: launch-star 2.4s ease-in-out infinite;
+}
