@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
@@ -25,6 +25,7 @@ import {
   Sparkles,
   Save,
   FileText,
+  ChevronDown,
 } from 'lucide-react';
 import {
   getInvoiceLinePresets,
@@ -37,6 +38,20 @@ import {
   MockInvoiceLinePreset,
   MockInvoicePagePreset,
 } from '@/lib/db/queries';
+import {
+  type InvoiceLinePresetCategory,
+  INVOICE_LINE_PRESET_CATEGORY_LABELS,
+  INVOICE_LINE_PRESET_CATEGORY_ORDER,
+} from '@/lib/invoice-preset-categories';
+import PageHeader from '@/components/ui/PageHeader';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Textarea from '@/components/ui/Textarea';
+import EmptyState from '@/components/ui/EmptyState';
+import ActionMenu from '@/components/ui/ActionMenu';
+import { cn, TABLE_ROW_HOVER } from '@/lib/utils';
 
 export default function InvoicesPresetsPage() {
   const [mounted, setMounted] = useState(false);
@@ -59,6 +74,14 @@ export default function InvoicesPresetsPage() {
   const [lineName, setLineName] = useState('');
   const [linePrice, setLinePrice] = useState<number>(0);
   const [lineDescription, setLineDescription] = useState('');
+  const [lineCategory, setLineCategory] = useState<InvoiceLinePresetCategory>('uncategorized');
+
+  // Collapsed-state tracking for category groups + per-preset detail panels.
+  // Categories default collapsed; expanded set is seeded below once data loads
+  // (first non-empty category opens automatically so the page isn't blank).
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [expandedPresets, setExpandedPresets] = useState<Set<string>>(new Set());
+  const initialOpenCategoryRef = useRef(false);
 
   // Modal forms for custom page
   const [pageModalOpen, setPageModalOpen] = useState(false);
@@ -158,6 +181,56 @@ export default function InvoicesPresetsPage() {
       setEditorHtml('');
     }
   }, [activeTab, pagePresets]);
+
+  // Bucket presets by category, preserving the canonical render order.
+  // DB-backed rows that predate the category column are treated as
+  // 'uncategorized' so they still surface in the catalog.
+  const presetsByCategory = useMemo(() => {
+    const buckets = new Map<InvoiceLinePresetCategory, MockInvoiceLinePreset[]>();
+    for (const cat of INVOICE_LINE_PRESET_CATEGORY_ORDER) {
+      buckets.set(cat, []);
+    }
+    for (const preset of linePresets) {
+      const cat = (preset.category ?? 'uncategorized') as InvoiceLinePresetCategory;
+      const bucket = buckets.get(cat) ?? buckets.get('uncategorized')!;
+      bucket.push(preset);
+    }
+    return buckets;
+  }, [linePresets]);
+
+  // Seed the collapsed-categories set once the first batch loads so every
+  // category is closed except the first one with presets in it.
+  useEffect(() => {
+    if (initialOpenCategoryRef.current) return;
+    if (linePresets.length === 0) return;
+
+    const firstWithItems = INVOICE_LINE_PRESET_CATEGORY_ORDER.find(
+      cat => (presetsByCategory.get(cat)?.length ?? 0) > 0
+    );
+    const collapsed = new Set<string>(
+      INVOICE_LINE_PRESET_CATEGORY_ORDER.filter(cat => cat !== firstWithItems)
+    );
+    setCollapsedCategories(collapsed);
+    initialOpenCategoryRef.current = true;
+  }, [linePresets, presetsByCategory]);
+
+  const toggleCategory = (cat: InvoiceLinePresetCategory) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const togglePreset = (id: string) => {
+    setExpandedPresets(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Handle click outside to close Context Menu
   useEffect(() => {
@@ -351,14 +424,19 @@ export default function InvoicesPresetsPage() {
           price: linePrice,
           description: lineDescription,
         });
-        setLinePresets(prev => [newPreset as MockInvoiceLinePreset, ...prev]);
+        // TODO: persist `category` server-side once the schema migration lands.
+        // For now we attach it locally so the UI can group correctly.
+        const patched = { ...(newPreset as MockInvoiceLinePreset), category: lineCategory };
+        setLinePresets(prev => [patched, ...prev]);
       } else if (modalMode === 'edit' && selectedLinePreset) {
         const updated = await updateInvoiceLinePreset(selectedLinePreset.id, {
           name: lineName,
           price: linePrice,
           description: lineDescription,
         });
-        setLinePresets(prev => prev.map(p => (p.id === selectedLinePreset.id ? (updated as MockInvoiceLinePreset) : p)));
+        // TODO: persist `category` server-side once the schema migration lands.
+        const patched = { ...(updated as MockInvoiceLinePreset), category: lineCategory };
+        setLinePresets(prev => prev.map(p => (p.id === selectedLinePreset.id ? patched : p)));
       }
       setModalOpen(false);
       resetForm();
@@ -389,6 +467,7 @@ export default function InvoicesPresetsPage() {
     setLineName(preset.name);
     setLinePrice(preset.price);
     setLineDescription(preset.description || '');
+    setLineCategory((preset.category ?? 'uncategorized') as InvoiceLinePresetCategory);
     setModalOpen(true);
   };
 
@@ -396,6 +475,7 @@ export default function InvoicesPresetsPage() {
     setLineName('');
     setLinePrice(0);
     setLineDescription('');
+    setLineCategory('uncategorized');
     setSelectedLinePreset(null);
   };
 
@@ -430,52 +510,49 @@ export default function InvoicesPresetsPage() {
     setRenameModalOpen(true);
   };
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* ── Header with Back link ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/admin/invoices"
-            className="flex items-center justify-center h-10 w-10 rounded-xl bg-card border border-border hover:bg-muted text-foreground transition-all duration-200 active-press"
-          >
-            <ArrowLeft size={16} />
-          </Link>
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
-              Invoices presets <Sliders size={20} className="text-primary" />
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configure standard service modules and construct custom document pages. (Right-click tabs to edit/rename).
-            </p>
-          </div>
-        </div>
-
-        {/* Saved status notification */}
-        {saveStatus === 'saved' && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold animate-fade-in">
-            <Check size={14} />
-            All changes saved to cloud
-          </div>
-        )}
-        {saveStatus === 'error' && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-semibold animate-fade-in">
-            <X size={14} />
-            Failed to save changes
-          </div>
-        )}
+  // Toast-style save indicator lives in PageHeader actions. Keep the same
+  // semantic states (saved / error / idle) so the existing save flow drives it.
+  const saveIndicator =
+    saveStatus === 'saved' ? (
+      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary/15 text-foreground border border-primary/30 text-xs font-medium animate-fade-in">
+        <Check size={14} />
+        All changes saved
       </div>
+    ) : saveStatus === 'error' ? (
+      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-medium animate-fade-in">
+        <X size={14} />
+        Failed to save
+      </div>
+    ) : null;
+
+  return (
+    <div className="max-w-6xl mx-auto pb-12">
+      {/* Breadcrumb-style back link (above the page header, not beside the title) */}
+      <Link
+        href="/admin/invoices"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
+      >
+        <ArrowLeft size={12} />
+        Back to invoices
+      </Link>
+
+      <PageHeader
+        title="Invoice presets"
+        description="Configure standard service modules and construct custom document pages."
+        actions={saveIndicator ?? undefined}
+      />
 
       {/* ── Tabs container with Dynamic Pages catalog + add custom page ── */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+      <div className="flex flex-wrap items-center gap-1 border-b border-border">
         {/* Line presets */}
         <button
           onClick={() => setActiveTab('lines')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={cn(
+            'relative px-3 py-2.5 -mb-px text-sm font-medium transition-colors cursor-pointer border-b-2',
             activeTab === 'lines'
-              ? 'bg-primary text-primary-foreground shadow-md'
-              : 'bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground'
-          }`}
+              ? 'text-foreground border-primary'
+              : 'text-muted-foreground hover:text-foreground border-transparent'
+          )}
         >
           Line Item Presets
         </button>
@@ -486,25 +563,36 @@ export default function InvoicesPresetsPage() {
             key={preset.pageKey}
             onClick={() => setActiveTab(preset.pageKey)}
             onContextMenu={(e) => handleTabContextMenu(e, preset.pageKey)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer capitalize select-none ${
+            className={cn(
+              'relative px-3 py-2.5 -mb-px text-sm font-medium transition-colors cursor-pointer capitalize select-none border-b-2',
               activeTab === preset.pageKey
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
+                ? 'text-foreground border-primary'
+                : 'text-muted-foreground hover:text-foreground border-transparent'
+            )}
           >
             {getPageTabLabel(preset.pageKey)}
           </button>
         ))}
 
-        {/* Create new custom page trigger */}
-        <button
+        {/* Spacer pushes the create trigger to the right */}
+        <div className="flex-1" />
+
+        {/* Create new custom page trigger — ghost button, dashed border, not loud */}
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setPageModalOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-dashed border-primary/40 hover:border-primary bg-primary/5 hover:bg-primary/10 text-primary text-xs font-bold transition-all cursor-pointer select-none"
+          leftIcon={<Plus size={14} />}
+          className="border border-dashed border-border hover:border-foreground/30 mb-1.5"
         >
-          <Plus size={13} />
           Create Custom Page
-        </button>
+        </Button>
       </div>
+
+      {/* Tab hint relocated from the page title — contextual to the tabs row itself */}
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Right-click any custom page tab to rename or delete it.
+      </p>
 
       {/* ── Floating Context Menu Overlay ── */}
       {mounted && contextMenu?.visible && createPortal(
@@ -544,77 +632,183 @@ export default function InvoicesPresetsPage() {
 
       {/* ── Main Tabbed views ── */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 space-y-3">
+        <div className="mt-10 flex flex-col items-center justify-center py-24 space-y-3">
           <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-          <span className="text-xs text-muted-foreground font-semibold">Loading presets...</span>
+          <span className="text-xs text-muted-foreground font-medium">Loading presets...</span>
         </div>
       ) : (
-        <div className="animate-fade-up">
+        <div className="animate-fade-up mt-8">
           {/* TAB 1: LINE ITEM PRESETS */}
           {activeTab === 'lines' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center bg-card border border-border p-4 rounded-2xl shadow-sm">
+            <div className="space-y-8">
+              {/* Catalog header — type-driven, no surface */}
+              <div className="flex items-end justify-between gap-4">
                 <div>
-                  <h3 className="text-sm font-bold">Standard Services Catalog</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                    Standard services catalog
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
                     Predefined services that appear as autofill options inside your invoice editor.
                   </p>
                 </div>
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Plus size={14} />}
                   onClick={openCreateModal}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:opacity-90 active-press transition-all duration-200 cursor-pointer"
                 >
-                  <Plus size={14} />
-                  Add Preset
-                </button>
+                  Add preset
+                </Button>
               </div>
 
               {linePresets.length === 0 ? (
-                <div className="text-center py-16 border border-dashed border-border rounded-3xl bg-card/30">
-                  <Sliders size={32} className="mx-auto text-muted-foreground/60 mb-3" />
-                  <h4 className="text-sm font-bold text-foreground">No presets created</h4>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                    Create your first preset to speed up your invoicing billing cycles.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {linePresets.map(preset => (
-                    <div
-                      key={preset.id}
-                      className="bg-card border border-border hover:border-primary/45 rounded-2xl p-5 shadow-sm transition-all flex flex-col justify-between group"
+                <EmptyState
+                  icon={<Sliders size={20} />}
+                  title="No presets yet"
+                  description="Create your first preset to speed up your invoicing billing cycles."
+                  action={
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      leftIcon={<Plus size={14} />}
+                      onClick={openCreateModal}
                     >
-                      <div>
-                        <div className="flex justify-between items-start gap-4">
-                          <h4 className="font-extrabold text-sm text-foreground group-hover:text-primary transition-colors">
-                            {preset.name}
-                          </h4>
-                          <span className="text-xs font-black text-primary shrink-0 bg-primary/10 px-2.5 py-1 rounded-lg">
-                            Rp {formatNumberIDR(preset.price)}
+                      Add preset
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="space-y-4">
+                  {INVOICE_LINE_PRESET_CATEGORY_ORDER.map(category => {
+                    const items = presetsByCategory.get(category) ?? [];
+                    if (items.length === 0) return null;
+                    const isCollapsed = collapsedCategories.has(category);
+                    return (
+                      <section
+                        key={category}
+                        className="rounded-2xl border border-border bg-card overflow-hidden"
+                      >
+                        {/* Category header — clickable to collapse the whole table.
+                            When expanded, a soft tinted strip visually fuses the
+                            header with the table beneath it. */}
+                        <button
+                          type="button"
+                          onClick={() => toggleCategory(category)}
+                          className={cn(
+                            'group w-full flex items-center gap-3 px-5 py-3.5 text-left cursor-pointer transition-colors',
+                            isCollapsed
+                              ? 'hover:bg-muted/20'
+                              : 'bg-muted/30 border-b border-border'
+                          )}
+                        >
+                          <h3 className="text-sm font-semibold text-foreground">
+                            {INVOICE_LINE_PRESET_CATEGORY_LABELS[category]}
+                          </h3>
+                          <Badge variant="neutral">{items.length}</Badge>
+                          <span className="flex-1" />
+                          <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                            {isCollapsed ? 'Show' : 'Hide'}
                           </span>
-                        </div>
-                        {preset.description && (
-                          <div className="mt-3 text-xs text-muted-foreground leading-relaxed whitespace-pre-line border-t border-border/60 pt-3">
-                            {preset.description}
+                          <ChevronDown
+                            size={16}
+                            className={cn(
+                              'text-muted-foreground transition-transform duration-200 group-hover:text-foreground',
+                              isCollapsed && '-rotate-90'
+                            )}
+                          />
+                        </button>
+
+                        {/* Category table */}
+                        {!isCollapsed && (
+                          <div className="overflow-x-auto animate-fade-in">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="text-[11px] text-muted-foreground font-medium border-b border-border align-bottom">
+                                  <th className="w-10 pl-5 pr-2 py-2.5"></th>
+                                  <th className="text-left py-2.5 pr-4 font-medium">Service</th>
+                                  <th className="text-right py-2.5 pr-4 font-medium hidden md:table-cell">Price (IDR)</th>
+                                  <th className="w-10 py-2.5 pr-4"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {items.map((preset, idx) => {
+                                  const isOpen = expandedPresets.has(preset.id);
+                                  const isLast = idx === items.length - 1;
+                                  return (
+                                    <React.Fragment key={preset.id}>
+                                      <tr
+                                        onClick={() => togglePreset(preset.id)}
+                                        className={cn(
+                                          'cursor-pointer transition-colors group/row',
+                                          !isLast && 'border-b border-border/50',
+                                          'hover:bg-muted/40'
+                                        )}
+                                      >
+                                        <td className="pl-5 pr-2 py-3.5 align-middle">
+                                          <ChevronDown
+                                            size={14}
+                                            className={cn(
+                                              'text-muted-foreground transition-transform duration-200 group-hover/row:text-foreground',
+                                              !isOpen && '-rotate-90'
+                                            )}
+                                          />
+                                        </td>
+                                        <td className="py-3.5 pr-4 align-middle">
+                                          <span className="text-sm font-medium text-foreground">
+                                            {preset.name}
+                                          </span>
+                                          <span className="ml-3 md:hidden text-xs text-muted-foreground tabular-nums">
+                                            Rp {formatNumberIDR(preset.price)}
+                                          </span>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 pr-4 text-right align-middle text-sm text-foreground tabular-nums">
+                                          Rp {formatNumberIDR(preset.price)}
+                                        </td>
+                                        <td
+                                          className="py-3.5 pr-4 align-middle text-right"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <ActionMenu
+                                            ariaLabel="Preset actions"
+                                            items={[
+                                              {
+                                                key: 'edit',
+                                                label: 'Edit preset',
+                                                icon: <Edit2 size={14} />,
+                                                onSelect: () => openEditModal(preset),
+                                              },
+                                              {
+                                                key: 'delete',
+                                                label: 'Delete preset',
+                                                icon: <Trash2 size={14} />,
+                                                destructive: true,
+                                                onSelect: () => handleDeleteLine(preset.id),
+                                              },
+                                            ]}
+                                          />
+                                        </td>
+                                      </tr>
+                                      {isOpen && (
+                                        <tr className={cn(!isLast && 'border-b border-border/50')}>
+                                          <td colSpan={4} className="bg-muted/20 pt-3 pb-5">
+                                            <div className="mx-5 border-l-2 border-primary pl-4 py-1 text-[13px] leading-relaxed text-muted-foreground whitespace-pre-line max-w-prose">
+                                              {preset.description?.trim()
+                                                ? preset.description
+                                                : 'No description provided.'}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
                         )}
-                      </div>
-                      <div className="flex justify-end gap-2 mt-4 border-t border-border/40 pt-3">
-                        <button
-                          onClick={() => openEditModal(preset)}
-                          className="p-2 rounded-xl border border-border hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteLine(preset.id)}
-                          className="p-2 rounded-xl border border-border bg-red-500/5 hover:bg-red-500/10 text-red-400 hover:text-red-300 cursor-pointer border-red-500/10 hover:border-red-500/20 transition-colors"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                      </section>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -865,61 +1059,60 @@ export default function InvoicesPresetsPage() {
             </div>
 
             <form onSubmit={handleCreateOrUpdateLine} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                  Preset Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Starter Company Profile Package"
-                  value={lineName}
-                  onChange={e => setLineName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-primary/45 focus:outline-none text-sm text-foreground font-semibold"
-                />
-              </div>
+              <Input
+                label="Preset name"
+                required
+                placeholder="e.g. Starter Company Profile Package"
+                value={lineName}
+                onChange={e => setLineName(e.target.value)}
+              />
 
-              <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                  Standard Price (Rate in IDR) *
-                </label>
-                <input
-                  type="text"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select
+                  label="Category"
+                  value={lineCategory}
+                  onChange={e => setLineCategory(e.target.value as InvoiceLinePresetCategory)}
+                >
+                  {INVOICE_LINE_PRESET_CATEGORY_ORDER.map(cat => (
+                    <option key={cat} value={cat}>
+                      {INVOICE_LINE_PRESET_CATEGORY_LABELS[cat]}
+                    </option>
+                  ))}
+                </Select>
+
+                <Input
+                  label="Standard price (IDR)"
                   required
+                  inputMode="numeric"
                   value={formatNumberIDR(linePrice)}
                   onChange={e => setLinePrice(parseNumber(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-primary/45 focus:outline-none text-sm text-foreground font-extrabold text-primary"
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                  Preset Sub-features / Description (One per line)
-                </label>
-                <textarea
-                  placeholder="Landing Page, Up to 10 Pages&#10;Mobile Responsive&#10;Custom UI/UX Designs & Animations"
-                  value={lineDescription}
-                  onChange={e => setLineDescription(e.target.value)}
-                  rows={5}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-primary/45 focus:outline-none text-sm text-foreground leading-relaxed"
-                />
-              </div>
+              <Textarea
+                label="Sub-features / description (one per line)"
+                placeholder="Landing Page, Up to 10 Pages&#10;Mobile Responsive&#10;Custom UI/UX Designs & Animations"
+                value={lineDescription}
+                onChange={e => setLineDescription(e.target.value)}
+                rows={5}
+              />
 
               <div className="flex justify-end gap-2 border-t border-border pt-4 mt-2">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-border hover:bg-muted text-xs font-bold transition-all cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:opacity-90 transition-all cursor-pointer shadow-md"
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Check size={14} />}
                 >
-                  <Check size={14} />
                   {modalMode === 'create' ? 'Create' : 'Save'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -948,38 +1141,31 @@ export default function InvoicesPresetsPage() {
             </div>
 
             <form onSubmit={handleCreatePagePreset} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                  Page Title * (e.g. Service SLA, Scope details)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Service Level Agreement"
-                  value={newPageTitle}
-                  onChange={e => setNewPageTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-primary/45 focus:outline-none text-sm text-foreground font-semibold"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
-                  Creating this will automatically generate a dynamic text tab sheet. You will be able to include or exclude this page on each invoice individually.
-                </p>
-              </div>
+              <Input
+                label="Page title (e.g. Service SLA, Scope details)"
+                required
+                placeholder="e.g. Service Level Agreement"
+                value={newPageTitle}
+                onChange={e => setNewPageTitle(e.target.value)}
+                hint="Creating this generates a dynamic text tab sheet. You can include or exclude this page on each invoice individually."
+              />
 
               <div className="flex justify-end gap-2 border-t border-border pt-4 mt-2">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setPageModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-border hover:bg-muted text-xs font-bold transition-all cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:opacity-90 transition-all cursor-pointer shadow-md"
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Check size={14} />}
                 >
-                  <Check size={14} />
-                  Create Page
-                </button>
+                  Create page
+                </Button>
               </div>
             </form>
           </div>
@@ -1008,35 +1194,30 @@ export default function InvoicesPresetsPage() {
             </div>
 
             <form onSubmit={handleRenamePagePreset} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                  Page Name * (e.g. Terms of Work)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Terms of Work"
-                  value={renameTitle}
-                  onChange={e => setRenameTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border focus:border-primary/45 focus:outline-none text-sm text-foreground font-semibold"
-                />
-              </div>
+              <Input
+                label="Page name (e.g. Terms of Work)"
+                required
+                placeholder="e.g. Terms of Work"
+                value={renameTitle}
+                onChange={e => setRenameTitle(e.target.value)}
+              />
 
               <div className="flex justify-end gap-2 border-t border-border pt-4 mt-2">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setRenameModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-border hover:bg-muted text-xs font-bold transition-all cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:opacity-90 transition-all cursor-pointer shadow-md"
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Check size={14} />}
                 >
-                  <Check size={14} />
-                  Rename Page
-                </button>
+                  Rename page
+                </Button>
               </div>
             </form>
           </div>

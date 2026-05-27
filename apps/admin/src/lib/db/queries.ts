@@ -1053,11 +1053,14 @@ export async function createPayout(data: schema.NewPayout) {
 // --- INVOICE PRESETS ---
 // ============================================================================
 
+import type { InvoiceLinePresetCategory } from '../invoice-preset-categories';
+
 export interface MockInvoiceLinePreset {
   id: string;
   name: string;
   description: string;
   price: number;
+  category: InvoiceLinePresetCategory;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1070,39 +1073,282 @@ export interface MockInvoicePagePreset {
   updatedAt: Date;
 }
 
+// Seeded service catalog grouped by category. Prices use the lower bound of
+// the quoted range; the description carries the published range for context.
+const now = new Date();
 let mockInvoiceLinePresets: MockInvoiceLinePreset[] = [
+  // ── Website Solutions ──
   {
-    id: 'lp1',
-    name: 'Starter Company Profile Package',
-    description: 'Landing Page, Up to 10 Pages\nMobile Responsive\nCustom UI/UX Designs & Animations\nSEO Optimization',
-    price: 5500000,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    id: 'lp_web_starter',
+    name: 'Starter Presence Website',
+    description:
+      'Range: Rp 5jt – 8jt\nTemplate-based website for businesses needing a professional online presence.\n\nIncludes:\n• Up to 5 pages\n• Mobile responsive\n• WhatsApp integration\n• Basic SEO\n• Contact form\n• Fast loading optimization\n\nRevisions: 1 Major, 2 Minor',
+    price: 5000000,
+    category: 'website',
+    createdAt: now,
+    updatedAt: now,
   },
   {
-    id: 'lp2',
-    name: 'Basic Maintenance',
-    description: 'Dependency & Stability checks\nPerformance checks\nBug & Critical Issue fixes\nSEO Optimality checks',
-    price: 1500000,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    id: 'lp_web_business',
+    name: 'Business Website',
+    description:
+      'Range: Rp 10jt – 18jt\nCustom-designed website tailored to your business and customer experience.\n\nIncludes:\n• Up to 10 pages\n• Custom UI design\n• CMS integration\n• SEO structure\n• Analytics integration\n• Better animations & interactions\n\nRevisions: 2 Major, 4 Minor',
+    price: 10000000,
+    category: 'website',
+    createdAt: now,
+    updatedAt: now,
   },
   {
-    id: 'lp3',
-    name: 'Starter E-Commerce Package',
-    description: 'Custom Storefront UI\nShopping Cart & Checkout\nMidtrans Payment Gateway Integration\nProduct Inventory Management Dashboard',
+    id: 'lp_web_premium',
+    name: 'Premium Digital Experience',
+    description:
+      'Range: Rp 20jt – 45jt+\nFully custom digital brand experience focused on premium positioning and conversion.\n\nIncludes:\n• Fully custom UI/UX\n• Premium interactions\n• Landing page systems\n• Advanced CMS\n• Conversion-focused UX\n• Performance optimization\n\nRevisions: 3 Major, 6 Minor',
+    price: 20000000,
+    category: 'website',
+    createdAt: now,
+    updatedAt: now,
+  },
+
+  // ── E-Commerce Solutions ──
+  {
+    id: 'lp_ecom_catalog',
+    name: 'Catalog Commerce Store',
+    description:
+      'Range: Rp 12jt – 20jt\nPlatform options: Shopify, WooCommerce, Custom Storefront.\n\nIncludes:\n• Product catalog system\n• Product categories & filters\n• Product management dashboard\n• WhatsApp checkout\n• Basic inventory tracking\n• SEO-friendly structure\n\nRevisions: 2 Major, 3 Minor',
     price: 12000000,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    category: 'ecommerce',
+    createdAt: now,
+    updatedAt: now,
   },
   {
-    id: 'lp4',
-    name: 'Custom Web Application development',
-    description: 'Next.js & Drizzle ORM stack\nCustom REST or GraphQL API\nRole-based access control\nFully responsive dashboard interface',
+    id: 'lp_ecom_full',
+    name: 'Full E-Commerce Platform',
+    description:
+      'Range: Rp 25jt – 50jt\nPlatform options: Shopify, WooCommerce, Fully Custom Platform.\n\nIncludes:\n• Full online checkout\n• Payment gateway integration\n• Shipping integration\n• Customer accounts\n• Inventory management\n• Order dashboard\n• Analytics dashboard\n\nRevisions: 3 Major, 5 Minor',
     price: 25000000,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
+    category: 'ecommerce',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_ecom_ecosystem',
+    name: 'Commerce Ecosystem Platform',
+    description:
+      'Range: Rp 60jt – 150jt+\nEnterprise commerce build with deep integrations.\n\nIncludes:\n• Membership systems\n• Loyalty systems\n• ERP/CRM integration\n• Warehouse integration\n• Automation workflows\n• Advanced analytics\n• Scalable architecture\n\nRevisions: Custom project agreement.',
+    price: 60000000,
+    category: 'ecommerce',
+    createdAt: now,
+    updatedAt: now,
+  },
+
+  // ── Business Systems ──
+  {
+    id: 'lp_biz_admin_basic',
+    name: 'Basic Admin Dashboard',
+    description:
+      'Range: Rp 6jt – 12jt\n\nIncludes:\n• Admin login\n• CRUD system\n• Basic analytics\n• Role access',
+    price: 6000000,
+    category: 'business_systems',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_biz_ops_dashboard',
+    name: 'Operational Dashboard System',
+    description:
+      'Range: Rp 15jt – 35jt\n\nIncludes:\n• Inventory management\n• Customer management\n• Reporting system\n• Notifications\n• Export system',
+    price: 15000000,
+    category: 'business_systems',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_biz_erp',
+    name: 'Custom Business System / ERP',
+    description:
+      'Range: Rp 50jt – 250jt+\n\nIncludes:\n• ERP systems\n• CRM systems\n• Operational workflows\n• Warehouse systems\n• Automation systems',
+    price: 50000000,
+    category: 'business_systems',
+    createdAt: now,
+    updatedAt: now,
+  },
+
+  // ── CRM Solutions ──
+  {
+    id: 'lp_crm_lite',
+    name: 'CRM Lite',
+    description:
+      'Range: Rp 12jt – 20jt\n\nIncludes:\n• Lead tracking\n• Kanban pipelines\n• Customer database\n• WhatsApp integration',
+    price: 12000000,
+    category: 'crm',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_crm_pro',
+    name: 'CRM Pro',
+    description:
+      'Range: Rp 25jt – 60jt\n\nIncludes:\n• Automation\n• Sales analytics\n• Team management\n• Reporting dashboard\n• Integrations',
+    price: 25000000,
+    category: 'crm',
+    createdAt: now,
+    updatedAt: now,
+  },
+
+  // ── Growth & Marketing ──
+  {
+    id: 'lp_growth_seo_setup',
+    name: 'SEO Foundation Setup',
+    description: 'Range: Rp 2jt – 5jt (one-time setup).',
+    price: 2000000,
+    category: 'growth',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_growth_seo_monthly',
+    name: 'Monthly SEO Growth',
+    description: 'Range: Rp 2jt – 15jt / month.',
+    price: 2000000,
+    category: 'growth',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_growth_newsletter_setup',
+    name: 'Newsletter & Email Marketing Setup',
+    description: 'Range: Rp 2jt – 5jt (one-time setup).',
+    price: 2000000,
+    category: 'growth',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_growth_email_monthly',
+    name: 'Monthly Email Marketing',
+    description: 'Range: Rp 1jt – 10jt / month.',
+    price: 1000000,
+    category: 'growth',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_growth_product_upload',
+    name: 'Product Upload Service',
+    description: 'Rp 5.000 per SKU.',
+    price: 5000,
+    category: 'growth',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_growth_seo_article',
+    name: 'SEO Article Writing',
+    description: 'Rp 300.000 per article.',
+    price: 300000,
+    category: 'growth',
+    createdAt: now,
+    updatedAt: now,
+  },
+
+  // ── AI & Automation ──
+  {
+    id: 'lp_ai_chatbot',
+    name: 'AI Chatbot Setup',
+    description: 'Range: Rp 8jt – 25jt.',
+    price: 8000000,
+    category: 'ai_automation',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_ai_whatsapp',
+    name: 'WhatsApp Automation',
+    description: 'Range: Rp 3jt – 20jt.',
+    price: 3000000,
+    category: 'ai_automation',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_ai_support',
+    name: 'AI Customer Support System',
+    description: 'Range: Rp 25jt – 100jt+.',
+    price: 25000000,
+    category: 'ai_automation',
+    createdAt: now,
+    updatedAt: now,
+  },
+
+  // ── Infrastructure & Security ──
+  {
+    id: 'lp_infra_hosting',
+    name: 'Managed Hosting',
+    description: 'Range: Rp 300k – 3jt / month.',
+    price: 300000,
+    category: 'infrastructure',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_infra_email',
+    name: 'Business Email',
+    description: 'Rp 20k – 100k per user / month.',
+    price: 20000,
+    category: 'infrastructure',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_infra_storage',
+    name: 'Cloud Storage',
+    description: 'Usage-based billing.',
+    price: 0,
+    category: 'infrastructure',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_infra_security',
+    name: 'Security & 2FA Setup',
+    description: 'Range: Rp 1.5jt – 5jt.',
+    price: 1500000,
+    category: 'infrastructure',
+    createdAt: now,
+    updatedAt: now,
+  },
+
+  // ── Ongoing Digital Support ──
+  {
+    id: 'lp_support_essential',
+    name: 'Essential Care',
+    description:
+      'Range: Rp 500k – 1jt / month.\n\nIncludes:\n• Security updates\n• Backups\n• Bug fixes\n• Uptime monitoring\n• Minor edits',
+    price: 500000,
+    category: 'support',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_support_growth',
+    name: 'Growth Support',
+    description:
+      'Range: Rp 1.5jt – 4jt / month.\n\nIncludes:\n• Everything in Essential\n• Monthly updates\n• SEO improvements\n• Performance optimization\n• Technical consultation',
+    price: 1500000,
+    category: 'support',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'lp_support_partnership',
+    name: 'Digital Partnership',
+    description:
+      'Range: Rp 5jt – 15jt / month.\n\nIncludes:\n• Priority support\n• Landing page additions\n• Continuous improvements\n• Optimization reviews\n• Strategy consultation\n• Long-term digital support',
+    price: 5000000,
+    category: 'support',
+    createdAt: now,
+    updatedAt: now,
+  },
 ];
 
 let mockInvoicePagePresets: MockInvoicePagePreset[] = [

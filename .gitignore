@@ -20,10 +20,15 @@ dist/
 # Misc / System
 .DS_Store
 *.pem
-.env*
+.env
+.env.*
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code local config, agents, and transcripts
+.claude/
+**/.claude/
 
 # Logs
 npm-debug.log*

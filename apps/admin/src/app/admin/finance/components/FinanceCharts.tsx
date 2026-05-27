@@ -9,7 +9,6 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
   Cell,
   PieChart,
   Pie
@@ -45,22 +44,22 @@ interface CustomTooltipProps {
   label?: string | number;
 }
 
-// Custom tooltips styling for both charts declared as a static component to satisfy react-hooks/static-components
+// Custom tooltip — soft surface, generous radius, hairline border, tabular nums.
 const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-card border border-border p-3.5 rounded-2xl shadow-xl z-30">
-        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-wider mb-2">
-          Ledger for {label}
+      <div className="bg-card/95 backdrop-blur-sm border border-border/80 px-4 py-3 rounded-2xl shadow-2xl shadow-black/5 min-w-[180px]">
+        <p className="text-[10px] uppercase text-muted-foreground tracking-[0.12em] font-medium mb-2.5">
+          {label}
         </p>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {payload.map((item, i: number) => (
-            <div key={i} className="flex items-center gap-6 justify-between">
-              <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                {item.name}:
+            <div key={i} className="flex items-center gap-5 justify-between">
+              <span className="text-xs text-muted-foreground flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                {item.name}
               </span>
-              <span className="text-xs font-black text-foreground font-mono">
+              <span className="text-xs font-semibold text-foreground tabular-nums">
                 {item.value !== undefined ? formatCurrencyIDR(Number(item.value)) : 'Rp 0'}
               </span>
             </div>
@@ -70,6 +69,13 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label })
     );
   }
   return null;
+};
+
+const formatCompactIDR = (value: number) => {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
+  return String(value);
 };
 
 export const FinanceCharts: React.FC<FinanceChartsProps> = ({
@@ -129,132 +135,177 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
     { name: 'Nicholas Draws', value: payoutsNicholas, color: '#60a5fa' },
   ];
 
+  const totalAllocation = treasury + payoutsFredrick + payoutsNicholas;
+  const totalRevenue = chartData.reduce((s, d) => s + d.Revenue, 0);
+  const totalExpenses = chartData.reduce((s, d) => s + d.Expenses, 0);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Monthly Cash Flow - 2/3 wide */}
-      <div className="glow-card relative rounded-2xl bg-card border border-border p-6 shadow-xl overflow-hidden lg:col-span-2 flex flex-col justify-between min-h-[360px]">
-        <div>
-          <h3 className="font-bold text-sm text-foreground">Cash Flow Visualizer</h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Comparison of month-on-month invoice collections vs. business expenses.
-          </p>
+      {/* ── Cash flow — 2/3 wide ── */}
+      <div className="relative rounded-3xl bg-card border border-border/70 p-7 overflow-hidden lg:col-span-2 flex flex-col min-h-[400px]">
+        {/* Decorative lime glow behind the chart */}
+        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
+
+        <div className="flex items-start justify-between gap-6 relative">
+          <div>
+            <h3 className="text-base font-semibold tracking-tight text-foreground">
+              Cash flow
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Last 6 months · revenue vs. expenses
+            </p>
+          </div>
+          <div className="flex items-center gap-6 text-right">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Revenue</p>
+              <p className="text-sm font-semibold text-foreground tabular-nums mt-0.5">
+                Rp {formatCompactIDR(totalRevenue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Expenses</p>
+              <p className="text-sm font-semibold text-foreground tabular-nums mt-0.5">
+                Rp {formatCompactIDR(totalExpenses)}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="w-full h-64 mt-4 relative">
+        <div className="w-full flex-1 mt-6 relative -ml-2">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 16, left: -8, bottom: 4 }}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0} />
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                  <stop offset="0%" stopColor="#ef4444" stopOpacity={0.22} />
+                  <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.3} />
+              <CartesianGrid strokeDasharray="2 6" vertical={false} stroke="var(--border)" opacity={0.6} />
               <XAxis
                 dataKey="month"
                 stroke="var(--muted-foreground)"
-                fontSize={10}
+                fontSize={11}
                 tickLine={false}
                 axisLine={false}
+                dy={8}
               />
               <YAxis
                 stroke="var(--muted-foreground)"
-                fontSize={10}
+                fontSize={11}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={value => {
-                  if (value >= 1000000) return `Rp ${(value / 1000000).toFixed(1)}M`;
-                  if (value >= 1000) return `Rp ${value / 1000}k`;
-                  return `Rp ${value}`;
-                }}
+                width={56}
+                tickFormatter={value => `Rp ${formatCompactIDR(value)}`}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }}
+              />
               <Area
                 type="monotone"
                 dataKey="Revenue"
                 stroke="var(--primary)"
-                strokeWidth={2}
-                fillOpacity={1}
+                strokeWidth={2.5}
                 fill="url(#colorRevenue)"
-                name="Revenue (Invoiced & Paid)"
+                fillOpacity={1}
+                name="Revenue"
+                activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)', fill: 'var(--primary)' }}
               />
               <Area
                 type="monotone"
                 dataKey="Expenses"
                 stroke="#ef4444"
                 strokeWidth={2}
-                fillOpacity={1}
                 fill="url(#colorExpenses)"
+                fillOpacity={1}
                 name="Expenses"
+                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)', fill: '#ef4444' }}
               />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Capital Distribution Breakdown - 1/3 wide */}
-      <div className="glow-card relative rounded-2xl bg-card border border-border p-6 shadow-xl overflow-hidden flex flex-col justify-between min-h-[360px]">
+      {/* ── Treasury allocation — 1/3 wide ── */}
+      <div className="relative rounded-3xl bg-card border border-border/70 p-7 overflow-hidden flex flex-col min-h-[400px]">
         <div>
-          <h3 className="font-bold text-sm text-foreground">Treasury Allocation</h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Proportional division of current cash vault vs. partner payouts drawn.
+          <h3 className="text-base font-semibold tracking-tight text-foreground">
+            Treasury allocation
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Retained vs. partner draws
           </p>
         </div>
 
-        {/* Donut Chart or Fallback */}
-        <div className="w-full h-48 mt-4 relative flex items-center justify-center">
-          {treasury + payoutsFredrick + payoutsNicholas > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any) => formatCurrencyIDR(Number(value || 0))}
-                  contentStyle={{
-                    backgroundColor: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+        {/* Donut chart with centered total */}
+        <div className="w-full flex-1 mt-4 relative flex items-center justify-center min-h-[180px]">
+          {totalAllocation > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={68}
+                    outerRadius={92}
+                    paddingAngle={3}
+                    cornerRadius={10}
+                    dataKey="value"
+                    strokeWidth={0}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: any) => formatCurrencyIDR(Number(value || 0))}
+                    contentStyle={{
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '16px',
+                      fontSize: '11px',
+                      padding: '10px 14px',
+                      boxShadow: '0 10px 30px -10px rgba(0,0,0,0.15)',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Total</p>
+                <p className="text-base font-semibold text-foreground tabular-nums mt-0.5">
+                  Rp {formatCompactIDR(totalAllocation)}
+                </p>
+              </div>
+            </>
           ) : (
             <div className="text-center p-4">
-              <p className="text-xs text-muted-foreground">No ledger data to display allocation ratio.</p>
+              <p className="text-xs text-muted-foreground">No ledger data yet</p>
             </div>
           )}
         </div>
 
-        {/* Legend Indicators */}
-        <div className="space-y-2 mt-4">
+        {/* Legend list */}
+        <div className="space-y-2.5 mt-5 pt-5 border-t border-border/60">
           {pieData.map((item, idx) => {
-            const total = treasury + payoutsFredrick + payoutsNicholas;
-            const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+            const pct = totalAllocation > 0 ? Math.round((item.value / totalAllocation) * 100) : 0;
             return (
-              <div key={idx} className="flex items-center justify-between text-[11px] font-semibold">
-                <div className="flex items-center gap-2">
+              <div key={idx} className="flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-muted-foreground truncate max-w-[140px]">{item.name}</span>
+                  <span className="text-muted-foreground truncate">{item.name}</span>
                 </div>
-                <span className="text-foreground shrink-0">{pct}% ({formatCurrencyIDR(item.value)})</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-foreground font-semibold tabular-nums">{pct}%</span>
+                  <span className="text-muted-foreground tabular-nums text-[11px]">
+                    Rp {formatCompactIDR(item.value)}
+                  </span>
+                </div>
               </div>
             );
           })}

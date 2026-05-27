@@ -1,30 +1,45 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  Receipt, 
-  Ticket, 
-  TrendingUp, 
-  ArrowUpRight, 
+import {
+  Users,
+  Receipt,
+  TrendingUp,
   Plus,
   ArrowRight,
   Clock,
-  CheckCircle,
-  AlertCircle,
+  CheckCircle2,
+  Ticket,
+  Loader2,
   AlertTriangle,
-  Calendar
+  LifeBuoy,
+  Wallet,
 } from 'lucide-react';
+
+const ticketCategoryLabels: Record<string, string> = {
+  billing: 'Billing',
+  technical: 'Technical',
+  general: 'General',
+  feature_request: 'Feature request',
+};
 import Link from 'next/link';
-import { 
-  getClients, 
-  getInvoices, 
-  getTickets, 
-  MockClient, 
-  MockInvoice, 
-  MockTicket 
+import {
+  getClients,
+  getInvoices,
+  getTickets,
+  MockClient,
+  MockInvoice,
+  MockTicket
 } from '@/lib/db/queries';
 import { getSubscriptionRemainingMonths } from '@/lib/utils';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import StatCard from '@/components/ui/StatCard';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import SectionHeading from '@/components/ui/SectionHeading';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton from '@/components/ui/Skeleton';
 
 export default function DashboardHome() {
   const [clients, setClients] = useState<MockClient[]>([]);
@@ -52,9 +67,51 @@ export default function DashboardHome() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-        <p className="text-sm text-muted-foreground">Gathering control plane analytics...</p>
+      <div className="space-y-8 animate-fade-up">
+        {/* Header skeleton */}
+        <div className="flex items-end justify-between gap-4">
+          <div className="space-y-2.5">
+            <Skeleton className="h-7 w-44" />
+            <Skeleton className="h-3.5 w-72" />
+          </div>
+          <Skeleton className="h-10 w-32" rounded="xl" />
+        </div>
+
+        {/* Stat cards skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-border bg-card p-6 space-y-3">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+
+        {/* Two-column block skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2 space-y-4">
+            <Skeleton className="h-4 w-32" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-4 py-2">
+                <div className="flex items-center gap-3 flex-1">
+                  <Skeleton className="h-10 w-10" rounded="full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3.5 w-3/5" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                </div>
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+            <Skeleton className="h-4 w-28" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-3.5 w-full" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -62,7 +119,7 @@ export default function DashboardHome() {
   // Calculate Metrics
   const totalClients = clients.length;
   const activeClients = clients.filter(c => c.status === 'active').length;
-  
+
   // Calculate MRR from actual active subscriptions: Static = 150k, Dynamic = 350k
   const calculatedMRR = clients.reduce((sum, c) => {
     if (c.status !== 'active') return sum;
@@ -70,7 +127,7 @@ export default function DashboardHome() {
     if (c.subscriptionType === 'dynamic') return sum + 350000;
     return sum;
   }, 0);
-  
+
   // Total Outstanding Invoices (issued + past_due)
   const outstandingInvoicesTotal = invoices
     .filter(inv => inv.status === 'issued' || inv.status === 'past_due')
@@ -94,379 +151,290 @@ export default function DashboardHome() {
     }).format(val);
   };
 
+  const openTickets = tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').slice(0, 3);
+  const outstandingInvoices = invoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due').slice(0, 4);
+
   return (
     <div className="space-y-8 animate-fade-up">
-      
-      {/* Title Panel */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">System Control Plane</h1>
-          <p className="text-sm text-muted-foreground mt-1">Overview of Scala solutions clients, invoices, and operations.</p>
-        </div>
-        
-        {/* Quick Date Display */}
-        <div className="flex items-center gap-2 bg-muted/40 border border-border px-3.5 py-1.5 rounded-xl text-xs text-muted-foreground font-medium">
-          <Calendar size={13} className="text-primary" />
-          <span>System Date: {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-        </div>
-      </div>
 
-      {/* --- EXPIRY ALERTS PANEL --- */}
-      {expiringClients.length > 0 && (
-        <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.03)] animate-pulse-subtle">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
-            <div className="flex-1">
-              <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200">Action Required: Subscriptions Expiring Soon</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                The following client subscriptions have less than 3 months remaining. Reach out to secure renewal.
-              </p>
-              
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-                {expiringClients.map(c => {
-                  const rem = getSubscriptionRemainingMonths(c);
-                  const hasUrl = c.websiteAddress && c.websiteAddress !== '';
-                  const domain = hasUrl ? c.websiteAddress!.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : '';
-                  const logoUrl = hasUrl ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+      {/* Title */}
+      <PageHeader
+        title="Dashboard"
+        description="Overview of clients, invoices, and operations."
+      />
 
-                  return (
-                    <Link key={c.id} href={`/admin/clients/${c.id}`} className="block">
-                      <div className="p-3 rounded-xl bg-card border border-amber-500/10 hover:border-amber-500/30 transition-all flex items-center justify-between cursor-pointer group">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {logoUrl ? (
-                            <img 
-                              src={logoUrl} 
-                              alt={c.name} 
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = 'none';
-                              }}
-                              className="w-8 h-8 rounded-lg border border-border object-contain bg-white p-0.5 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-muted/40 flex items-center justify-center font-bold text-xs text-muted-foreground group-hover:text-primary group-hover:bg-primary/5 transition-all duration-200 shrink-0">
-                              {c.name.substring(0, 2).toUpperCase()}
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold truncate group-hover:text-primary transition-colors">{c.name}</h4>
-                            <p className="text-[10px] text-muted-foreground capitalize mt-0.5">{c.subscriptionType} Hosting</p>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className={`text-[9px] font-black px-2 py-0.75 rounded-md tracking-wider font-mono ${
-                            rem === 0 
-                              ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20' 
-                              : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20'
-                          }`}>
-                            {rem === 0 ? 'Expired' : `${rem} mo remaining`}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+      {/* Quick Actions — pulled to the top so the most common admin moves are one click away. */}
+      <Card padding="md">
+        <SectionHeading
+          eyebrow="Get started"
+          title="Quick actions"
+        />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Link href="/admin/clients?new=true" className="block">
+            <Button variant="primary" size="md" leftIcon={<Plus size={16} />} className="w-full">
+              New Client
+            </Button>
+          </Link>
+          <Link href="/admin/invoices?new=true" className="block">
+            <Button variant="secondary" size="md" leftIcon={<Receipt size={16} />} className="w-full">
+              New Invoice
+            </Button>
+          </Link>
+          <Link href="/admin/tickets?new=true" className="block">
+            <Button variant="secondary" size="md" leftIcon={<Ticket size={16} />} className="w-full">
+              New Ticket
+            </Button>
+          </Link>
         </div>
-      )}
+      </Card>
 
       {/* --- METRICS GRID --- */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        
-        {/* Metric 1: Clients */}
-        <Link href="/admin/clients" className="block group">
-          <div className="p-6 rounded-2xl bg-card border border-border group-hover:border-primary/30 transition-all hover:shadow-[0_0_15px_rgba(206,248,78,0.05)] cursor-pointer relative h-full">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Clients</span>
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                <Users size={16} />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-3xl font-extrabold tracking-tight flex items-baseline gap-1.5">
-                {totalClients}
-                <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
-                {activeClients} active accounts
-              </p>
-            </div>
-          </div>
+
+        {/* Metric 1: Clients — accent on the headline metric only. */}
+        <Link href="/admin/clients" className="block">
+          <StatCard
+            label="Total clients"
+            value={totalClients}
+            icon={<Users size={14} />}
+            accent
+            delta={{ value: `${activeClients} active`, trend: 'neutral' }}
+            className="h-full hover:border-foreground/15 transition-colors"
+          />
         </Link>
 
         {/* Metric 2: Estimated MRR */}
-        <Link href="/admin/clients" className="block group">
-          <div className="p-6 rounded-2xl bg-card border border-border group-hover:border-primary/30 transition-all hover:shadow-[0_0_15px_rgba(206,248,78,0.05)] cursor-pointer relative h-full">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hosting MRR</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-                <TrendingUp size={16} />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-2xl font-extrabold tracking-tight text-emerald-400 flex items-baseline gap-1.5">
-                {formatCurrencyIDR(calculatedMRR)}
-                <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Hosting recurring subscription</p>
-            </div>
-          </div>
+        <Link href="/admin/clients" className="block">
+          <StatCard
+            label="Hosting MRR"
+            value={formatCurrencyIDR(calculatedMRR)}
+            icon={<TrendingUp size={14} />}
+            delta={{ value: 'From active subscriptions', trend: 'neutral' }}
+            className="h-full hover:border-foreground/15 transition-colors"
+          />
         </Link>
 
         {/* Metric 3: Outstanding Receivables */}
-        <Link href="/admin/invoices" className="block group">
-          <div className="p-6 rounded-2xl bg-card border border-border group-hover:border-primary/30 transition-all hover:shadow-[0_0_15px_rgba(206,248,78,0.05)] cursor-pointer relative h-full">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Outstanding Invoices</span>
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
-                <Receipt size={16} />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-2xl font-extrabold tracking-tight text-amber-400 flex items-baseline gap-1.5">
-                {formatCurrencyIDR(outstandingInvoicesTotal)}
-                <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Pending collection invoices</p>
-            </div>
-          </div>
+        <Link href="/admin/invoices" className="block">
+          <StatCard
+            label="Outstanding"
+            value={formatCurrencyIDR(outstandingInvoicesTotal)}
+            icon={<Receipt size={14} />}
+            delta={{ value: `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? '' : 's'} unpaid`, trend: 'neutral' }}
+            className="h-full hover:border-foreground/15 transition-colors"
+          />
         </Link>
 
         {/* Metric 4: Unresolved Tickets */}
-        <Link href="/admin/tickets" className="block group">
-          <div className="p-6 rounded-2xl bg-card border border-border group-hover:border-primary/30 transition-all hover:shadow-[0_0_15px_rgba(206,248,78,0.05)] cursor-pointer relative h-full">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Support Tickets</span>
-              <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 group-hover:scale-110 transition-transform">
-                <Ticket size={16} />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-3xl font-extrabold tracking-tight text-red-400 flex items-baseline gap-1.5">
-                {unresolvedTickets}
-                <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
-                Requires admin resolution
-              </p>
-            </div>
-          </div>
+        <Link href="/admin/tickets" className="block">
+          <StatCard
+            label="Open tickets"
+            value={unresolvedTickets}
+            icon={<Ticket size={14} />}
+            delta={{ value: unresolvedTickets === 0 ? 'All resolved' : 'Awaiting action', trend: 'neutral' }}
+            className="h-full hover:border-foreground/15 transition-colors"
+          />
         </Link>
 
       </div>
 
-      {/* --- QUICK ACTIONS & SPLIT PANEL --- */}
-      <div className="grid gap-8 lg:grid-cols-3">
-        
-        {/* Left Column: Quick Actions & Recent Clients */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Recent Clients List */}
-          <div className="p-6 rounded-2xl bg-card border border-border">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-bold">Recent Clients</h2>
-                <p className="text-xs text-muted-foreground">Directory of recently onboarded client sites.</p>
-              </div>
-              <Link href="/admin/clients">
-                <button className="flex items-center gap-1 text-xs text-primary hover:underline font-medium cursor-pointer">
-                  View all clients
-                  <ArrowRight size={14} />
-                </button>
-              </Link>
-            </div>
+      {/* --- EXPIRING SUBSCRIPTIONS PANEL --- */}
+      {expiringClients.length > 0 && (
+        <Card padding="md">
+          <SectionHeading
+            icon={<AlertTriangle size={16} />}
+            title="Subscriptions expiring soon"
+            description="These clients have less than 3 months remaining."
+            action={<Badge variant="warning">Expiring</Badge>}
+          />
 
-            <div className="divide-y divide-border">
-              {clients.slice(0, 3).map((client) => {
-                const hasUrl = client.websiteAddress && client.websiteAddress !== '';
-                // Simple regex to extract domain
-                const domain = hasUrl ? client.websiteAddress!.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : '';
-                const logoUrl = hasUrl ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+          <div className="divide-y divide-border">
+            {expiringClients.map(c => {
+              const rem = getSubscriptionRemainingMonths(c);
 
-                return (
-                  <Link key={client.id} href={`/admin/clients/${client.id}`} className="block group">
-                    <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0 cursor-pointer hover:bg-muted/10 px-2 rounded-xl transition-all duration-200">
-                      <div className="flex items-center gap-3">
-                        {logoUrl ? (
-                          <img 
-                            src={logoUrl} 
-                            alt={client.name} 
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                            className="w-10 h-10 rounded-xl border border-border object-contain bg-white p-1"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-xl bg-muted/40 flex items-center justify-center font-bold text-sm text-muted-foreground group-hover:text-primary group-hover:bg-primary/5 transition-all duration-200">
-                            {client.name.substring(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                        <div>
-                          <h4 className="text-sm font-semibold group-hover:text-primary transition-colors">{client.name}</h4>
-                          <p className="text-xs text-muted-foreground">{client.companyName || 'No Company'} • {client.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {client.subscriptionType && (
-                          <span className={`text-[10px] capitalize px-2 py-0.5 rounded-md font-semibold ${
-                            client.subscriptionType === 'dynamic' 
-                              ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          }`}>
-                            {client.subscriptionType}
-                          </span>
-                        )}
-                        <span className={`text-[9px] uppercase font-black px-2 py-0.75 rounded-md border tracking-wider font-mono ${
-                          client.status === 'active' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                            : client.status === 'pending'
-                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                            : 'bg-muted text-muted-foreground border-border'
-                        }`}>
-                          {client.status}
-                        </span>
-                      </div>
+              return (
+                <Link key={c.id} href={`/admin/clients/${c.id}`} className="block">
+                  <div className="flex items-center justify-between gap-3 py-4 px-2 -mx-2 rounded-lg hover:bg-muted/20 transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize mt-1">{c.subscriptionType} hosting</p>
                     </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick Actions Panel */}
-          <div className="p-6 rounded-2xl bg-muted/20 border border-border">
-            <h3 className="text-sm font-bold mb-4 uppercase tracking-wider text-muted-foreground">Admin Operations</h3>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Link href="/admin/clients?new=true">
-                <button className="flex flex-col items-center justify-center p-4 rounded-xl bg-card border border-border hover:border-primary/30 transition-all text-center w-full group cursor-pointer active-press">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-2.5 group-hover:scale-110 transition-transform">
-                    <Plus size={16} />
-                  </div>
-                  <span className="text-xs font-semibold">New Client</span>
-                </button>
-              </Link>
-
-              <Link href="/admin/invoices?new=true">
-                <button className="flex flex-col items-center justify-center p-4 rounded-xl bg-card border border-border hover:border-primary/30 transition-all text-center w-full group cursor-pointer active-press">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-2.5 group-hover:scale-110 transition-transform">
-                    <Receipt size={16} />
-                  </div>
-                  <span className="text-xs font-semibold">New Invoice</span>
-                </button>
-              </Link>
-
-              <Link href="/admin/tickets?new=true">
-                <button className="flex flex-col items-center justify-center p-4 rounded-xl bg-card border border-border hover:border-primary/30 transition-all text-center w-full group cursor-pointer active-press">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-2.5 group-hover:scale-110 transition-transform">
-                    <Ticket size={16} />
-                  </div>
-                  <span className="text-xs font-semibold">New Ticket</span>
-                </button>
-              </Link>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Right Column: Support Tickets & Invoices list */}
-        <div className="space-y-8">
-          
-          {/* Urgent Tickets Panel */}
-          <div className="p-6 rounded-2xl bg-card border border-border">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-bold">Support Queue</h2>
-                <p className="text-xs text-muted-foreground">Unresolved client issues needing review.</p>
-              </div>
-              <Link href="/admin/tickets">
-                <button className="flex items-center gap-1 text-xs text-primary hover:underline font-medium cursor-pointer">
-                  Open Hub
-                  <ArrowRight size={14} />
-                </button>
-              </Link>
-            </div>
-
-            <div className="space-y-4">
-              {tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').slice(0, 3).map((ticket) => (
-                <Link key={ticket.id} href={`/admin/tickets?id=${ticket.id}`} className="block">
-                  <div className="p-4 rounded-xl bg-muted/30 border border-border hover:border-primary/20 transition-all cursor-pointer group">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-sm font-semibold truncate group-hover:text-primary transition-colors flex-1">{ticket.title}</h4>
-                      <span className={`text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded ${
-                        ticket.priority === 'urgent' 
-                          ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
-                          : ticket.priority === 'high' 
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                      }`}>
-                        {ticket.priority}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{ticket.description}</p>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-3">
-                      <Clock size={12} />
-                      <span>{new Date(ticket.createdAt).toLocaleDateString('id-ID')}</span>
-                      <span>•</span>
-                      <span className="capitalize">{ticket.category}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {rem === 0 ? (
+                        <Badge variant="danger">Expired</Badge>
+                      ) : (
+                        <Badge variant="warning">{rem} mo left</Badge>
+                      )}
                     </div>
                   </div>
                 </Link>
-              ))}
-              {tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').length === 0 && (
-                <div className="flex flex-col items-center justify-center p-6 text-center">
-                  <CheckCircle size={24} className="text-primary mb-2 opacity-50" />
-                  <p className="text-sm font-semibold">Queue Clear</p>
-                  <p className="text-xs text-muted-foreground">All support tickets are currently resolved.</p>
-                </div>
-              )}
-            </div>
+              );
+            })}
           </div>
+        </Card>
+      )}
 
-          {/* Pending Invoices Panel */}
-          <div className="p-6 rounded-2xl bg-card border border-border">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-bold">Collections</h2>
-                <p className="text-xs text-muted-foreground">Outstanding accounts receivable details.</p>
-              </div>
-            </div>
+      {/* --- TWO-COLUMN: Support Queue (left) + Recent Clients (right) --- */}
+      <div className="grid gap-6 lg:grid-cols-2">
 
-            <div className="space-y-3">
-              {invoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due').slice(0, 3).map((invoice) => {
-                const client = clients.find(c => c.id === invoice.clientId);
-                return (
-                  <div key={invoice.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border">
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold truncate">{client?.name || 'Unknown Client'}</h4>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Due: {new Date(invoice.dueDate).toLocaleDateString('id-ID')}</p>
+        {/* Support Queue — action-oriented, sits left. */}
+        <Card padding="md">
+          <SectionHeading
+            icon={<LifeBuoy size={16} />}
+            title="Support queue"
+            description="Unresolved client issues needing review."
+            action={
+              <Link
+                href="/admin/tickets"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                View all
+                <ArrowRight size={12} />
+              </Link>
+            }
+          />
+
+          <div className="space-y-3">
+            {openTickets.length > 0 ? openTickets.map((ticket) => {
+              const priorityVariant: 'danger' | 'warning' | 'neutral' =
+                ticket.priority === 'urgent' ? 'danger'
+                : ticket.priority === 'high' ? 'warning'
+                : 'neutral';
+
+              return (
+                <Link key={ticket.id} href={`/admin/tickets?id=${ticket.id}`} className="block">
+                  <div className="p-4 rounded-xl border border-border hover:border-foreground/15 transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground truncate flex-1">{ticket.title}</p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge variant="neutral">
+                          {ticketCategoryLabels[ticket.category] ?? ticket.category}
+                        </Badge>
+                        <Badge variant={priorityVariant} className="capitalize">
+                          {ticket.priority}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-extrabold">{formatCurrencyIDR(invoice.total)}</p>
-                      <span className={`text-[8px] uppercase font-black px-1 py-0.25 rounded ${
-                        invoice.status === 'past_due' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'
-                      }`}>
-                        {invoice.status.replace('_', ' ')}
-                      </span>
+                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
+                      {ticket.description}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3">
+                      <Clock size={12} />
+                      <span>{new Date(ticket.createdAt).toLocaleDateString('id-ID')}</span>
                     </div>
                   </div>
-                );
-              })}
-              {invoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due').length === 0 && (
-                <div className="flex flex-col items-center justify-center p-6 text-center">
-                  <CheckCircle size={24} className="text-emerald-400 mb-2 opacity-50" />
-                  <p className="text-sm font-semibold">Collections Paid</p>
-                  <p className="text-xs text-muted-foreground">All issued invoices have been fully paid!</p>
-                </div>
-              )}
-            </div>
+                </Link>
+              );
+            }) : (
+              <EmptyState
+                icon={<CheckCircle2 size={18} />}
+                title="Queue clear"
+                description="All support tickets are currently resolved."
+                className="py-10"
+              />
+            )}
           </div>
+        </Card>
 
-        </div>
+        {/* Recent Clients — informational, sits right. */}
+        <Card padding="md">
+          <SectionHeading
+            icon={<Users size={16} />}
+            title="Recent clients"
+            description="Directory of recently onboarded client sites."
+            action={
+              <Link
+                href="/admin/clients"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                View all
+                <ArrowRight size={12} />
+              </Link>
+            }
+          />
+
+          <div className="divide-y divide-border">
+            {clients.slice(0, 3).map((client) => {
+              const statusVariant: 'success' | 'warning' | 'neutral' =
+                client.status === 'active' ? 'success'
+                : client.status === 'pending' ? 'warning'
+                : 'neutral';
+
+              return (
+                <Link key={client.id} href={`/admin/clients/${client.id}`} className="block">
+                  <div className="flex items-center justify-between gap-3 py-5 px-2 -mx-2 rounded-lg hover:bg-muted/20 transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
+                      <p className="text-xs text-muted-foreground truncate mt-1.5">
+                        {client.companyName || 'No company'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={statusVariant} className="capitalize">
+                        {client.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
 
       </div>
+
+      {/* --- COLLECTIONS — full-width below the split. --- */}
+      <Card padding="md">
+        <SectionHeading
+          icon={<Wallet size={16} />}
+          title="Collections"
+          description="Outstanding accounts receivable."
+          action={
+            <Link
+              href="/admin/invoices"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              View all
+              <ArrowRight size={12} />
+            </Link>
+          }
+        />
+
+        {outstandingInvoices.length > 0 ? (
+          <div className="divide-y divide-border">
+            {outstandingInvoices.map((invoice) => {
+              const client = clients.find(c => c.id === invoice.clientId);
+              const statusVariant: 'danger' | 'warning' = invoice.status === 'past_due' ? 'danger' : 'warning';
+
+              return (
+                <div key={invoice.id} className="flex items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{client?.name || 'Unknown Client'}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {invoice.invoiceNumber} · Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <Badge variant={statusVariant} className="capitalize">
+                      {invoice.status.replace('_', ' ')}
+                    </Badge>
+                    <p className="text-sm font-medium text-foreground tabular-nums">
+                      {formatCurrencyIDR(invoice.total)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<CheckCircle2 size={18} />}
+            title="Collections paid"
+            description="All issued invoices have been fully paid."
+            className="py-10"
+          />
+        )}
+      </Card>
 
     </div>
   );

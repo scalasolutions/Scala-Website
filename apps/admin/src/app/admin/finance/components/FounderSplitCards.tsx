@@ -1,17 +1,17 @@
 'use client';
 
 import React from 'react';
-import { ArrowUpRight, ArrowDownRight, Wallet, Percent, PiggyBank } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Wallet, PiggyBank } from 'lucide-react';
 import { formatCurrencyIDR } from './FinanceOverviewCards';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
 
 interface FounderData {
   name: string;
   key: 'fredrick' | 'nicholas';
   fullName: string;
   avatarLetter: string;
-  colorClass: string;
-  bgLightClass: string;
-  glowClass: string;
   injected: number;
   baseProfit: number;
   commission: number;
@@ -29,11 +29,13 @@ interface FounderSplitCardsProps {
   baseProfitShare: number;
   commissionFredrick: number;
   commissionNicholas: number;
-  onActionClick: (actionType: 'inject' | 'draw', founderKey: 'fredrick' | 'nicholas') => void;
+  onActionClick: (
+    actionType: 'inject' | 'draw',
+    founderKey: 'fredrick' | 'nicholas'
+  ) => void;
 }
 
 export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
-  netProfit,
   payoutsFredrick,
   payoutsNicholas,
   injectionsFredrick,
@@ -49,175 +51,185 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
       key: 'fredrick',
       fullName: 'Fredrick Yang',
       avatarLetter: 'F',
-      colorClass: 'text-primary',
-      bgLightClass: 'bg-primary/10 border-primary/20',
-      glowClass: 'shadow-primary/5',
       injected: injectionsFredrick,
       baseProfit: baseProfitShare,
       commission: commissionFredrick,
       profitAllocation: baseProfitShare + commissionFredrick,
       payoutsDrawn: payoutsFredrick,
-      remainingDraw: Math.max(0, (baseProfitShare + commissionFredrick) - payoutsFredrick),
+      remainingDraw: Math.max(
+        0,
+        baseProfitShare + commissionFredrick - payoutsFredrick
+      ),
     },
     {
       name: 'Nicholas',
       key: 'nicholas',
       fullName: 'Nicholas Chairnando',
       avatarLetter: 'N',
-      colorClass: 'text-blue-400',
-      bgLightClass: 'bg-blue-500/10 border-blue-500/20',
-      glowClass: 'shadow-blue-500/5',
       injected: injectionsNicholas,
       baseProfit: baseProfitShare,
       commission: commissionNicholas,
       profitAllocation: baseProfitShare + commissionNicholas,
       payoutsDrawn: payoutsNicholas,
-      remainingDraw: Math.max(0, (baseProfitShare + commissionNicholas) - payoutsNicholas),
+      remainingDraw: Math.max(
+        0,
+        baseProfitShare + commissionNicholas - payoutsNicholas
+      ),
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {founders.map(founder => {
-        // Calculate payout percentage progress
-        const drawPercent = founder.profitAllocation > 0
-          ? Math.min(100, Math.round((founder.payoutsDrawn / founder.profitAllocation) * 100))
-          : 0;
+    <div className="grid gap-5 md:grid-cols-2">
+      {founders.map((founder) => {
+        const drawPercent =
+          founder.profitAllocation > 0
+            ? Math.min(
+                100,
+                Math.round((founder.payoutsDrawn / founder.profitAllocation) * 100)
+              )
+            : 0;
 
         return (
-          <div
-            key={founder.key}
-            className="glow-card relative rounded-2xl bg-card border border-border p-6 shadow-xl overflow-hidden transition-all duration-300 flex flex-col justify-between"
-          >
-            {/* Header row */}
+          <Card key={founder.key} padding="md" className="flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between pb-4 border-b border-border/60">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm border ${founder.bgLightClass}`}>
+              {/* Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-border">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 shrink-0 rounded-lg bg-muted/50 border border-border flex items-center justify-center text-sm font-medium text-muted-foreground">
                     {founder.avatarLetter}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-foreground">{founder.fullName}</h3>
-                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-0.5">
-                      Co-Founder &amp; Equity Partner
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-medium text-foreground truncate">
+                      {founder.fullName}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Co-founder &amp; equity partner
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 bg-muted/40 border border-border/50 px-2 py-1 rounded-lg">
-                  <Percent size={11} className={founder.colorClass} />
-                  <span className="text-[10px] font-black text-foreground">50% Split</span>
-                </div>
+                <Badge variant="neutral">50% split</Badge>
               </div>
 
-              {/* Founder financials ledger list */}
+              {/* Ledger lines */}
               <div className="mt-5 space-y-4">
-                {/* 1. Capital contributions */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold">
-                    <PiggyBank size={14} className="opacity-80" />
-                    <span>Capital Injected</span>
-                  </div>
-                  <span className="font-bold text-xs text-foreground">
-                    {formatCurrencyIDR(founder.injected)}
-                  </span>
-                </div>
+                <Row
+                  icon={<PiggyBank size={14} />}
+                  label="Capital injected"
+                  value={formatCurrencyIDR(founder.injected)}
+                />
+                <Row
+                  icon={<Wallet size={14} />}
+                  label="Base profit share (50%)"
+                  value={formatCurrencyIDR(founder.baseProfit)}
+                />
 
-                {/* 2. Base Profit Share */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold">
-                    <Wallet size={14} className="opacity-80" />
-                    <span>Base Profit Share (50%)</span>
-                  </div>
-                  <span className="font-bold text-xs text-foreground">
-                    {formatCurrencyIDR(founder.baseProfit)}
-                  </span>
-                </div>
-
-                {/* 2.5 Sourcing Commission */}
                 {founder.commission > 0 && (
-                  <div className="flex items-center justify-between text-blue-400">
-                    <div className="flex items-center gap-2 text-xs font-bold">
-                      <Percent size={14} className="opacity-80 text-blue-400" />
-                      <span>Sales Commission (10%)</span>
-                    </div>
-                    <span className="font-extrabold text-xs">
-                      + {formatCurrencyIDR(founder.commission)}
-                    </span>
-                  </div>
+                  <Row
+                    icon={<TrendIcon />}
+                    label="Sales commission (10%)"
+                    value={`+ ${formatCurrencyIDR(founder.commission)}`}
+                  />
                 )}
 
-                {/* 3. Total Allocated Draw */}
-                <div className="flex items-center justify-between pt-3.5 border-t border-border/40">
-                  <div className="flex items-center gap-2 text-foreground text-xs font-bold">
-                    <Wallet size={14} className="opacity-85 text-primary" />
-                    <span>Total Allocated Payout</span>
-                  </div>
-                  <span className="font-black text-sm text-foreground">
+                {/* Total allocated */}
+                <div className="flex items-center justify-between pt-3 border-t border-border">
+                  <span className="text-sm font-medium text-foreground">
+                    Total allocated payout
+                  </span>
+                  <span className="text-sm font-medium text-foreground tabular-nums">
                     {formatCurrencyIDR(founder.profitAllocation)}
                   </span>
                 </div>
 
-                {/* 4. Distributions drawn */}
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold">
-                    <ArrowDownRight size={14} className="opacity-80" />
-                    <span>Payout Distributions Drawn</span>
-                  </div>
-                  <span className="font-bold text-xs text-foreground">
-                    {formatCurrencyIDR(founder.payoutsDrawn)}
-                  </span>
-                </div>
+                <Row
+                  icon={<ArrowDownRight size={14} />}
+                  label="Distributions drawn"
+                  value={formatCurrencyIDR(founder.payoutsDrawn)}
+                />
 
-                {/* Progress bar container */}
+                {/* Progress */}
                 <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
-                    <span>Draw Progress ({drawPercent}%)</span>
-                    <span>Rp {new Intl.NumberFormat('id-ID').format(founder.payoutsDrawn)} / Rp {new Intl.NumberFormat('id-ID').format(founder.profitAllocation)}</span>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Draw progress · {drawPercent}%</span>
+                    <span className="tabular-nums">
+                      Rp {new Intl.NumberFormat('id-ID').format(founder.payoutsDrawn)} /
+                      Rp {new Intl.NumberFormat('id-ID').format(founder.profitAllocation)}
+                    </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-muted/50 overflow-hidden border border-border/40">
+                  <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        founder.key === 'fredrick' ? 'bg-primary' : 'bg-blue-400'
-                      }`}
+                      className="h-full rounded-full bg-foreground/30 transition-all duration-500"
                       style={{ width: `${drawPercent}%` }}
                     />
                   </div>
                 </div>
 
-                {/* 4. Available draw balance */}
-                <div className="pt-3 border-t border-border/40 flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground">Remaining Available Draw</span>
-                  <span className={`font-black text-sm ${founder.colorClass}`}>
+                {/* Remaining */}
+                <div className="pt-3 border-t border-border flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Remaining available draw
+                  </span>
+                  <span className="text-base font-semibold text-foreground tabular-nums">
                     {formatCurrencyIDR(founder.remainingDraw)}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Quick Actions buttons */}
-            <div className="mt-6 pt-4 border-t border-border/60 grid grid-cols-2 gap-3">
-              <button
+            {/* Actions */}
+            <div className="mt-6 pt-4 border-t border-border grid grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<ArrowUpRight size={14} />}
                 onClick={() => onActionClick('inject', founder.key)}
-                className="flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold rounded-xl border border-border hover:bg-muted text-muted-foreground transition-all cursor-pointer hover:text-foreground active-press"
               >
-                <ArrowUpRight size={13} />
-                Inject Cash
-              </button>
-              <button
+                Inject cash
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<ArrowDownRight size={14} />}
                 onClick={() => onActionClick('draw', founder.key)}
-                className={`flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all cursor-pointer active-press shadow-xs hover:opacity-90 ${
-                  founder.key === 'fredrick'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-blue-500 text-white'
-                }`}
               >
-                <ArrowDownRight size={13} />
-                Draw Payout
-              </button>
+                Draw payout
+              </Button>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>
   );
 };
+
+// Tiny internal row helper — keeps the JSX in the main component readable.
+const Row: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}> = ({ icon, label, value }) => (
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <span className="text-muted-foreground/70">{icon}</span>
+      <span>{label}</span>
+    </div>
+    <span className="text-xs text-foreground tabular-nums">{value}</span>
+  </div>
+);
+
+// Tiny icon stand-in for the commission row (kept simple, no extra import overhead).
+const TrendIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M3 17l6-6 4 4 8-8" />
+    <path d="M14 7h7v7" />
+  </svg>
+);

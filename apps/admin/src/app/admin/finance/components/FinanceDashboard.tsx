@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { Landmark, Plus, BookOpen } from 'lucide-react';
-import { 
-  getExpenses, 
-  getCapitalInjections, 
-  getPayouts, 
-  getInvoices, 
+import { Landmark, Plus, BookOpen, Loader2 } from 'lucide-react';
+import {
+  getExpenses,
+  getCapitalInjections,
+  getPayouts,
+  getInvoices,
   deleteExpense,
   MockExpense,
   MockCapitalInjection,
   MockPayout,
   MockInvoice,
-  MockClient
+  MockClient,
 } from '@/lib/db/queries';
 import { FinanceOverviewCards } from './FinanceOverviewCards';
 import { FounderSplitCards } from './FounderSplitCards';
@@ -20,6 +20,9 @@ import { PartnershipSplitGuide } from './PartnershipSplitGuide';
 import { FinanceCharts } from './FinanceCharts';
 import { TransactionTabs } from './TransactionTabs';
 import { ExpenseModal, InjectionModal, PayoutModal } from './TransactionModals';
+import PageHeader from '@/components/ui/PageHeader';
+import Button from '@/components/ui/Button';
+import SectionHeading from '@/components/ui/SectionHeading';
 
 export const FinanceDashboard: React.FC = () => {
   const [expenses, setExpenses] = useState<MockExpense[]>([]);
@@ -147,39 +150,36 @@ export const FinanceDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fade-up">
-      {/* Dashboard Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight">Finance &amp; Partner Splits</h1>
-            <button
+      {/* Page header */}
+      <PageHeader
+        title="Finance"
+        description="Corporate treasury, business expenses, and founder distribution splits."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              leftIcon={<BookOpen size={16} />}
               onClick={() => setGuideOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 active-press transition-all duration-200 font-bold text-xs cursor-pointer shadow-sm mt-1"
-              title="View Partnership & Referral Guidelines"
             >
-              <BookOpen size={13} className="text-primary animate-pulse" />
-              Partnership Policy
-            </button>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Available corporate treasury, business expenses, and personal distribution splits for Fredrick &amp; Nicholas.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setExpenseModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500 hover:opacity-90 active-press transition-all duration-200 text-white font-semibold text-sm cursor-pointer self-start"
-          style={{ boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)' }}
-        >
-          <Plus size={16} />
-          Record Expense
-        </button>
-      </div>
+              Policy
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              leftIcon={<Plus size={16} />}
+              onClick={() => setExpenseModalOpen(true)}
+            >
+              Record Expense
+            </Button>
+          </>
+        }
+      />
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-28 gap-3">
-          <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
-          <p className="text-xs text-muted-foreground">Reconciling company ledger accounts...</p>
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+          <Loader2 className="animate-spin text-muted-foreground" size={20} />
+          <p className="text-sm text-muted-foreground">Loading ledger…</p>
         </div>
       ) : (
         <>
@@ -192,11 +192,12 @@ export const FinanceDashboard: React.FC = () => {
           />
 
           {/* 2. Co-Founder splitting details panels */}
-          <div className="space-y-3 pt-2">
-            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Landmark size={18} className="text-primary" />
-              Founder Accounts &amp; Equity Splits
-            </h3>
+          <div className="space-y-5 pt-2">
+            <SectionHeading
+              icon={<Landmark size={16} />}
+              title="Founder accounts & equity splits"
+              description="Per-founder ledger of injections, allocations, and draws."
+            />
             <FounderSplitCards
               netProfit={netProfit}
               payoutsFredrick={payoutsFredrick}
@@ -221,8 +222,11 @@ export const FinanceDashboard: React.FC = () => {
           />
 
           {/* 4. Filterable Transactions tabs index lists */}
-          <div className="space-y-3 pt-2">
-            <h3 className="text-lg font-bold text-foreground">Ledger Activity</h3>
+          <div className="space-y-5 pt-2">
+            <SectionHeading
+              title="Ledger activity"
+              description="Browse expenses, injections, and payout distributions."
+            />
             <TransactionTabs
               expenses={expenses}
               injections={injections}

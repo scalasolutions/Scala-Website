@@ -2,14 +2,27 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Star, Sparkles, AlertCircle, TrendingUp, Users, HeartHandshake, BookOpen } from 'lucide-react';
+import {
+  X,
+  BookOpen,
+  TrendingUp,
+  Users,
+  AlertCircle,
+} from 'lucide-react';
+import SectionHeading from '@/components/ui/SectionHeading';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 
 interface PartnershipSplitGuideProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const PartnershipSplitGuide: React.FC<PartnershipSplitGuideProps> = ({ isOpen, onClose }) => {
+export const PartnershipSplitGuide: React.FC<PartnershipSplitGuideProps> = ({
+  isOpen,
+  onClose,
+}) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -20,175 +33,194 @@ export const PartnershipSplitGuide: React.FC<PartnershipSplitGuideProps> = ({ is
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-center items-start overflow-y-auto p-6 md:p-12">
-      {/* Backdrop blur */}
-      <div 
-        className="fixed inset-0 bg-background/85 backdrop-blur-md transition-opacity duration-300" 
-        onClick={onClose} 
+      <div
+        className="fixed inset-0 bg-background/85 backdrop-blur-md"
+        onClick={onClose}
       />
 
-      {/* Modal Dialog container */}
-      <div className="relative w-full max-w-3xl rounded-2xl bg-card border border-border p-6 md:p-8 shadow-2xl animate-fade-in-scale z-10">
-        
-        {/* Header row */}
-        <div className="flex items-start justify-between pb-4 border-b border-border/60 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-              <BookOpen size={20} />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-base text-foreground flex items-center gap-2">
-                Partnership Policy &amp; Guidelines
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-extrabold uppercase tracking-wide">
+      <div className="relative w-full max-w-3xl rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale z-10">
+        <div className="p-6 sm:p-8">
+          {/* Header */}
+          <SectionHeading
+            icon={<BookOpen size={16} />}
+            title="Partnership policy & guidelines"
+            description="Official revenue sharing policy for Scala Solutions co-founders."
+            action={
+              <div className="flex items-center gap-2">
+                <Badge variant="success">
                   Active SLA
-                </span>
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-                Official revenue sharing policy for Scala Solutions co-founders.
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors active-press"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Two-column layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* Sourced Clients Column */}
-          <div className="rounded-xl border border-border/60 bg-muted/20 p-5 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                  <Users size={16} />
-                </div>
-                <h4 className="font-bold text-sm text-foreground">Co-Founder Sourcing (Organic)</h4>
+                </Badge>
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <p className="text-[11px] text-muted-foreground font-medium leading-relaxed mt-3">
-                Since Fredrick and Nicholas operate as a unified company, all partner-sourced leads are treated as organic with no separate sourcing incentive:
-              </p>
-              <ul className="mt-4 space-y-2 text-[11px] text-muted-foreground font-semibold list-disc list-inside">
-                <li>
-                  <span className="text-foreground font-extrabold">Unified Referrals:</span> Fredrick's referral is Nicholas' referral. Sourcing by either partner is considered organic.
-                </li>
-                <li>
-                  <span className="text-foreground font-extrabold">No Finder's Fee:</span> Sourcing commissions do not apply to co-founders, keeping incentives fully aligned.
-                </li>
-                <li>
-                  <span className="text-foreground font-extrabold">50/50 Profit Split:</span> 100% of the client budget flows into the company pool, and net profits are split exactly equally.
-                </li>
-              </ul>
-            </div>
+            }
+          />
 
-            {/* Live Example calculator */}
-            <div className="mt-5 p-3.5 rounded-lg bg-card border border-border/80">
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2.5">
-                Example: Rp 10.000.000 Client Invoice
-              </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
-                <div className="text-muted-foreground font-semibold">Gross Client Budget</div>
-                <div className="text-right font-black text-foreground">Rp 10.000.000</div>
-                
-                <div className="text-muted-foreground font-semibold flex items-center gap-1">
-                  Sourcing Fee (0%) <Star size={9} className="text-muted-foreground fill-muted" />
+          {/* Two-column layout */}
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* Sourced Clients Column */}
+            <Card padding="md" className="bg-muted/15 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-muted/50 border border-border flex items-center justify-center text-muted-foreground">
+                    <Users size={14} />
+                  </div>
+                  <h4 className="text-sm font-medium text-foreground">
+                    Co-founder sourcing (organic)
+                  </h4>
                 </div>
-                <div className="text-right font-black text-muted-foreground">Rp 0</div>
-
-                <div className="text-muted-foreground font-semibold">Remaining to Company</div>
-                <div className="text-right font-bold text-muted-foreground">Rp 10.000.000</div>
-
-                <div className="text-muted-foreground font-semibold">Operating Expenses</div>
-                <div className="text-right font-bold text-red-400">- Rp 1.000.000</div>
-
-                <div className="text-muted-foreground font-bold border-t border-border/40 pt-2 mt-1">
-                  Net Profit Split (50/50)
-                </div>
-                <div className="text-right font-black text-emerald-400 border-t border-border/40 pt-2 mt-1">
-                  Rp 4.500.000 each
-                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed mt-3">
+                  Since Fredrick and Nicholas operate as a unified company, all
+                  partner-sourced leads are treated as organic with no separate sourcing
+                  incentive:
+                </p>
+                <ul className="mt-3 space-y-2 text-xs text-muted-foreground list-disc list-inside leading-relaxed">
+                  <li>
+                    <span className="text-foreground font-medium">Unified referrals:</span>{' '}
+                    Fredrick's referral is Nicholas' referral. Sourcing by either partner
+                    is considered organic.
+                  </li>
+                  <li>
+                    <span className="text-foreground font-medium">No finder's fee:</span>{' '}
+                    Sourcing commissions do not apply to co-founders, keeping incentives
+                    aligned.
+                  </li>
+                  <li>
+                    <span className="text-foreground font-medium">50/50 profit split:</span>{' '}
+                    100% of the client budget flows into the company pool, and net profits
+                    are split exactly equally.
+                  </li>
+                </ul>
               </div>
-            </div>
-          </div>
 
-          {/* External Affiliates Column */}
-          <div className="rounded-xl border border-border/60 bg-muted/20 p-5 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <TrendingUp size={16} />
+              {/* Live example */}
+              <Card padding="sm" className="mt-5 bg-card">
+                <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                  Example · Rp 10.000.000 client invoice
+                </p>
+                <ExampleGrid
+                  rows={[
+                    ['Gross client budget', 'Rp 10.000.000', 'foreground'],
+                    ['Sourcing fee (0%)', 'Rp 0', 'muted'],
+                    ['Remaining to company', 'Rp 10.000.000', 'muted'],
+                    ['Operating expenses', '- Rp 1.000.000', 'danger'],
+                  ]}
+                  total={['Net profit split (50/50)', 'Rp 4.500.000 each']}
+                />
+              </Card>
+            </Card>
+
+            {/* External Affiliates Column */}
+            <Card padding="md" className="bg-muted/15 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-muted/50 border border-border flex items-center justify-center text-muted-foreground">
+                    <TrendingUp size={14} />
+                  </div>
+                  <h4 className="text-sm font-medium text-foreground">
+                    External affiliate sourcing
+                  </h4>
                 </div>
-                <h4 className="font-bold text-sm text-foreground">External Affiliate Sourcing</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed mt-3">
+                  When external contacts refer a client to Scala Solutions, they are paid a
+                  fixed <span className="text-foreground font-medium">10% commission</span>{' '}
+                  on gross budgets, shared equally by both partners:
+                </p>
+                <ul className="mt-3 space-y-2 text-xs text-muted-foreground list-disc list-inside leading-relaxed">
+                  <li>
+                    <span className="text-foreground font-medium">Corporate COGS:</span>{' '}
+                    The affiliate commission is deducted as a direct company operating
+                    expense.
+                  </li>
+                  <li>
+                    <span className="text-foreground font-medium">
+                      Shared acquisition cost:
+                    </span>{' '}
+                    Because net profit is calculated after this deduction, both partners
+                    share the fee 50/50.
+                  </li>
+                  <li>
+                    <span className="text-foreground font-medium">
+                      Out-of-pocket protection:
+                    </span>{' '}
+                    No partner pays the affiliate directly; it is settled from the invoice
+                    receipts.
+                  </li>
+                </ul>
               </div>
-              <p className="text-[11px] text-muted-foreground font-medium leading-relaxed mt-3">
-                When external contacts refer a client to Scala Solutions, they are paid a fixed **10%** commission on gross budgets, shared equally by both partners:
-              </p>
-              <ul className="mt-4 space-y-2 text-[11px] text-muted-foreground font-semibold list-disc list-inside">
-                <li>
-                  <span className="text-foreground font-extrabold">Corporate COGS:</span> The affiliate commission is deducted as a direct company operating expense (COGS).
-                </li>
-                <li>
-                  <span className="text-foreground font-extrabold">Shared Acquisition Cost:</span> Because net profit is calculated *after* this deduction, both partners automatically share the fee 50/50.
-                </li>
-                <li>
-                  <span className="text-foreground font-extrabold">Out-of-Pocket Protection:</span> No partner pays the affiliate directly; it is settled from the invoice receipts.
-                </li>
-              </ul>
-            </div>
 
-            {/* Live Example calculator */}
-            <div className="mt-5 p-3.5 rounded-lg bg-card border border-border/80">
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2.5">
-                Example: Rp 10.000.000 Client Invoice
-              </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
-                <div className="text-muted-foreground font-semibold">Gross Client Budget</div>
-                <div className="text-right font-black text-foreground">Rp 10.000.000</div>
-                
-                <div className="text-muted-foreground font-semibold flex items-center gap-1">
-                  Affiliate Fee (10%) <Sparkles size={9} className="text-emerald-400 fill-emerald-400" />
-                </div>
-                <div className="text-right font-black text-red-400">- Rp 1.000.000</div>
-
-                <div className="text-muted-foreground font-semibold">Net Company Revenue</div>
-                <div className="text-right font-bold text-muted-foreground">Rp 9.000.000</div>
-
-                <div className="text-muted-foreground font-semibold">Operating Expenses</div>
-                <div className="text-right font-bold text-red-400">- Rp 1.000.000</div>
-
-                <div className="text-muted-foreground font-bold border-t border-border/40 pt-2 mt-1">
-                  Net Profit Split (50/50)
-                </div>
-                <div className="text-right font-black text-emerald-400 border-t border-border/40 pt-2 mt-1">
-                  Rp 4.000.000 each
-                </div>
-              </div>
-            </div>
+              <Card padding="sm" className="mt-5 bg-card">
+                <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                  Example · Rp 10.000.000 client invoice
+                </p>
+                <ExampleGrid
+                  rows={[
+                    ['Gross client budget', 'Rp 10.000.000', 'foreground'],
+                    ['Affiliate fee (10%)', '- Rp 1.000.000', 'danger'],
+                    ['Net company revenue', 'Rp 9.000.000', 'muted'],
+                    ['Operating expenses', '- Rp 1.000.000', 'danger'],
+                  ]}
+                  total={['Net profit split (50/50)', 'Rp 4.000.000 each']}
+                />
+              </Card>
+            </Card>
           </div>
 
-        </div>
+          {/* Footer info box */}
+          <div className="mt-6 rounded-xl border border-border bg-muted/20 p-4 flex items-start gap-3">
+            <AlertCircle size={15} className="text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              <span className="text-foreground font-medium">Symmetry principle:</span>{' '}
+              This setup ensures that regardless of who is in the "sales seat" or the
+              "delivery seat" for any given month, both founders are compensated for
+              their contributions while maintaining an exactly equal 50/50 equity
+              structure.
+            </p>
+          </div>
 
-        {/* Footer info box */}
-        <div className="mt-6 p-3.5 rounded-xl border border-primary/10 bg-primary/5 flex items-start gap-3">
-          <AlertCircle size={15} className="text-primary shrink-0 mt-0.5" />
-          <p className="text-[10px] text-muted-foreground leading-normal font-semibold">
-            <strong className="text-foreground">Symmetry Principle:</strong> This setup ensures that regardless of who is in the "sales seat" or the "delivery seat" for any given month, both founders are properly compensated for their unique, individual contributions while maintaining an exactly equal 50/50 equity structure.
-          </p>
-        </div>
-
-        {/* Bottom Actions footer */}
-        <div className="mt-6 pt-4 border-t border-border/60 flex justify-end">
-          <button 
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:opacity-90 active-press transition-opacity shadow-sm cursor-pointer"
-          >
-            I Understand
-          </button>
+          {/* Bottom actions */}
+          <div className="mt-6 pt-4 border-t border-border flex justify-end">
+            <Button variant="primary" size="md" onClick={onClose}>
+              I understand
+            </Button>
+          </div>
         </div>
       </div>
     </div>,
     document.body
   );
 };
+
+// Tiny helper for the example calc rows. Keeps the layout consistent without
+// reinventing a table for two cells.
+type RowTone = 'foreground' | 'muted' | 'danger';
+const toneClasses: Record<RowTone, string> = {
+  foreground: 'text-foreground',
+  muted: 'text-muted-foreground',
+  danger: 'text-red-500',
+};
+
+const ExampleGrid: React.FC<{
+  rows: Array<[string, string, RowTone]>;
+  total: [string, string];
+}> = ({ rows, total }) => (
+  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+    {rows.map(([label, value, tone]) => (
+      <React.Fragment key={label}>
+        <div className="text-muted-foreground">{label}</div>
+        <div className={`text-right tabular-nums ${toneClasses[tone]}`}>{value}</div>
+      </React.Fragment>
+    ))}
+    <div className="text-foreground font-medium border-t border-border pt-2 mt-1 col-span-1">
+      {total[0]}
+    </div>
+    <div className="text-right text-foreground font-medium tabular-nums border-t border-border pt-2 mt-1 col-span-1">
+      {total[1]}
+    </div>
+  </div>
+);
