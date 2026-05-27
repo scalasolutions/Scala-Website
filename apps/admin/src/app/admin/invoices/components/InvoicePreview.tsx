@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ZoomIn, ZoomOut, Printer, X } from 'lucide-react';
-import { MockInvoice, MockClient } from '@/lib/db/queries';
+import { MockInvoice, MockClient, getInvoicePagePresets, MockInvoicePagePreset } from '@/lib/db/queries';
 import { InvoiceLineItem, getClientRefCode, formatDateClean } from './invoice-types';
 import { InvoiceCoverPage } from './InvoiceCoverPage';
 import { InvoiceTCPage1 } from './InvoiceTCPage1';
@@ -13,10 +13,6 @@ import { InvoiceBillingPage } from './InvoiceBillingPage';
 const PAGE_W = 800;
 const PAGE_H = 1130;
 const PAGE_GAP = 32;
-const NUM_PAGES = 4;
-const TOTAL_UNSCALED_HEIGHT = PAGE_H * NUM_PAGES + PAGE_GAP * (NUM_PAGES - 1);
-
-const PAGE_LABELS = ['Billing', 'Cover', 'T&C (I)', 'T&C (II)'];
 
 // Shared page style applied to every A4 div
 const PAGE_STYLE: React.CSSProperties = {
@@ -98,36 +94,28 @@ const PRINT_CSS = `
       overflow: visible !important;
       margin: 0 !important;
       padding: 0 !important;
+      width: 100% !important;
     }
 
-    /* Position the pages wrapper in the center of the print flow at actual 100% size */
+    /* Target the absolute scale-wrapper and reset its transform so pages print in 100% scale A4 */
     #invoice-pages-wrapper {
-      position: relative !important;
-      width: 800px !important;
-      margin: 0 auto !important;
-      padding: 0 !important;
+      position: static !important;
       transform: none !important;
       display: flex !important;
       flex-direction: column !important;
-      gap: 0 !important;
-      background: white !important;
-      visibility: visible !important;
+      gap: 0mm !important;
+      width: 100% !important;
     }
 
-    /* Perfect A4 styling for each page */
+    /* Enforce exact A4 size during print and avoid background shadows */
     .invoice-print-page {
-      width: 800px !important;
-      height: 1130px !important;
-      min-height: 1130px !important;
-      max-height: 1130px !important;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      border: none !important;
+      width: 210mm !important;
+      height: 297mm !important;
       margin: 0 auto !important;
-      padding: 56px 64px !important;
-      box-sizing: border-box !important;
-      overflow: hidden !important;
-      position: relative !important;
+      padding: 20mm 20mm !important;
+      border: none !important;
+      box-shadow: none !important;
+      border-radius: 0px !important;
       page-break-after: always !important;
       page-break-inside: avoid !important;
       background: white !important;
@@ -156,10 +144,43 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const [scale, setScale] = useState(1);
   const [currentPage, setCurrentPage] = useState(0);
   const [preparedBy, setPreparedBy] = useState<'nicholas' | 'fredrick' | 'both'>('nicholas');
+  const [pagePresets, setPagePresets] = useState<MockInvoicePagePreset[]>([]);
+  const [titlePresets, setTitlePresets] = useState<MockInvoicePagePreset[]>([]);
 
   const outerPagesRef = useRef<HTMLDivElement>(null);
-
   const effectiveScale = scale * zoomLevel;
+
+  // Bootstrap page presets
+  useEffect(() => {
+    async function loadPagePresets() {
+      try {
+        const presets = await getInvoicePagePresets();
+        const fullPages = presets.filter(p => p.sectionKey === 'full_page_html');
+        const titles = presets.filter(p => p.sectionKey === 'page_title');
+
+        // Apply local storage overrides if present
+        if (typeof window !== 'undefined') {
+          fullPages.forEach(p => {
+            const localContent = localStorage.getItem(`scala_preset_${p.pageKey}`);
+            if (localContent) {
+              p.content = localContent;
+            }
+          });
+          titles.forEach(t => {
+            const localTitle = localStorage.getItem(`scala_preset_title_${t.pageKey}`);
+            if (localTitle) {
+              t.content = localTitle;
+            }
+          });
+        }
+        setPagePresets(fullPages);
+        setTitlePresets(titles);
+      } catch (e) {
+        console.warn("Failed to load page presets inside preview:", e);
+      }
+    }
+    loadPagePresets();
+  }, [invoice]);
 
   // Auto-fit scale on mount / resize
   useEffect(() => {
@@ -173,6 +194,61 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     window.addEventListener('resize', computeScale);
     return () => window.removeEventListener('resize', computeScale);
   }, []);
+
+  // Parse included page keys from invoice
+  const getIncludedPageKeys = (): string[] => {
+    if (invoice.includedPagesJson) {
+      try {
+        return JSON.parse(invoice.includedPagesJson) as string[];
+      } catch (e) {
+        return ['cover', 'tc1', 'tc2'];
+      }
+    }
+    return ['cover', 'tc1', 'tc2'];
+  };
+
+  const getPageTitle = (key: string): string => {
+    if (key === 'billing') return 'Billing';
+    if (key === 'cover') return 'Cover';
+
+    const customTitle = titlePresets.find(t => t.pageKey === key);
+    if (customTitle && customTitle.content) return customTitle.content;
+
+    if (key === 'tc1') return 'T&C Page 1';
+    if (key === 'tc2') return 'T&C Page 2';
+    if (key.startsWith('custom_')) {
+      return key.replace('custom_', '').replace(/_/g, ' ');
+    }
+    return key;
+  };
+
+  const includedPageKeys = getIncludedPageKeys();
+
+  // Composing dynamic pages catalog
+  const activePages: Array<{ key: string; label: string; content?: string }> = [];
+  
+  // 1. Billing is always included
+  activePages.push({ key: 'billing', label: 'Billing' });
+
+  // 2. Cover is optional
+  if (includedPageKeys.includes('cover')) {
+    activePages.push({ key: 'cover', label: 'Cover' });
+  }
+
+  // 3. Page Presets (Default + Custom) are optional
+  pagePresets.forEach(preset => {
+    if (includedPageKeys.includes(preset.pageKey)) {
+      activePages.push({
+        key: preset.pageKey,
+        label: getPageTitle(preset.pageKey),
+        content: preset.content,
+      });
+    }
+  });
+
+  const numPages = activePages.length;
+  const totalUnscaledHeight = PAGE_H * numPages + PAGE_GAP * (numPages - 1);
+  const pageLabels = activePages.map(p => p.label);
 
   // Reset zoom and scroll to top when invoice changes
   useEffect(() => {
@@ -195,17 +271,16 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
       if (!outer) return;
       const mainRect = mainEl.getBoundingClientRect();
       const outerRect = outer.getBoundingClientRect();
-      // How far we've scrolled past the top of the pages area
       const scrolledPast = mainRect.top - outerRect.top;
       const scaledPageSize = (PAGE_H + PAGE_GAP) * effectiveScale;
-      const page = Math.max(0, Math.min(NUM_PAGES - 1, Math.floor(scrolledPast / scaledPageSize)));
+      const page = Math.max(0, Math.min(numPages - 1, Math.floor(scrolledPast / scaledPageSize)));
       setCurrentPage(page);
     };
 
     mainEl.addEventListener('scroll', handleScroll, { passive: true });
     return () => mainEl.removeEventListener('scroll', handleScroll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scale, zoomLevel]);
+  }, [scale, zoomLevel, numPages]);
 
   // Scroll main to a specific page index
   const scrollToPage = (pageIndex: number) => {
@@ -215,7 +290,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
     const mainRect = mainEl.getBoundingClientRect();
     const outerRect = outer.getBoundingClientRect();
-    // Absolute top of the outer pages container within the main scroll area
     const outerTopInMain = outerRect.top - mainRect.top + mainEl.scrollTop;
     const scaledPageSize = (PAGE_H + PAGE_GAP) * effectiveScale;
 
@@ -223,7 +297,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     setCurrentPage(pageIndex);
   };
 
-  // Resolve client data
+  // Resolve client details
   const client = clients.find(c => c.id === invoice.clientId);
   const clientName = client?.name || 'Unknown Client';
   const companyName = client?.companyName || 'No Company';
@@ -231,71 +305,74 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const clientRefCode = getClientRefCode(companyName || clientName, invoice.invoiceNumber);
   const formattedDate = formatDateClean(invoice.createdAt || invoice.issuedAt || new Date());
 
-  const sharedPageProps = {
-    companyName: companyName || clientName,
-    clientRefCode,
-    formattedDate,
-    pageStyle: PAGE_STYLE,
-    totalPages: NUM_PAGES,
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
-    <div className="animate-fade-up flex flex-col">
+    <div className="relative w-full flex flex-col gap-6 select-none animate-fade-up">
+      {/* Dynamic Print styles block */}
+      <style>{PRINT_CSS}</style>
 
-      {/* ── Print styles ── */}
-      <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
-
-      {/* ── Sticky top toolbar ── */}
-      <div className="sticky top-0 z-10 w-full flex items-center justify-between gap-4 bg-card border border-border p-4 rounded-2xl shadow-lg print:hidden mb-6">
-
-        {/* Back button */}
-        <button
-          onClick={onClose}
-          className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          <ArrowLeft size={16} />
-          <span className="hidden sm:inline">Back to Invoices</span>
-          <span className="inline sm:hidden">Back</span>
-        </button>
-
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border/60">
+      {/* ── Sticky Toolbar ── */}
+      <div
+        className="sticky top-0 z-30 flex items-center justify-between p-4 bg-background/90 backdrop-blur border-b border-border print:hidden"
+      >
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setZoomLevel(prev => Math.max(0.4, parseFloat((prev - 0.1).toFixed(1))))}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
-            title="Zoom Out"
+            onClick={onClose}
+            className="flex items-center justify-center h-10 w-10 rounded-xl bg-card border border-border hover:bg-muted text-foreground cursor-pointer transition-all"
+            title="Back to Invoices"
           >
-            <ZoomOut size={15} />
+            <ArrowLeft size={16} />
           </button>
-          <span className="text-[11px] font-bold text-foreground min-w-[40px] text-center">
-            {Math.round(zoomLevel * 100)}%
-          </span>
-          <button
-            onClick={() => setZoomLevel(prev => Math.min(2.0, parseFloat((prev + 0.1).toFixed(1))))}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
-            title="Zoom In"
-          >
-            <ZoomIn size={15} />
-          </button>
-          <button
-            onClick={() => setZoomLevel(1)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer border-l border-border/40 pl-2 ml-1"
-          >
-            <span className="text-[10px] font-bold tracking-wider uppercase">Reset</span>
-          </button>
+          <div>
+            <h2 className="text-base font-extrabold flex items-center gap-2">
+              Preview Invoice
+              <span className="text-[10px] uppercase font-black tracking-widest text-primary shrink-0 bg-primary/10 px-2 py-0.5 rounded">
+                Rp {invoice.total.toLocaleString('id-ID')}
+              </span>
+            </h2>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Ref: <span className="font-mono">{invoice.invoiceNumber}</span> • {clientName}
+            </p>
+          </div>
         </div>
 
-        {/* Print + Close */}
+        {/* Toolbar Center Controls */}
         <div className="flex items-center gap-2">
+          {/* Zoom controls */}
+          <div className="flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
+            <button
+              onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.25))}
+              className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground cursor-pointer"
+              title="Zoom Out"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <span className="text-[10px] font-black text-foreground w-12 text-center select-none tabular-nums">
+              {Math.round(effectiveScale * 100)}%
+            </span>
+            <button
+              onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.25))}
+              className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground cursor-pointer"
+              title="Zoom In"
+            >
+              <ZoomIn size={14} />
+            </button>
+          </div>
+
+          {/* Action Print button */}
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 text-xs font-bold bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:opacity-90 cursor-pointer"
-            style={{ boxShadow: '0 0 10px rgba(206, 248, 78, 0.2)' }}
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all cursor-pointer"
+            style={{ boxShadow: '0 0 12px rgba(206, 248, 78, 0.2)' }}
           >
-            <Printer size={14} />
-            <span className="hidden sm:inline">Print Invoice</span>
-            <span className="inline sm:hidden">Print</span>
+            <Printer size={13} />
+            Print / PDF
           </button>
+
+          {/* Close button */}
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-muted-foreground hover:bg-muted cursor-pointer"
@@ -314,7 +391,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
       <div
         ref={outerPagesRef}
         className="relative w-full flex justify-center"
-        style={{ height: TOTAL_UNSCALED_HEIGHT * effectiveScale }}
+        style={{ height: totalUnscaledHeight * effectiveScale }}
       >
         <div
           id="invoice-pages-wrapper"
@@ -329,17 +406,66 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             gap: `${PAGE_GAP}px`,
           }}
         >
-          <InvoiceBillingPage
-            {...sharedPageProps}
-            pageNumber={1}
-            lineItems={parsedItems}
-            total={invoice.total}
-            discountType={invoice.discountType}
-            discountValue={invoice.discountValue}
-          />
-          <InvoiceCoverPage {...sharedPageProps} pageNumber={2} preparedBy={preparedBy} />
-          <InvoiceTCPage1  {...sharedPageProps} pageNumber={3} />
-          <InvoiceTCPage2  {...sharedPageProps} pageNumber={4} />
+          {activePages.map((page, index) => {
+            const pageNo = index + 1;
+            const sharedProps = {
+              companyName: companyName || clientName,
+              clientRefCode,
+              formattedDate,
+              pageStyle: PAGE_STYLE,
+              pageNumber: pageNo,
+              totalPages: numPages,
+            };
+
+            if (page.key === 'billing') {
+              return (
+                <InvoiceBillingPage
+                  key="billing"
+                  {...sharedProps}
+                  lineItems={parsedItems}
+                  total={invoice.total}
+                  discountType={invoice.discountType}
+                  discountValue={invoice.discountValue}
+                />
+              );
+            }
+            if (page.key === 'cover') {
+              return (
+                <InvoiceCoverPage
+                  key="cover"
+                  {...sharedProps}
+                  preparedBy={preparedBy}
+                />
+              );
+            }
+            if (page.key === 'tc1') {
+              return (
+                <InvoiceTCPage1
+                  key="tc1"
+                  {...sharedProps}
+                  htmlContent={page.content}
+                />
+              );
+            }
+            if (page.key === 'tc2') {
+              return (
+                <InvoiceTCPage2
+                  key="tc2"
+                  {...sharedProps}
+                  htmlContent={page.content}
+                />
+              );
+            }
+
+            // Custom dynamic HTML pages use the responsive TCPage1 renderer
+            return (
+              <InvoiceTCPage1
+                key={page.key}
+                {...sharedProps}
+                htmlContent={page.content}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -348,40 +474,42 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
         className="sticky bottom-6 self-end mr-[15px] z-20 print:hidden flex flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
       >
         {/* Prepared By Selector */}
-        <div 
-          className="group bg-card border border-border rounded-2xl p-3 shadow-xl flex flex-col gap-2 transition-all duration-300"
-          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-        >
-          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/80 pb-1 mb-0.5">
-            Prepared By
-          </span>
-          <div className="flex flex-col gap-0 group-hover:gap-1 transition-all duration-300">
-            {[
-              { id: 'nicholas', label: 'Nicholas' },
-              { id: 'fredrick', label: 'Fredrick' },
-              { id: 'both', label: 'Both' }
-            ].map(opt => (
-              <button
-                key={opt.id}
-                onClick={() => setPreparedBy(opt.id as any)}
-                className={`w-full px-2.5 rounded-lg text-left text-[10px] font-black transition-all duration-300 origin-top flex items-center ${
-                  preparedBy === opt.id
-                    ? 'bg-primary text-primary-foreground py-1.5 h-7 min-h-[28px]'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-7 group-hover:min-h-[28px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-1.5 group-hover:pointer-events-auto'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+        {includedPageKeys.includes('cover') && (
+          <div 
+            className="group bg-card border border-border rounded-2xl p-3 shadow-xl flex flex-col gap-2 transition-all duration-300 animate-fade-in"
+            style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+          >
+            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/80 pb-1 mb-0.5">
+              Prepared By
+            </span>
+            <div className="flex flex-col gap-0 group-hover:gap-1 transition-all duration-300">
+              {[
+                { id: 'nicholas', label: 'Nicholas' },
+                { id: 'fredrick', label: 'Fredrick' },
+                { id: 'both', label: 'Both' }
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setPreparedBy(opt.id as any)}
+                  className={`w-full px-2.5 rounded-lg text-left text-[10px] font-black transition-all duration-300 origin-top flex items-center ${
+                    preparedBy === opt.id
+                      ? 'bg-primary text-primary-foreground py-1.5 h-7 min-h-[28px]'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-7 group-hover:min-h-[28px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-1.5 group-hover:pointer-events-auto'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Page Navigator */}
+        {/* Dynamic Page Navigator */}
         <div
           className="group bg-card border border-border rounded-2xl p-1.5 shadow-xl flex flex-col gap-0 group-hover:gap-1.5 transition-all duration-300"
           style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
         >
-          {PAGE_LABELS.map((label, i) => (
+          {pageLabels.map((label, i) => (
             <button
               key={i}
               onClick={() => scrollToPage(i)}
@@ -402,8 +530,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               >
                 {i + 1}
               </span>
-              {/* Label — only on wider screens */}
-              <span className="hidden lg:block text-[11px] font-bold pr-0.5">{label}</span>
+              {/* Label */}
+              <span className="hidden lg:block text-[11px] font-bold pr-0.5 truncate">{label}</span>
             </button>
           ))}
         </div>

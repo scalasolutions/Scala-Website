@@ -29,6 +29,7 @@ import {
   getInvoices, 
   getTickets, 
   updateClient, 
+  deleteClient,
   MockClient, 
   MockInvoice, 
   MockTicket 
@@ -64,6 +65,12 @@ export default function ClientDetailPage() {
   const [subscriptionStartDate, setSubscriptionStartDate] = useState<string>('');
   const [portalPassword, setPortalPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Delete Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deleteConfirmNameInput, setDeleteConfirmNameInput] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function loadClientData() {
@@ -107,10 +114,10 @@ export default function ClientDetailPage() {
     loadClientData();
   }, [id]);
 
-  // Prevent background scrolling when Edit modal is open (prevent double scrollbar)
+  // Prevent background scrolling when Edit or Delete modal is open (prevent double scrollbar)
   useEffect(() => {
     const mainEl = document.querySelector('main');
-    if (editModalOpen) {
+    if (editModalOpen || deleteModalOpen) {
       if (mainEl) mainEl.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
     } else {
@@ -121,7 +128,7 @@ export default function ClientDetailPage() {
       if (mainEl) mainEl.style.overflow = '';
       document.body.style.overflow = '';
     };
-  }, [editModalOpen]);
+  }, [editModalOpen, deleteModalOpen]);
 
   if (loading) {
     return (
@@ -197,6 +204,21 @@ export default function ClientDetailPage() {
         console.error("Failed to update client", err);
       }
     });
+  };
+
+  const handleDeleteClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteConfirmInput !== 'CONFIRM' || deleteConfirmNameInput !== client.name) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteClient(client.id);
+      setDeleteModalOpen(false);
+      router.push('/admin/clients');
+    } catch (err) {
+      console.error("Failed to delete client account", err);
+      setIsDeleting(false);
+    }
   };
 
   const hasUrl = client.websiteAddress && client.websiteAddress !== '';
@@ -570,6 +592,95 @@ export default function ClientDetailPage() {
         </div>
 
       </div>
+
+      {/* --- DANGER ZONE --- */}
+      <div className="p-6 rounded-2xl bg-red-500/5 border border-red-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h4 className="text-sm font-extrabold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+            <AlertTriangle size={15} />
+            Danger Zone
+          </h4>
+          <p className="text-xs text-muted-foreground mt-1">
+            Permanently delete this client account, portal access, and revoke all active monthly SLAs. This action is irreversible.
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setDeleteConfirmInput('');
+            setDeleteConfirmNameInput('');
+            setDeleteModalOpen(true);
+          }}
+          className="px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-md shadow-red-500/10 hover:shadow-red-500/20 active-press"
+        >
+          Delete Account
+        </button>
+      </div>
+
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {mounted && deleteModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/85 backdrop-blur-md" onClick={() => setDeleteModalOpen(false)}></div>
+          
+          <div className="relative w-full max-w-md rounded-2xl bg-card border border-border p-6 shadow-2xl animate-fade-in-scale">
+            <div className="flex items-center gap-3 pb-3 border-b border-border mb-4 text-red-400">
+              <AlertTriangle size={20} className="animate-pulse" />
+              <h3 className="text-base font-bold">Delete Client Account?</h3>
+            </div>
+            
+            <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+              Are you absolutely sure you want to delete <strong>{client.name}</strong>? This will immediately revoke portal credentials, terminate active hosting SLAs, and <strong className="text-red-400 font-bold">permanently delete all associated invoices, billing history, and support tickets</strong>. This action is irreversible.
+            </p>
+            
+            <form onSubmit={handleDeleteClient} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
+                  Type the Client's Name (<span className="text-foreground select-all font-mono font-black">{client.name}</span>) to verify:
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder={client.name}
+                  value={deleteConfirmNameInput}
+                  onChange={(e) => setDeleteConfirmNameInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border text-sm font-semibold focus:border-red-500/40 focus:outline-none transition-all text-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
+                  Type <span className="text-red-400 font-mono font-black select-all">CONFIRM</span> below to execute:
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="CONFIRM"
+                  value={deleteConfirmInput}
+                  onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border text-center text-sm font-black tracking-widest focus:border-red-500/40 focus:outline-none transition-all text-red-400 font-mono uppercase"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-border">
+                <button 
+                  type="button"
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={deleteConfirmInput !== 'CONFIRM' || deleteConfirmNameInput !== client.name || isDeleting}
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-red-500 text-white text-xs font-bold hover:bg-red-600 disabled:opacity-50 cursor-pointer transition-all active-press"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* --- EDIT CLIENT MODAL --- */}
       {mounted && editModalOpen && createPortal(

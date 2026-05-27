@@ -42,6 +42,7 @@ export interface MockInvoice {
   total: number;
   status: 'draft' | 'issued' | 'paid' | 'past_due' | 'written_off';
   itemsJson: string;
+  includedPagesJson?: string | null;
   issuedAt: Date | null;
   dueDate: Date;
   paidAt: Date | null;
@@ -447,6 +448,23 @@ export async function updateClientStatus(id: string, status: 'pending' | 'active
   return null;
 }
 
+export async function deleteClient(id: string) {
+  if (isDbConfigured()) {
+    try {
+      await db.delete(schema.invoices).where(eq(schema.invoices.clientId, id));
+      await db.delete(schema.tickets).where(eq(schema.tickets.clientId, id));
+      await db.delete(schema.clients).where(eq(schema.clients.id, id));
+      return true;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  mockInvoices = mockInvoices.filter(inv => inv.clientId !== id);
+  mockTickets = mockTickets.filter(t => t.clientId !== id);
+  mockClients = mockClients.filter(c => c.id !== id);
+  return true;
+}
+
 // --- INVOICE QUERIES ---
 export async function getInvoices() {
   if (isDbConfigured()) {
@@ -485,6 +503,7 @@ export async function createInvoice(data: schema.NewInvoice) {
     total: data.total,
     status: data.status || 'draft',
     itemsJson: data.itemsJson,
+    includedPagesJson: data.includedPagesJson || null,
     issuedAt: data.issuedAt || null,
     dueDate: data.dueDate,
     paidAt: data.paidAt || null,
@@ -548,6 +567,7 @@ export async function updateInvoice(id: string, data: Partial<schema.NewInvoice>
       paidAt: data.status ? (data.status === 'paid' ? new Date() : null) : mockInvoices[idx].paidAt,
       discountType: data.discountType !== undefined ? (data.discountType as 'percentage' | 'fixed' | null) : mockInvoices[idx].discountType,
       discountValue: data.discountValue !== undefined && data.discountValue !== null ? Number(data.discountValue) : mockInvoices[idx].discountValue,
+      includedPagesJson: data.includedPagesJson !== undefined ? data.includedPagesJson : mockInvoices[idx].includedPagesJson,
       updatedAt: new Date()
     } as MockInvoice;
     return mockInvoices[idx];
@@ -982,4 +1002,269 @@ export async function createPayout(data: schema.NewPayout) {
   };
   mockPayouts.push(newPayout);
   return newPayout;
+}
+
+// ============================================================================
+// --- INVOICE PRESETS ---
+// ============================================================================
+
+export interface MockInvoiceLinePreset {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MockInvoicePagePreset {
+  id: string;
+  pageKey: string;
+  sectionKey: string;
+  content: string;
+  updatedAt: Date;
+}
+
+let mockInvoiceLinePresets: MockInvoiceLinePreset[] = [
+  {
+    id: 'lp1',
+    name: 'Starter Company Profile Package',
+    description: 'Landing Page, Up to 10 Pages\nMobile Responsive\nCustom UI/UX Designs & Animations\nSEO Optimization',
+    price: 5500000,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'lp2',
+    name: 'Basic Maintenance',
+    description: 'Dependency & Stability checks\nPerformance checks\nBug & Critical Issue fixes\nSEO Optimality checks',
+    price: 1500000,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'lp3',
+    name: 'Starter E-Commerce Package',
+    description: 'Custom Storefront UI\nShopping Cart & Checkout\nMidtrans Payment Gateway Integration\nProduct Inventory Management Dashboard',
+    price: 12000000,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'lp4',
+    name: 'Custom Web Application development',
+    description: 'Next.js & Drizzle ORM stack\nCustom REST or GraphQL API\nRole-based access control\nFully responsive dashboard interface',
+    price: 25000000,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+];
+
+let mockInvoicePagePresets: MockInvoicePagePreset[] = [
+  {
+    id: 'pp1',
+    pageKey: 'tc1',
+    sectionKey: 'timeline',
+    content: JSON.stringify([
+      'Discovery & Planning: 2–5 Working Days',
+      'UI/UX Design: 5–10 Working Days',
+      'Development: 10–25 Working Days',
+      'Testing & Launch: 3–7 Working Days'
+    ]),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'pp2',
+    pageKey: 'tc2',
+    sectionKey: 'maintenance',
+    content: JSON.stringify([
+      'Maintenance fees that have been paid are non-refundable.',
+      'Maintenance covers minor updates, monitoring, and technical support only.',
+      'Major redesigns or additional features are excluded unless agreed separately.'
+    ]),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'pp3',
+    pageKey: 'tc2',
+    sectionKey: 'payment_terms',
+    content: JSON.stringify([
+      '50% Down Payment (DP) is required before project scheduling and development begins.',
+      'Remaining 50% payment must be completed before final handoff and website launch.',
+      'Late payments may result in project delays or temporary pause in development.'
+    ]),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'pp4',
+    pageKey: 'tc2',
+    sectionKey: 'scope_changes',
+    content: JSON.stringify([
+      'Any additional requests outside the agreed scope may require additional charges or timeline adjustments.'
+    ]),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'pp5',
+    pageKey: 'tc2',
+    sectionKey: 'client_responsibilities',
+    content: JSON.stringify([
+      'Providing accurate content/assets',
+      'Giving timely feedback',
+      'Maintaining communication during development'
+    ]),
+    updatedAt: new Date(),
+  },
+  {
+    id: 'pp6',
+    pageKey: 'tc2',
+    sectionKey: 'support',
+    content: 'Minor bug fixes after launch are included within the agreed support period. (1 Month). Does not include third-party/server/platform related issues.',
+    updatedAt: new Date(),
+  },
+  {
+    id: 'pp7',
+    pageKey: 'tc1',
+    sectionKey: 'full_page_html',
+    content: `<h2>1. Project Workflow</h2>\n<p>Our standard workflow:</p>\n<ol>\n  <li>Client Discovery</li>\n  <li>Asset Handoff</li>\n  <li>UI/UX Design</li>\n  <li>Website Development</li>\n  <li>Testing & Revisions</li>\n  <li>Launch & Handoff</li>\n</ol>\n\n<h2>2. Asset Handoff</h2>\n<p>Development can only begin after all required assets have been submitted by the client.</p>\n<p>Required assets may include:</p>\n<ul>\n  <li>Logo</li>\n  <li>Images/videos</li>\n  <li>Product data</li>\n  <li>Company profile/content</li>\n  <li>Social links</li>\n  <li>Domain/hosting access (if needed)</li>\n</ul>\n<p>Delays in asset submission may affect project timeline.</p>\n\n<h2>3. Revision Policy</h2>\n<p>This project includes:</p>\n<ul>\n  <li>2 Major Review Sessions</li>\n  <li>1 during UI/UX Design</li>\n  <li>1 before Final Launch</li>\n</ul>\n<p>Additional major revisions outside the agreed sessions may incur extra charges.</p>`,
+    updatedAt: new Date(),
+  },
+  {
+    id: 'pp8',
+    pageKey: 'tc2',
+    sectionKey: 'full_page_html',
+    content: `<h2>4. Estimated Timeline</h2>\n<p>Phase Estimated Time</p>\n<ul>\n  <li>Discovery & Planning: 2–5 Working Days</li>\n  <li>UI/UX Design: 5–10 Working Days</li>\n  <li>Development: 10–25 Working Days</li>\n  <li>Testing & Launch: 3–7 Working Days</li>\n</ul>\n<p>Timeline may vary depending on project complexity and response time.</p>\n\n<h2>5. Maintenance Terms</h2>\n<p>Maintenance fees that have been paid are non-refundable.</p>\n<p>Maintenance covers minor updates, monitoring, and technical support only.</p>\n<p>Major redesigns or additional features are excluded unless agreed separately.</p>\n\n<h2>6. Payment Terms</h2>\n<p>50% Down Payment (DP) is required before project scheduling and development begins.</p>\n<p>Remaining 50% payment must be completed before final handoff and website launch.</p>\n<p>Development can only begin after:</p>\n<ol>\n  <li>DP payment confirmation</li>\n  <li>Complete asset handoff from client</li>\n</ol>\n<p>Late payments may result in project delays or temporary pause in development.</p>\n\n<h2>7. Scope Changes</h2>\n<p>Any additional requests outside the agreed scope may require:</p>\n<ul>\n  <li>Additional charges</li>\n  <li>Timeline adjustments</li>\n</ul>\n\n<h2>8. Client Responsibilities</h2>\n<p>Client is responsible for:</p>\n<ul>\n  <li>Providing accurate content/assets</li>\n  <li>Giving timely feedback</li>\n  <li>Maintaining communication during development</li>\n</ul>\n\n<h2>9. Post Launch Support</h2>\n<p>Minor bug fixes after launch are included within the agreed support period. <strong>(1 Month)</strong></p>\n<p>Does not include third-party/server/platform related issues.</p>`,
+    updatedAt: new Date(),
+  }
+];
+
+export async function getInvoiceLinePresets() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.invoiceLinePresets.findMany({
+        orderBy: [desc(schema.invoiceLinePresets.createdAt)]
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockInvoiceLinePresets].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function createInvoiceLinePreset(data: { name: string; description?: string | null; price: number }) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.invoiceLinePresets).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newPreset: MockInvoiceLinePreset = {
+    id: crypto.randomUUID(),
+    name: data.name,
+    description: data.description || '',
+    price: data.price,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockInvoiceLinePresets.push(newPreset);
+  return newPreset;
+}
+
+export async function updateInvoiceLinePreset(id: string, data: { name?: string; description?: string | null; price?: number }) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.update(schema.invoiceLinePresets).set(data).where(eq(schema.invoiceLinePresets.id, id)).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Update failed, running mock update: ", e);
+    }
+  }
+  const idx = mockInvoiceLinePresets.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    mockInvoiceLinePresets[idx] = {
+      ...mockInvoiceLinePresets[idx],
+      ...data,
+      description: data.description !== undefined ? (data.description || '') : mockInvoiceLinePresets[idx].description,
+      updatedAt: new Date(),
+    };
+    return mockInvoiceLinePresets[idx];
+  }
+  return null;
+}
+
+export async function deleteInvoiceLinePreset(id: string) {
+  if (isDbConfigured()) {
+    try {
+      await db.delete(schema.invoiceLinePresets).where(eq(schema.invoiceLinePresets.id, id));
+      return true;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  mockInvoiceLinePresets = mockInvoiceLinePresets.filter(p => p.id !== id);
+  return true;
+}
+
+export async function getInvoicePagePresets() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.invoicePagePresets.findMany();
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockInvoicePagePresets];
+}
+
+export async function updateInvoicePagePreset(pageKey: string, sectionKey: string, content: string) {
+  if (isDbConfigured()) {
+    try {
+      const existing = await db.query.invoicePagePresets.findFirst({
+        where: (presets, { and, eq }) => and(eq(presets.pageKey, pageKey), eq(presets.sectionKey, sectionKey))
+      });
+      if (existing) {
+        const results = await db.update(schema.invoicePagePresets).set({ content, updatedAt: new Date() }).where(eq(schema.invoicePagePresets.id, existing.id)).returning();
+        return results[0];
+      } else {
+        const results = await db.insert(schema.invoicePagePresets).values({ pageKey, sectionKey, content }).returning();
+        return results[0];
+      }
+    } catch (e) {
+      console.warn("DB Update failed, running mock update: ", e);
+    }
+  }
+  const idx = mockInvoicePagePresets.findIndex(p => p.pageKey === pageKey && p.sectionKey === sectionKey);
+  if (idx !== -1) {
+    mockInvoicePagePresets[idx] = {
+      ...mockInvoicePagePresets[idx],
+      content,
+      updatedAt: new Date(),
+    };
+    return mockInvoicePagePresets[idx];
+  } else {
+    const newPreset: MockInvoicePagePreset = {
+      id: crypto.randomUUID(),
+      pageKey: pageKey as any,
+      sectionKey,
+      content,
+      updatedAt: new Date(),
+    };
+    mockInvoicePagePresets.push(newPreset);
+    return newPreset;
+  }
+}
+
+export async function deleteInvoicePagePreset(pageKey: string) {
+  if (isDbConfigured()) {
+    try {
+      await db.delete(schema.invoicePagePresets).where(eq(schema.invoicePagePresets.pageKey, pageKey));
+      return true;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  mockInvoicePagePresets = mockInvoicePagePresets.filter(p => p.pageKey !== pageKey);
+  return true;
 }

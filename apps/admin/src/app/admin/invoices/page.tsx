@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import {
   Plus,
   Search,
@@ -16,8 +17,9 @@ import {
   Check,
   ChevronDown,
   AlertTriangle,
+  Sliders,
 } from 'lucide-react';
-import { getInvoices, getClients, createInvoice, updateInvoiceStatus, updateInvoice, deleteInvoice, MockInvoice, MockClient } from '@/lib/db/queries';
+import { getInvoices, getClients, createInvoice, updateInvoiceStatus, updateInvoice, deleteInvoice, MockInvoice, MockClient, getInvoiceLinePresets, MockInvoiceLinePreset, getInvoicePagePresets, MockInvoicePagePreset } from '@/lib/db/queries';
 import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
 
@@ -30,8 +32,24 @@ export default function InvoicesPage() {
     return new Intl.NumberFormat('id-ID').format(Number(num));
   };
 
+  const getPageTitle = (key: string): string => {
+    const titlePreset = allPagePresets.find(p => p.pageKey === key && p.sectionKey === 'page_title');
+    if (titlePreset?.content) return titlePreset.content;
+
+    if (key === 'tc1') return 'T&C Page 1';
+    if (key === 'tc2') return 'T&C Page 2';
+    if (key === 'cover') return 'Cover Page';
+    if (key.startsWith('custom_')) {
+      return key.replace('custom_', '').replace(/_/g, ' ');
+    }
+    return key;
+  };
+
   const [invoices, setInvoices] = useState<MockInvoice[]>([]);
   const [clients, setClients] = useState<MockClient[]>([]);
+  const [linePresets, setLinePresets] = useState<MockInvoiceLinePreset[]>([]);
+  const [allPagePresets, setAllPagePresets] = useState<MockInvoicePagePreset[]>([]);
+  const [includedPages, setIncludedPages] = useState<string[]>(['cover', 'tc1', 'tc2']);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
@@ -91,6 +109,16 @@ export default function InvoicesPage() {
 
     setDiscountType(invoice.discountType || 'none');
     setDiscountValue(invoice.discountValue || 0);
+
+    if (invoice.includedPagesJson) {
+      try {
+        setIncludedPages(JSON.parse(invoice.includedPagesJson) as string[]);
+      } catch (e) {
+        setIncludedPages(['cover', 'tc1', 'tc2']);
+      }
+    } else {
+      setIncludedPages(['cover', 'tc1', 'tc2']);
+    }
 
     setModalOpen(true);
   };
@@ -172,9 +200,21 @@ export default function InvoicesPage() {
     }
 
     async function loadData() {
-      const [inv, c] = await Promise.all([getInvoices(), getClients()]);
+      const [inv, c, presets, pages] = await Promise.all([
+        getInvoices(),
+        getClients(),
+        getInvoiceLinePresets(),
+        getInvoicePagePresets(),
+      ]);
       setInvoices(inv as MockInvoice[]);
       setClients(c);
+      setLinePresets(presets as MockInvoiceLinePreset[]);
+      setAllPagePresets(pages as MockInvoicePagePreset[]);
+      
+      // Dynamically initialize the default pages checklist to only include existing presets
+      const activeKeys = pages.filter(p => p.sectionKey === 'full_page_html').map(p => p.pageKey);
+      setIncludedPages(['cover', ...activeKeys]);
+      
       setInvoiceNumber(`INV-2026-${String(inv.length + 1).padStart(3, '0')}`);
 
       const defaultDue = new Date();
@@ -267,6 +307,7 @@ export default function InvoicesPage() {
             total,
             status,
             itemsJson: JSON.stringify(lineItems),
+            includedPagesJson: JSON.stringify(includedPages),
             dueDate: new Date(dueDate),
             discountType: discountType === 'none' ? null : discountType,
             discountValue: Number(discountValue),
@@ -277,7 +318,7 @@ export default function InvoicesPage() {
             setInvoices(prev =>
               prev.map(inv =>
                 inv.id === editingInvoice.id
-                  ? ({ ...updatedInv, client } as MockInvoice)
+                  ? ({ ...updatedInv, client } as any)
                   : inv
               )
             );
@@ -303,6 +344,7 @@ export default function InvoicesPage() {
             total,
             status,
             itemsJson: JSON.stringify(lineItems),
+            includedPagesJson: JSON.stringify(includedPages),
             dueDate: new Date(dueDate),
             issuedAt: status !== 'draft' ? new Date() : null,
             paidAt: status === 'paid' ? new Date() : null,
@@ -312,7 +354,7 @@ export default function InvoicesPage() {
 
           if (newInv) {
             const client = clients.find(c => c.id === selectedClientId);
-            setInvoices(prev => [{ ...newInv, client } as MockInvoice, ...prev]);
+            setInvoices(prev => [{ ...newInv, client } as any, ...prev]);
             setModalOpen(false);
             setLineItems([
               { name: 'Starter Company Profile Package', description: '', price: 5500000, quantity: 1 },
@@ -415,14 +457,30 @@ export default function InvoicesPage() {
             Review accounts receivables, generate client invoices, and track payments.
           </p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active-press transition-all duration-200 cursor-pointer self-start"
-          style={{ boxShadow: '0 0 15px rgba(206, 248, 78, 0.25)' }}
-        >
-          <Plus size={16} />
-          Create Invoice
-        </button>
+        <div className="flex items-center gap-2 self-start shrink-0">
+          <Link
+            href="/admin/invoices/presets"
+            className="flex items-center justify-center h-[40px] w-[40px] rounded-xl bg-card border border-border hover:bg-muted active-press transition-all duration-200 cursor-pointer text-foreground"
+            title="Invoices presets"
+            style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)' }}
+          >
+            <Sliders size={16} />
+          </Link>
+          <button
+            onClick={() => {
+              const activeKeys = allPagePresets
+                .filter(p => p.sectionKey === 'full_page_html')
+                .map(p => p.pageKey);
+              setIncludedPages(['cover', ...activeKeys]);
+              setModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 h-[40px] rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active-press transition-all duration-200 cursor-pointer"
+            style={{ boxShadow: '0 0 15px rgba(206, 248, 78, 0.25)' }}
+          >
+            <Plus size={16} />
+            Create Invoice
+          </button>
+        </div>
       </div>
 
       {/* ── Search + filter bar ── */}
@@ -658,6 +716,8 @@ export default function InvoicesPage() {
               setDiscountType('none');
               setDiscountValue(0);
               setLineItems([{ name: 'Starter Company Profile Package', description: '', price: 5500000, quantity: 1 }]);
+              const activeKeys = allPagePresets.filter(p => p.sectionKey === 'full_page_html').map(p => p.pageKey);
+              setIncludedPages(['cover', ...activeKeys]);
             }}
           />
 
@@ -680,6 +740,8 @@ export default function InvoicesPage() {
                   setDiscountValue(0);
                   setLineItems([{ name: 'Starter Company Profile Package', description: '', price: 5500000, quantity: 1 }]);
                   setInvoiceNumber(`INV-2026-${String(invoices.length + 2).padStart(3, '0')}`);
+                  const activeKeys = allPagePresets.filter(p => p.sectionKey === 'full_page_html').map(p => p.pageKey);
+                  setIncludedPages(['cover', ...activeKeys]);
                 }}
                 className="p-1 rounded-lg text-muted-foreground hover:bg-muted cursor-pointer"
               >
@@ -826,9 +888,36 @@ export default function InvoicesPage() {
                       <div className="flex gap-3 items-end w-full">
                         {/* Item name */}
                         <div className="flex-1 min-w-0">
-                          <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                            Item Title *
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                              Item Title *
+                            </label>
+                            {linePresets.length > 0 && (
+                              <select
+                                onChange={(e) => {
+                                  const presetId = e.target.value;
+                                  if (presetId) {
+                                    const preset = linePresets.find(p => p.id === presetId);
+                                    if (preset) {
+                                      handleLineItemChange(index, 'name', preset.name);
+                                      handleLineItemChange(index, 'price', preset.price);
+                                      handleLineItemChange(index, 'description', preset.description || '');
+                                    }
+                                    e.target.value = ''; // Reset select after choosing
+                                  }
+                                }}
+                                className="text-[10px] text-primary bg-transparent border-none focus:outline-none cursor-pointer font-bold hover:underline"
+                                defaultValue=""
+                              >
+                                <option value="" disabled>-- Load Preset --</option>
+                                {linePresets.map(preset => (
+                                  <option key={preset.id} value={preset.id} className="bg-card text-foreground">
+                                    {preset.name}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
                           <input
                             type="text"
                             required
@@ -994,6 +1083,60 @@ export default function InvoicesPage() {
                   </div>
                 )}
 
+                {/* ── Invoice Pages inclusion toggles ── */}
+                <div className="border-t border-border/60 p-4 bg-muted/5">
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2.5">
+                    Include Invoice Pages
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {/* Cover Page */}
+                    <label className="flex items-center gap-2.5 p-2 rounded-xl border border-border/50 bg-card hover:bg-muted cursor-pointer transition-all select-none">
+                      <input
+                        type="checkbox"
+                        checked={includedPages.includes('cover')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setIncludedPages(prev => [...prev, 'cover']);
+                          } else {
+                            setIncludedPages(prev => prev.filter(p => p !== 'cover'));
+                          }
+                        }}
+                        className="accent-primary rounded"
+                      />
+                      <span className="text-xs font-semibold text-foreground">{getPageTitle('cover')}</span>
+                    </label>
+
+                    {/* Dynamic custom & standard pages checklist */}
+                    {allPagePresets
+                      .filter(p => p.sectionKey === 'full_page_html')
+                      .map(customPage => {
+                        const isChecked = includedPages.includes(customPage.pageKey);
+                        const pageTitle = getPageTitle(customPage.pageKey);
+
+                        return (
+                          <label
+                            key={customPage.id}
+                            className="flex items-center gap-2.5 p-2 rounded-xl border border-border/50 bg-card hover:bg-muted cursor-pointer transition-all select-none capitalize"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setIncludedPages(prev => [...prev, customPage.pageKey]);
+                                  } else {
+                                    setIncludedPages(prev => prev.filter(p => p !== customPage.pageKey));
+                                  }
+                              }}
+                              className="accent-primary rounded"
+                            />
+                            <span className="text-xs font-semibold text-foreground">{pageTitle}</span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+
                 {/* Divider + total row */}
                 <div className="border-t border-border/60 flex items-center justify-between px-4 py-3">
                   <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Invoice Total</span>
@@ -1027,6 +1170,8 @@ export default function InvoicesPage() {
                     setDiscountValue(0);
                     setLineItems([{ name: 'Starter Company Profile Package', description: '', price: 5500000, quantity: 1 }]);
                     setInvoiceNumber(`INV-2026-${String(invoices.length + 2).padStart(3, '0')}`);
+                    const activeKeys = allPagePresets.filter(p => p.sectionKey === 'full_page_html').map(p => p.pageKey);
+                    setIncludedPages(['cover', ...activeKeys]);
                   }}
                   className="px-4 py-2.5 rounded-xl bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 cursor-pointer"
                 >

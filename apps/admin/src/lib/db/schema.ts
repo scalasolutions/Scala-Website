@@ -38,6 +38,7 @@ export const invoices = pgTable('invoices', {
   total: bigint('total', { mode: 'number' }).notNull(),
   status: invoiceStatusEnum('status').notNull().default('draft'),
   itemsJson: text('items_json').notNull(), // JSON string for billing line items
+  includedPagesJson: text('included_pages_json'), // JSON list of included custom/default page keys
   issuedAt: timestamp('issued_at'),
   dueDate: timestamp('due_date').notNull(),
   paidAt: timestamp('paid_at'),
@@ -123,6 +124,25 @@ export const payouts = pgTable('payouts', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// 8. Invoice Line Presets Table
+export const invoiceLinePresets = pgTable('invoice_line_presets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  description: text('description'),
+  price: bigint('price', { mode: 'number' }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 9. Invoice Page Presets Table
+export const invoicePagePresets = pgTable('invoice_page_presets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pageKey: text('page_key').notNull(), // 'cover' | 'tc1' | 'tc2'
+  sectionKey: text('section_key').notNull(), // 'timeline' | 'maintenance' | 'payment_terms' | 'scope_changes' | 'client_responsibilities' | 'support'
+  content: text('content').notNull(), // JSON string or block text
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Types
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
@@ -138,3 +158,7 @@ export type CapitalInjection = typeof capitalInjections.$inferSelect;
 export type NewCapitalInjection = typeof capitalInjections.$inferInsert;
 export type Payout = typeof payouts.$inferSelect;
 export type NewPayout = typeof payouts.$inferInsert;
+export type InvoiceLinePreset = typeof invoiceLinePresets.$inferSelect;
+export type NewInvoiceLinePreset = typeof invoiceLinePresets.$inferInsert;
+export type InvoicePagePreset = typeof invoicePagePresets.$inferSelect;
+export type NewInvoicePagePreset = typeof invoicePagePresets.$inferInsert;
