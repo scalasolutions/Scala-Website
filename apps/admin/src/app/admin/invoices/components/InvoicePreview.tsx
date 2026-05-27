@@ -145,7 +145,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 }) => {
   const [zoomPercent, setZoomPercent] = useState(100);
   const [currentPage, setCurrentPage] = useState(0);
-  const [showModifyMenu, setShowModifyMenu] = useState(false);
   const [preparedBy, setPreparedBy] = useState<'nicholas' | 'fredrick' | 'both'>('nicholas');
   const [pagePresets, setPagePresets] = useState<MockInvoicePagePreset[]>([]);
   const [titlePresets, setTitlePresets] = useState<MockInvoicePagePreset[]>([]);
@@ -305,19 +304,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     mainEl.scrollTo({ top: outerTopInMain + pageIndex * scaledPageSize, behavior: 'smooth' });
     setCurrentPage(pageIndex);
   };
-
-  // Close modify dropdown on global click
-  useEffect(() => {
-    const handleGlobalClick = () => {
-      setShowModifyMenu(false);
-    };
-    if (showModifyMenu) {
-      window.addEventListener('click', handleGlobalClick);
-    }
-    return () => {
-      window.removeEventListener('click', handleGlobalClick);
-    };
-  }, [showModifyMenu]);
 
   // Resolve client details
   const client = clients.find(c => c.id === invoice.clientId);
@@ -560,13 +546,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
           {/* Divider line, only visible when hovered */}
           <div className="h-px bg-border/60 mx-1.5 hidden group-hover:block transition-all duration-300" />
 
-          {/* (+/-) Modify Button */}
-          <div className="relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowModifyMenu(prev => !prev);
-              }}
+          {/* (+/-) Modify Button and Hover Flyout */}
+          <div className="relative group/modify">
+            <Link
+              href="/admin/invoices/presets"
               title="Modify page inclusions or presets"
               className="w-full flex items-center gap-2 px-2.5 rounded-xl text-left transition-all duration-300 text-primary hover:bg-primary/10 h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-9 group-hover:min-h-[36px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-2 group-hover:pointer-events-auto border border-dashed border-primary/30 cursor-pointer font-extrabold text-xs"
             >
@@ -574,35 +557,32 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 ±
               </span>
               <span className="hidden lg:block">Modify</span>
-            </button>
+            </Link>
 
             {/* Modify Flyout Options Menu */}
-            {showModifyMenu && (
-              <div 
-                className="absolute bottom-11 right-0 bg-card border border-border backdrop-blur-md rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 min-w-[160px] z-30 animate-fade-in-scale text-foreground text-[11px] font-semibold"
-                style={{ boxShadow: '0 10px 40px -6px rgba(0,0,0,0.3)' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {onModify && (
-                  <button
-                    onClick={() => {
-                      setShowModifyMenu(false);
-                      onModify();
-                    }}
-                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
-                  >
-                    ⚙️ Include / Exclude
-                  </button>
-                )}
-
-                <Link
-                  href="/admin/invoices/presets?createPage=true"
+            <div 
+              className="absolute bottom-11 right-0 bg-card border border-border backdrop-blur-md rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 min-w-[160px] z-30 transition-all duration-200 opacity-0 pointer-events-none scale-95 origin-bottom-right group-hover/modify:opacity-100 group-hover/modify:pointer-events-auto group-hover/modify:scale-100 text-foreground text-[11px] font-semibold"
+              style={{ boxShadow: '0 10px 40px -6px rgba(0,0,0,0.3)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {onModify && (
+                <button
+                  onClick={() => {
+                    onModify();
+                  }}
                   className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
                 >
-                  ➕ Add New Preset
-                </Link>
-              </div>
-            )}
+                  ⚙️ Include / Exclude
+                </button>
+              )}
+
+              <Link
+                href="/admin/invoices/presets"
+                className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
+              >
+                ➕ Add New Preset
+              </Link>
+            </div>
           </div>
         </div>
       </div>

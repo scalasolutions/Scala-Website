@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { Landmark, Plus } from 'lucide-react';
+import { Landmark, Plus, BookOpen } from 'lucide-react';
 import { 
   getExpenses, 
   getCapitalInjections, 
@@ -11,10 +11,12 @@ import {
   MockExpense,
   MockCapitalInjection,
   MockPayout,
-  MockInvoice
+  MockInvoice,
+  MockClient
 } from '@/lib/db/queries';
 import { FinanceOverviewCards } from './FinanceOverviewCards';
 import { FounderSplitCards } from './FounderSplitCards';
+import { PartnershipSplitGuide } from './PartnershipSplitGuide';
 import { FinanceCharts } from './FinanceCharts';
 import { TransactionTabs } from './TransactionTabs';
 import { ExpenseModal, InjectionModal, PayoutModal } from './TransactionModals';
@@ -23,7 +25,7 @@ export const FinanceDashboard: React.FC = () => {
   const [expenses, setExpenses] = useState<MockExpense[]>([]);
   const [injections, setInjections] = useState<MockCapitalInjection[]>([]);
   const [payouts, setPayouts] = useState<MockPayout[]>([]);
-  const [invoices, setInvoices] = useState<MockInvoice[]>([]);
+  const [invoices, setInvoices] = useState<(MockInvoice & { client?: MockClient })[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Transitions for deleting/actions
@@ -34,6 +36,7 @@ export const FinanceDashboard: React.FC = () => {
   const [injectionModalOpen, setInjectionModalOpen] = useState(false);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [selectedFounder, setSelectedFounder] = useState<'fredrick' | 'nicholas'>('fredrick');
+  const [guideOpen, setGuideOpen] = useState(false);
 
   // Master fetch ledger records
   const loadFinanceLedger = async () => {
@@ -50,7 +53,7 @@ export const FinanceDashboard: React.FC = () => {
         setExpenses(exp as MockExpense[]);
         setInjections(inj as MockCapitalInjection[]);
         setPayouts(pay as MockPayout[]);
-        setInvoices(inv as MockInvoice[]);
+        setInvoices(inv as (MockInvoice & { client?: MockClient })[]);
         setLoading(false);
       }, 0);
     } catch (err) {
@@ -124,17 +127,40 @@ export const FinanceDashboard: React.FC = () => {
     .filter(i => i.founderName === 'nicholas')
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const halfNetProfit = Math.max(0, netProfit / 2);
+  // Sourcing Commissions arithmetic logic (Deprecated co-founder commission, now unified organic company profit)
+  const paidInvoices = invoices.filter(inv => inv.status === 'paid');
+  
+  const commissionsFredrick = 0;
+  const commissionsNicholas = 0;
+
+  const totalSourcingCommissions = 0;
+  
+  const splittableNetProfit = netProfit;
+  const halfSplittableProfit = Math.max(0, splittableNetProfit / 2);
+  
+  const allocationFredrick = halfSplittableProfit;
+  const allocationNicholas = halfSplittableProfit;
+
   const remainingAllowedDraw = selectedFounder === 'fredrick'
-    ? Math.max(0, halfNetProfit - payoutsFredrick)
-    : Math.max(0, halfNetProfit - payoutsNicholas);
+    ? Math.max(0, allocationFredrick - payoutsFredrick)
+    : Math.max(0, allocationNicholas - payoutsNicholas);
 
   return (
     <div className="space-y-8 animate-fade-up">
       {/* Dashboard Top Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Finance &amp; Partner Splits</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-extrabold tracking-tight">Finance &amp; Partner Splits</h1>
+            <button
+              onClick={() => setGuideOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 active-press transition-all duration-200 font-bold text-xs cursor-pointer shadow-sm mt-1"
+              title="View Partnership & Referral Guidelines"
+            >
+              <BookOpen size={13} className="text-primary animate-pulse" />
+              Partnership Policy
+            </button>
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             Available corporate treasury, business expenses, and personal distribution splits for Fredrick &amp; Nicholas.
           </p>
@@ -177,8 +203,12 @@ export const FinanceDashboard: React.FC = () => {
               payoutsNicholas={payoutsNicholas}
               injectionsFredrick={injectionsFredrick}
               injectionsNicholas={injectionsNicholas}
+              baseProfitShare={halfSplittableProfit}
+              commissionFredrick={commissionsFredrick}
+              commissionNicholas={commissionsNicholas}
               onActionClick={handleFounderAction}
             />
+            <PartnershipSplitGuide isOpen={guideOpen} onClose={() => setGuideOpen(false)} />
           </div>
 
           {/* 3. Recharts Cash Flow Analytics Visualizers */}

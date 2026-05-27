@@ -32,7 +32,9 @@ import {
   deleteClient,
   MockClient, 
   MockInvoice, 
-  MockTicket 
+  MockTicket,
+  getPartners,
+  MockPartner
 } from '@/lib/db/queries';
 import { getSubscriptionRemainingMonths } from '@/lib/utils';
 
@@ -49,6 +51,7 @@ export default function ClientDetailPage() {
   const [client, setClient] = useState<MockClient | null>(null);
   const [invoices, setInvoices] = useState<MockInvoice[]>([]);
   const [tickets, setTickets] = useState<MockTicket[]>([]);
+  const [partners, setPartners] = useState<MockPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
@@ -65,6 +68,7 @@ export default function ClientDetailPage() {
   const [subscriptionStartDate, setSubscriptionStartDate] = useState<string>('');
   const [portalPassword, setPortalPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [sourcedBy, setSourcedBy] = useState('organic');
 
   // Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -83,12 +87,16 @@ export default function ClientDetailPage() {
         }
         setClient(c);
         
-        // Load Invoices & Tickets to filter for this client
-        const allInvoices = await getInvoices();
-        const allTickets = await getTickets();
+        // Load Invoices, Tickets, Partners to filter for this client
+        const [allInvoices, allTickets, allPartners] = await Promise.all([
+          getInvoices(),
+          getTickets(),
+          getPartners()
+        ]);
         
         setInvoices(allInvoices.filter(inv => inv.clientId === id) as MockInvoice[]);
         setTickets(allTickets.filter(t => t.clientId === id));
+        setPartners(allPartners as MockPartner[]);
         
         // Initialize form fields
         setName(c.name);
@@ -105,6 +113,8 @@ export default function ClientDetailPage() {
             : new Date().toISOString().substring(0, 10)
         );
         setPortalPassword(c.portalPassword || '');
+        const loadedSourcedBy = c.sourcedBy || 'organic';
+        setSourcedBy(loadedSourcedBy === 'fredrick' || loadedSourcedBy === 'nicholas' ? 'organic' : loadedSourcedBy);
       } catch (err) {
         console.error("Failed to load client profile details", err);
       } finally {
@@ -193,7 +203,8 @@ export default function ClientDetailPage() {
           subscriptionType: subscriptionType || null,
           subscriptionMonths: subscriptionType ? Number(subscriptionMonths) : null,
           subscriptionStartDate: subscriptionType ? new Date(subscriptionStartDate) : null,
-          portalPassword: portalPassword || null
+          portalPassword: portalPassword || null,
+          sourcedBy: sourcedBy || 'organic'
         });
 
         if (updated) {
@@ -219,6 +230,20 @@ export default function ClientDetailPage() {
       console.error("Failed to delete client account", err);
       setIsDeleting(false);
     }
+  };
+
+  const getSourcedByLabel = (sourcedByVal: string | null) => {
+    if (!sourcedByVal || sourcedByVal === 'organic' || sourcedByVal === 'fredrick' || sourcedByVal === 'nicholas') {
+      return 'Organic';
+    }
+    const partner = partners.find(p => p.id === sourcedByVal);
+    if (partner) {
+      return partner.name;
+    }
+    if (sourcedByVal === 'affiliate') {
+      return 'Affiliate';
+    }
+    return sourcedByVal || 'Organic';
   };
 
   const hasUrl = client.websiteAddress && client.websiteAddress !== '';
@@ -276,6 +301,16 @@ export default function ClientDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <span className={`text-xs uppercase font-extrabold px-3 py-1 rounded-md border tracking-wider font-mono ${
+              getSourcedByLabel(client.sourcedBy) === 'Organic'
+                ? 'bg-muted text-muted-foreground border-border'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+            }`}>
+              {getSourcedByLabel(client.sourcedBy) === 'Organic'
+                ? 'Organic Client' 
+                : `Partner: ${getSourcedByLabel(client.sourcedBy)}`}
+            </span>
+
             <span className={`text-xs uppercase font-extrabold px-3 py-1 rounded-md border tracking-wider font-mono ${
               client.status === 'active' 
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' 
@@ -833,6 +868,21 @@ export default function ClientDetailPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Acquisition Source (Sourced By)</label>
+                <select
+                  value={sourcedBy}
+                  onChange={(e) => setSourcedBy(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-muted/40 border border-border text-sm focus:border-primary/40 focus:outline-none transition-all text-foreground appearance-none cursor-pointer"
+                >
+                  <option value="organic">Organic / Direct (No Commission)</option>
+                  {partners.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.referralRate}% Affiliate)</option>
+                  ))}
+                  <option value="affiliate">External Affiliate Partner (10% Commission)</option>
+                </select>
               </div>
 
               <div>

@@ -13,6 +13,8 @@ interface FounderData {
   bgLightClass: string;
   glowClass: string;
   injected: number;
+  baseProfit: number;
+  commission: number;
   profitAllocation: number;
   payoutsDrawn: number;
   remainingDraw: number;
@@ -24,6 +26,9 @@ interface FounderSplitCardsProps {
   payoutsNicholas: number;
   injectionsFredrick: number;
   injectionsNicholas: number;
+  baseProfitShare: number;
+  commissionFredrick: number;
+  commissionNicholas: number;
   onActionClick: (actionType: 'inject' | 'draw', founderKey: 'fredrick' | 'nicholas') => void;
 }
 
@@ -33,10 +38,11 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
   payoutsNicholas,
   injectionsFredrick,
   injectionsNicholas,
+  baseProfitShare,
+  commissionFredrick,
+  commissionNicholas,
   onActionClick,
 }) => {
-  const halfProfit = Math.max(0, netProfit / 2);
-
   const founders: FounderData[] = [
     {
       name: 'Fredrick',
@@ -47,9 +53,11 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
       bgLightClass: 'bg-primary/10 border-primary/20',
       glowClass: 'shadow-primary/5',
       injected: injectionsFredrick,
-      profitAllocation: halfProfit,
+      baseProfit: baseProfitShare,
+      commission: commissionFredrick,
+      profitAllocation: baseProfitShare + commissionFredrick,
       payoutsDrawn: payoutsFredrick,
-      remainingDraw: Math.max(0, halfProfit - payoutsFredrick),
+      remainingDraw: Math.max(0, (baseProfitShare + commissionFredrick) - payoutsFredrick),
     },
     {
       name: 'Nicholas',
@@ -60,9 +68,11 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
       bgLightClass: 'bg-blue-500/10 border-blue-500/20',
       glowClass: 'shadow-blue-500/5',
       injected: injectionsNicholas,
-      profitAllocation: halfProfit,
+      baseProfit: baseProfitShare,
+      commission: commissionNicholas,
+      profitAllocation: baseProfitShare + commissionNicholas,
       payoutsDrawn: payoutsNicholas,
-      remainingDraw: Math.max(0, halfProfit - payoutsNicholas),
+      remainingDraw: Math.max(0, (baseProfitShare + commissionNicholas) - payoutsNicholas),
     },
   ];
 
@@ -112,19 +122,43 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
                   </span>
                 </div>
 
-                {/* 2. Profit allocated */}
+                {/* 2. Base Profit Share */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold">
                     <Wallet size={14} className="opacity-80" />
-                    <span>Allocated Profit Share</span>
+                    <span>Base Profit Share (50%)</span>
                   </div>
                   <span className="font-bold text-xs text-foreground">
+                    {formatCurrencyIDR(founder.baseProfit)}
+                  </span>
+                </div>
+
+                {/* 2.5 Sourcing Commission */}
+                {founder.commission > 0 && (
+                  <div className="flex items-center justify-between text-blue-400">
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      <Percent size={14} className="opacity-80 text-blue-400" />
+                      <span>Sales Commission (10%)</span>
+                    </div>
+                    <span className="font-extrabold text-xs">
+                      + {formatCurrencyIDR(founder.commission)}
+                    </span>
+                  </div>
+                )}
+
+                {/* 3. Total Allocated Draw */}
+                <div className="flex items-center justify-between pt-3.5 border-t border-border/40">
+                  <div className="flex items-center gap-2 text-foreground text-xs font-bold">
+                    <Wallet size={14} className="opacity-85 text-primary" />
+                    <span>Total Allocated Payout</span>
+                  </div>
+                  <span className="font-black text-sm text-foreground">
                     {formatCurrencyIDR(founder.profitAllocation)}
                   </span>
                 </div>
 
-                {/* 3. Distributions drawn */}
-                <div className="flex items-center justify-between">
+                {/* 4. Distributions drawn */}
+                <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold">
                     <ArrowDownRight size={14} className="opacity-80" />
                     <span>Payout Distributions Drawn</span>
