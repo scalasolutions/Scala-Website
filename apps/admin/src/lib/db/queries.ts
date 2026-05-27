@@ -1456,6 +1456,7 @@ export async function createInvoiceLinePreset(data: { name: string; description?
     name: data.name,
     description: data.description || '',
     price: data.price,
+    category: 'uncategorized',
     createdAt: new Date(),
     updatedAt: new Date(),
   };

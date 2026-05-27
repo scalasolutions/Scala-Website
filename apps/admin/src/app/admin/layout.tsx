@@ -290,7 +290,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               icon={item.icon}
               label={item.label}
               active={pathname.startsWith(item.href)}
-              badge={item.badge}
               collapsed={sidebarCollapsed}
             />
           ))}
@@ -368,7 +367,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     icon={item.icon}
                     label={item.label}
                     active={pathname.startsWith(item.href)}
-                    badge={item.badge}
                   />
                 </div>
               ))}
