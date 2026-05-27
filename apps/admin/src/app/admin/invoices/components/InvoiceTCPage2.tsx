@@ -78,7 +78,7 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
         formattedDate={formattedDate}
       />
 
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, paddingBottom: '80px' }}>
         {htmlContent ? (
           <>
             <style>{`

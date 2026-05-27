@@ -445,6 +445,13 @@ export default function InvoicesPage() {
           invoice={previewInvoice}
           clients={clients}
           onClose={() => setPreviewInvoice(null)}
+          onModify={() => {
+            if (previewInvoice) {
+              const target = previewInvoice;
+              setPreviewInvoice(null);
+              startEditInvoice(target);
+            }
+          }}
         />
       ) : (
         <>

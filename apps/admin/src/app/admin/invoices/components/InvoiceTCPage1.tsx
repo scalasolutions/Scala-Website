@@ -82,7 +82,7 @@ export const InvoiceTCPage1: React.FC<InvoiceTCPage1Props> = ({
         formattedDate={formattedDate}
       />
 
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, paddingBottom: '80px' }}>
         {/* Main T&C heading — only appears on page 2 */}
         <div style={{ fontSize: 16, fontWeight: 700, color: '#111111', marginBottom: 24 }}>
           Terms and Conditions

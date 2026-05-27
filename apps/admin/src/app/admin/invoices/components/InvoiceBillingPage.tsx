@@ -43,7 +43,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
         formattedDate={formattedDate}
       />
 
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 32, paddingBottom: '80px' }}>
 
         {/* Table header bar — black rounded pill */}
         <div

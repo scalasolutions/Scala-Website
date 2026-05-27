@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { ArrowLeft, ZoomIn, ZoomOut, Printer, X } from 'lucide-react';
 import { MockInvoice, MockClient, getInvoicePagePresets, MockInvoicePagePreset } from '@/lib/db/queries';
 import { InvoiceLineItem, getClientRefCode, formatDateClean } from './invoice-types';
@@ -132,6 +133,7 @@ interface InvoicePreviewProps {
   invoice: MockInvoice;
   clients: MockClient[];
   onClose: () => void;
+  onModify?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -139,16 +141,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   invoice,
   clients,
   onClose,
+  onModify,
 }) => {
-  const [zoomLevel, setZoomLevel] = useState(2);
-  const [scale, setScale] = useState(1);
+  const [zoomPercent, setZoomPercent] = useState(100);
   const [currentPage, setCurrentPage] = useState(0);
+  const [showModifyMenu, setShowModifyMenu] = useState(false);
   const [preparedBy, setPreparedBy] = useState<'nicholas' | 'fredrick' | 'both'>('nicholas');
   const [pagePresets, setPagePresets] = useState<MockInvoicePagePreset[]>([]);
   const [titlePresets, setTitlePresets] = useState<MockInvoicePagePreset[]>([]);
 
   const outerPagesRef = useRef<HTMLDivElement>(null);
-  const effectiveScale = scale * zoomLevel;
+  const effectiveScale = zoomPercent / 100;
 
   // Bootstrap page presets
   useEffect(() => {
@@ -187,8 +190,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     const computeScale = () => {
       const availH = window.innerHeight - (window.innerWidth < 640 ? 160 : 200);
       const availW = window.innerWidth - (window.innerWidth < 640 ? 48 : 120);
-      const s = Math.max(0.2, Math.min(availH / PAGE_H, availW / PAGE_W, 1.2));
-      setScale(s);
+      const rawScale = Math.max(0.2, Math.min(availH / PAGE_H, availW / PAGE_W, 1.2));
+      // Set initial zoom percent as a rounded 10% multiple (e.g. rawScale * 2 * 100 rounded to nearest 10)
+      const roundedPercent = Math.round((rawScale * 2) * 10) * 10;
+      setZoomPercent(roundedPercent);
     };
     computeScale();
     window.addEventListener('resize', computeScale);
@@ -253,7 +258,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   // Reset zoom and scroll to top when invoice changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      setZoomLevel(2);
+      const availH = window.innerHeight - (window.innerWidth < 640 ? 160 : 200);
+      const availW = window.innerWidth - (window.innerWidth < 640 ? 48 : 120);
+      const rawScale = Math.max(0.2, Math.min(availH / PAGE_H, availW / PAGE_W, 1.2));
+      const roundedPercent = Math.round((rawScale * 2) * 10) * 10;
+      setZoomPercent(roundedPercent);
       setCurrentPage(0);
     }, 0);
     const mainEl = document.querySelector('main');
@@ -280,7 +289,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     mainEl.addEventListener('scroll', handleScroll, { passive: true });
     return () => mainEl.removeEventListener('scroll', handleScroll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scale, zoomLevel, numPages]);
+  }, [zoomPercent, numPages]);
 
   // Scroll main to a specific page index
   const scrollToPage = (pageIndex: number) => {
@@ -296,6 +305,19 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     mainEl.scrollTo({ top: outerTopInMain + pageIndex * scaledPageSize, behavior: 'smooth' });
     setCurrentPage(pageIndex);
   };
+
+  // Close modify dropdown on global click
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setShowModifyMenu(false);
+    };
+    if (showModifyMenu) {
+      window.addEventListener('click', handleGlobalClick);
+    }
+    return () => {
+      window.removeEventListener('click', handleGlobalClick);
+    };
+  }, [showModifyMenu]);
 
   // Resolve client details
   const client = clients.find(c => c.id === invoice.clientId);
@@ -344,17 +366,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
           {/* Zoom controls */}
           <div className="flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
             <button
-              onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.25))}
+              onClick={() => setZoomPercent(prev => Math.max(40, prev - 10))}
               className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground cursor-pointer"
               title="Zoom Out"
             >
               <ZoomOut size={14} />
             </button>
             <span className="text-[10px] font-black text-foreground w-12 text-center select-none tabular-nums">
-              {Math.round(effectiveScale * 100)}%
+              {zoomPercent}%
             </span>
             <button
-              onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.25))}
+              onClick={() => setZoomPercent(prev => Math.min(300, prev + 10))}
               className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground cursor-pointer"
               title="Zoom In"
             >
@@ -534,6 +556,54 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               <span className="hidden lg:block text-[11px] font-bold pr-0.5 truncate">{label}</span>
             </button>
           ))}
+
+          {/* Divider line, only visible when hovered */}
+          <div className="h-px bg-border/60 mx-1.5 hidden group-hover:block transition-all duration-300" />
+
+          {/* (+/-) Modify Button */}
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowModifyMenu(prev => !prev);
+              }}
+              title="Modify page inclusions or presets"
+              className="w-full flex items-center gap-2 px-2.5 rounded-xl text-left transition-all duration-300 text-primary hover:bg-primary/10 h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-9 group-hover:min-h-[36px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-2 group-hover:pointer-events-auto border border-dashed border-primary/30 cursor-pointer font-extrabold text-xs"
+            >
+              <span className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 bg-primary/15 text-primary">
+                ±
+              </span>
+              <span className="hidden lg:block">Modify</span>
+            </button>
+
+            {/* Modify Flyout Options Menu */}
+            {showModifyMenu && (
+              <div 
+                className="absolute bottom-11 right-0 bg-card border border-border backdrop-blur-md rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 min-w-[160px] z-30 animate-fade-in-scale text-foreground text-[11px] font-semibold"
+                style={{ boxShadow: '0 10px 40px -6px rgba(0,0,0,0.3)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {onModify && (
+                  <button
+                    onClick={() => {
+                      setShowModifyMenu(false);
+                      onModify();
+                    }}
+                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
+                  >
+                    ⚙️ Include / Exclude
+                  </button>
+                )}
+
+                <Link
+                  href="/admin/invoices/presets?createPage=true"
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
+                >
+                  ➕ Add New Preset
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -135,6 +135,18 @@ export default function InvoicesPresetsPage() {
     loadData();
   }, []);
 
+  // Auto-trigger Create Page Modal from query param
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('createPage') === 'true') {
+        setPageModalOpen(true);
+        // Clean up URL so refresh doesn't trigger modal again
+        window.history.replaceState({}, '', '/admin/invoices/presets');
+      }
+    }
+  }, []);
+
   // Update editor HTML when tab changes
   useEffect(() => {
     if (activeTab === 'lines') return;

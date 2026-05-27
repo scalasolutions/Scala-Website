@@ -13,30 +13,39 @@ Welcome to the admin control panel for **Scala Solutions**. This portal is desig
 
 ---
 
-## 🚀 What Has Been Achieved
+## 🚀 What Has Been Achieved & Core Capabilities
 
-### 1. Client CRM Directory (`/admin/clients`)
-* Track active and pending client accounts.
-* Add new clients using a premium slide-over drawer form.
-* Quick-search client databases by name or status tabs.
+This project has evolved into a comprehensive, enterprise-ready administration and customer portal monorepo, featuring role-based segregation, strict tenancy-isolation, and dynamic layout generation.
 
-### 2. Billing & Invoices Hub (`/admin/invoices`)
-* **Generate Invoices**: Create new client invoices with dynamic line items, quantity/rate calculators, and custom discounts.
-* **Perfect Alignment Actions**: Compact circular action buttons (`Preview`, `Mark Paid`, `Delete`) aligned in a grid that stays vertically consistent row-by-row.
-* **Sleek Tooltips**: Micro-tooltips fade in above each button on hover and are absolutely isolated, ensuring no layout shifting.
-* **A4 Print Sheet Preview**: Click the `Eye` button to preview full, professional 4-page invoice documents:
-  - **Auto-Scale viewport**: Fits pages seamlessly on any screen height without awkward scrollbars.
-  - **Default Zoom**: Set to a crisp **200% default zoom level** for high fidelity viewing.
-  - **Sticky Navigator**: A floating page-navigator sticks at the bottom-right of the scroll area to switch between Billing, Cover, T&C I, and T&C II pages instantly.
-  - **Print Layout**: Completely styled print overlay (`Ctrl + P`) that hides all admin sidebars, menus, and headers automatically.
+### 1. Covert Client Portal & Secure Routing Gate (`/login` ➡️ `/portal`)
+* **Stealth Administration Cover**: The main login gateway is fully rebranded as the **Scala Client Workspace**. External visitors see a standard portal for clients to check invoices and SLAs, completely obscuring internal administrative tools.
+* **Intelligent Routing Dispatcher**: Entering the admin email (`scalasolutions.dev@gmail.com`) automatically routes to the Admin Dashboard, while entering client credentials redirects instantly to the custom **Client Portal**.
+* **Zero-Flash Theme Sync (FART Free)**: Integrated a lightweight inline script in the layout head to check `localStorage` and toggle the root `dark` class before the first paint, preventing flashing. Includes a sleek floating theme selector.
 
-### 3. Multi-Level Delete Protection
-* **Standard Invoices**: Prompts a clean confirmation dialog before deleting draft or unpaid invoices.
-* **Paid Invoices**: Enforces strict financial security by prompting an audit warning and requiring the admin to type **`CONFIRM`** (case-sensitive) to enable deletion.
+### 2. Client CRM Directory (`/admin/clients`)
+* **Live CRM Tracker**: Manage static and dynamic hosting SLA lifecycles, active/pending metrics, and subscription timers.
+* **Premium slide-drawer forms**: Add or update client directories using sleek transition drawers.
+* **Secure Deletion Cascades**: Supports clean cascading deletion of clients, automatically purging all historical invoices, support tickets, and chat threads.
+* **Double-Verification Warning**: Client account purging requires co-founders to enter the **Client Name** AND the uppercase confirmation token **`CONFIRM`** in separate fields.
 
-### 4. Support Tickets Hub (`/admin/tickets`)
-* Chat-style support message log.
-* Message clients directly inside active threads with a real-time message append.
+### 3. Dynamic Custom Invoices Engine (`/admin/invoices`)
+* **Interactive Inclusion Checklist**: Choose exactly which pages to include or exclude (e.g., Cover, Billing, Terms & Conditions, specialized SLAs) on a per-invoice basis via simple modal checkboxes.
+* **Stepped 10% Zoom Controllers**: Viewport-anchored scaling with clean, round 10% zooms (e.g. 90% ➡️ 100% ➡️ 110%).
+* **Flexible Pages Composition & Navigator**: Trailing page navigation, titles, and layout margins adjust programmatically. Page number footers compute and increment sequentially (e.g. page "2 of 3") regardless of included selections.
+* **A4 Print Sheet Preview**: Click the `Eye` button to preview invoice documents in full size, optimized for `Ctrl + P` to automatically hide menus, sidebars, and top navigation.
+
+### 4. Custom Page CRUD & Docs Editor (`/admin/invoices/presets`)
+* **Google Docs-Style Rich Text Editor**: Create and format an arbitrary number of custom document pages (e.g. specialized SLAs, timeline agreements, milestones) directly inside the browser.
+* **Right-Click Tab Management Context Menu**: Right-click page tabs to trigger glassmorphic dropdowns allowing instant **Rename** and **Delete** actions.
+
+### 5. Interactive Client Hub Portal (`/portal`)
+* **B2B Tenancy Isolation**: Secure client dashboard at `/portal` restricts client accounts to viewing strictly their own files, preventing cross-client document access.
+* **SLA Billing Invoices**: Clients can browse billed invoice histories, see outstanding balances, and click to view and print their own invoices via `/portal/invoices/[id]`.
+* **Technical Support Center**: Clients can create support tickets (specifying categories and urgency) and select any active ticket to converse in real-time with Scala developers directly inside an immersive chat thread!
+
+### 6. Developer Support & Core Chat (`/admin/tickets`)
+* **Unified Admin Ticketing Desk**: Chat-style support message log for admin staff to track customer requests.
+* **Bidirectional Developer Messaging**: Send updates to client portals instantly with auto-scrolling log synchronization.
 
 ---
 
