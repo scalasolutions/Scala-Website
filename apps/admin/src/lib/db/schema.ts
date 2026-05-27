@@ -24,6 +24,7 @@ export const clients = pgTable('clients', {
   subscriptionMonths: integer('subscription_months').default(12),
   subscriptionStartDate: timestamp('subscription_start_date'),
   portalPassword: text('portal_password'),
+  sourcedBy: text('sourced_by').notNull().default('organic'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -143,6 +144,19 @@ export const invoicePagePresets = pgTable('invoice_page_presets', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// 10. Affiliate Partners Table
+export const partners = pgTable('partners', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  phone: text('phone'),
+  companyName: text('company_name'),
+  referralRate: integer('referral_rate').default(10).notNull(), // rate in percentage, defaults to 10%
+  bankDetails: text('bank_details'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Types
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
@@ -162,3 +176,5 @@ export type InvoiceLinePreset = typeof invoiceLinePresets.$inferSelect;
 export type NewInvoiceLinePreset = typeof invoiceLinePresets.$inferInsert;
 export type InvoicePagePreset = typeof invoicePagePresets.$inferSelect;
 export type NewInvoicePagePreset = typeof invoicePagePresets.$inferInsert;
+export type Partner = typeof partners.$inferSelect;
+export type NewPartner = typeof partners.$inferInsert;

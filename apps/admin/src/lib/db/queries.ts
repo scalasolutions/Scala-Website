@@ -29,6 +29,7 @@ export interface MockClient {
   subscriptionMonths: number | null;
   subscriptionStartDate: Date | null;
   portalPassword: string | null;
+  sourcedBy: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,7 +74,44 @@ export interface MockTicketMessage {
   createdAt: Date;
 }
 
+export interface MockPartner {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  companyName: string | null;
+  referralRate: number;
+  bankDetails: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Global In-Memory state for mock data
+let mockPartners: MockPartner[] = [
+  {
+    id: 'p1111111-1111-1111-1111-111111111111',
+    name: 'Alex Kim',
+    email: 'alex@marketingventures.com',
+    phone: '+6281999888777',
+    companyName: 'Marketing Ventures Ltd',
+    referralRate: 10,
+    bankDetails: 'BCA Account 1234567890 (a.n. Alex Kim)',
+    createdAt: new Date('2026-01-15T08:00:00Z'),
+    updatedAt: new Date('2026-01-15T08:00:00Z'),
+  },
+  {
+    id: 'p2222222-2222-2222-2222-222222222222',
+    name: 'Jessica Wong',
+    email: 'jessica.w@referralhub.id',
+    phone: '+6285777666555',
+    companyName: 'Referral Hub Indonesia',
+    referralRate: 10,
+    bankDetails: 'Mandiri Account 9876543210 (a.n. Jessica Wong)',
+    createdAt: new Date('2026-02-10T10:00:00Z'),
+    updatedAt: new Date('2026-02-10T10:00:00Z'),
+  }
+];
+
 let mockClients: MockClient[] = [
   {
     id: 'c1111111-1111-1111-1111-111111111111',
@@ -88,6 +126,7 @@ let mockClients: MockClient[] = [
     subscriptionMonths: 12,
     subscriptionStartDate: new Date('2025-06-01T08:00:00Z'), // Expires June 2026 (~1 month remaining as of May 2026)
     portalPassword: 'scala-fredrick-2026',
+    sourcedBy: 'organic',
     createdAt: new Date('2025-06-01T08:00:00Z'),
     updatedAt: new Date('2026-05-15T08:00:00Z'),
   },
@@ -104,6 +143,7 @@ let mockClients: MockClient[] = [
     subscriptionMonths: 12,
     subscriptionStartDate: new Date('2026-01-01T10:00:00Z'), // Expires Jan 2027 (~7-8 months remaining as of May 2026)
     portalPassword: 'scala-sarah-2026',
+    sourcedBy: 'p1111111-1111-1111-1111-111111111111',
     createdAt: new Date('2026-02-10T10:00:00Z'),
     updatedAt: new Date('2026-05-20T10:00:00Z'),
   },
@@ -120,6 +160,7 @@ let mockClients: MockClient[] = [
     subscriptionMonths: null,
     subscriptionStartDate: null,
     portalPassword: 'scala-tony-2026',
+    sourcedBy: 'organic',
     createdAt: new Date('2025-11-01T09:00:00Z'),
     updatedAt: new Date('2026-04-12T09:00:00Z'),
   },
@@ -136,6 +177,7 @@ let mockClients: MockClient[] = [
     subscriptionMonths: 12,
     subscriptionStartDate: new Date('2026-05-24T14:30:00Z'), // Just started (~12 months remaining)
     portalPassword: 'scala-bruce-2026',
+    sourcedBy: 'organic',
     createdAt: new Date('2026-05-24T14:30:00Z'),
     updatedAt: new Date('2026-05-24T14:30:00Z'),
   },
@@ -152,6 +194,7 @@ let mockClients: MockClient[] = [
     subscriptionMonths: 3,
     subscriptionStartDate: new Date('2026-04-15T08:00:00Z'), // Expires July 2026 (~1.5 months remaining)
     portalPassword: 'scala-aspire-2026',
+    sourcedBy: 'organic',
     createdAt: new Date('2026-05-20T08:00:00Z'),
     updatedAt: new Date('2026-05-20T08:00:00Z'),
   }
@@ -390,6 +433,7 @@ export async function createClient(data: schema.NewClient) {
     subscriptionMonths: data.subscriptionMonths !== undefined && data.subscriptionMonths !== null ? Number(data.subscriptionMonths) : null,
     subscriptionStartDate: data.subscriptionStartDate ? new Date(data.subscriptionStartDate) : null,
     portalPassword: data.portalPassword || `scala-${data.name.split(' ')[0].toLowerCase()}-2026`,
+    sourcedBy: data.sourcedBy || 'organic',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -417,6 +461,7 @@ export async function updateClient(id: string, data: Partial<schema.NewClient>) 
       subscriptionStartDate: data.subscriptionStartDate ? new Date(data.subscriptionStartDate) : mockClients[idx].subscriptionStartDate,
       subscriptionMonths: data.subscriptionMonths !== undefined && data.subscriptionMonths !== null ? Number(data.subscriptionMonths) : mockClients[idx].subscriptionMonths,
       portalPassword: data.portalPassword !== undefined ? data.portalPassword : mockClients[idx].portalPassword,
+      sourcedBy: data.sourcedBy !== undefined ? data.sourcedBy : mockClients[idx].sourcedBy,
       updatedAt: new Date()
     } as MockClient;
     return mockClients[idx];
@@ -1266,5 +1311,87 @@ export async function deleteInvoicePagePreset(pageKey: string) {
     }
   }
   mockInvoicePagePresets = mockInvoicePagePresets.filter(p => p.pageKey !== pageKey);
+  return true;
+}
+
+// --- AFFILIATE PARTNER QUERIES ---
+export async function getPartners() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.partners.findMany({
+        orderBy: [desc(schema.partners.createdAt)]
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockPartners].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function createPartner(data: schema.NewPartner) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.partners).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newPartner: MockPartner = {
+    id: crypto.randomUUID(),
+    name: data.name,
+    email: data.email,
+    phone: data.phone || null,
+    companyName: data.companyName || null,
+    referralRate: data.referralRate !== undefined && data.referralRate !== null ? Number(data.referralRate) : 10,
+    bankDetails: data.bankDetails || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockPartners.push(newPartner);
+  return newPartner;
+}
+
+export async function updatePartner(id: string, data: Partial<schema.NewPartner>) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.update(schema.partners)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.partners.id, id))
+        .returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Update failed, running mock update: ", e);
+    }
+  }
+  const idx = mockPartners.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    mockPartners[idx] = {
+      ...mockPartners[idx],
+      ...data,
+      referralRate: data.referralRate !== undefined && data.referralRate !== null ? Number(data.referralRate) : mockPartners[idx].referralRate,
+      updatedAt: new Date()
+    } as MockPartner;
+    return mockPartners[idx];
+  }
+  return null;
+}
+
+export async function deletePartner(id: string) {
+  if (isDbConfigured()) {
+    try {
+      await db.delete(schema.partners).where(eq(schema.partners.id, id));
+      return true;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  // When deleting a partner, any clients referred by them are updated to 'organic'
+  const clientsToUpdate = mockClients.filter(c => c.sourcedBy === id);
+  clientsToUpdate.forEach(c => {
+    c.sourcedBy = 'organic';
+  });
+  
+  mockPartners = mockPartners.filter(p => p.id !== id);
   return true;
 }

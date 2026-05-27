@@ -117,7 +117,7 @@ export default function DashboardHome() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
             <div className="flex-1">
-              <h3 className="text-sm font-bold text-amber-200">Action Required: Subscriptions Expiring Soon</h3>
+              <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200">Action Required: Subscriptions Expiring Soon</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 The following client subscriptions have less than 3 months remaining. Reach out to secure renewal.
               </p>
@@ -125,18 +125,38 @@ export default function DashboardHome() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-4">
                 {expiringClients.map(c => {
                   const rem = getSubscriptionRemainingMonths(c);
+                  const hasUrl = c.websiteAddress && c.websiteAddress !== '';
+                  const domain = hasUrl ? c.websiteAddress!.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : '';
+                  const logoUrl = hasUrl ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+
                   return (
                     <Link key={c.id} href={`/admin/clients/${c.id}`} className="block">
                       <div className="p-3 rounded-xl bg-card border border-amber-500/10 hover:border-amber-500/30 transition-all flex items-center justify-between cursor-pointer group">
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-bold truncate group-hover:text-primary transition-colors">{c.name}</h4>
-                          <p className="text-[10px] text-muted-foreground capitalize mt-0.5">{c.subscriptionType} Hosting</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          {logoUrl ? (
+                            <img 
+                              src={logoUrl} 
+                              alt={c.name} 
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                              className="w-8 h-8 rounded-lg border border-border object-contain bg-white p-0.5 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-muted/40 flex items-center justify-center font-bold text-xs text-muted-foreground group-hover:text-primary group-hover:bg-primary/5 transition-all duration-200 shrink-0">
+                              {c.name.substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold truncate group-hover:text-primary transition-colors">{c.name}</h4>
+                            <p className="text-[10px] text-muted-foreground capitalize mt-0.5">{c.subscriptionType} Hosting</p>
+                          </div>
                         </div>
                         <div className="text-right shrink-0">
                           <span className={`text-[9px] font-black px-2 py-0.75 rounded-md tracking-wider font-mono ${
                             rem === 0 
-                              ? 'bg-red-500/15 text-red-400 border border-red-500/20' 
-                              : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                              ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20' 
+                              : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20'
                           }`}>
                             {rem === 0 ? 'Expired' : `${rem} mo remaining`}
                           </span>
