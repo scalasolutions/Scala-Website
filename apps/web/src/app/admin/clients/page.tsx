@@ -35,6 +35,7 @@ import {
   getInvoices,
   MockInvoice,
 } from '@/lib/db/queries';
+import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
 import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER } from '@/lib/utils';
 import { formatCurrencyIDR } from '@/app/admin/invoices/components/invoice-types';
 import PageHeader from '@/components/ui/PageHeader';
@@ -183,6 +184,7 @@ export default function ClientsPage() {
         });
 
         if (newClient) {
+          invalidateCache(CACHE_KEYS.CLIENTS);
           setClients((prev) => [newClient as MockClient, ...prev]);
           // Reset form fields
           setName('');
@@ -284,7 +286,8 @@ export default function ClientsPage() {
       try {
         await deletePartner(partnerId);
         setPartners((prev) => prev.filter((p) => p.id !== partnerId));
-        // Refresh clients to reflect organic status if any were modified
+        // Refresh clients — some may now show 'organic' sourcing.
+        invalidateCache(CACHE_KEYS.CLIENTS);
         const c = await getClients();
         setClients(c);
       } catch (err) {

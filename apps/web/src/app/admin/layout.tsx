@@ -24,10 +24,10 @@ import {
   Coins
 } from 'lucide-react';
 import {
-  getClients,
-  getInvoices,
-  getTickets
-} from '@/lib/db/queries';
+  getCachedClients,
+  getCachedInvoices,
+  getCachedTickets,
+} from '@/lib/data-cache';
 import { getSubscriptionRemainingMonths, cn } from '@/lib/utils';
 import ScalaLogo from '@/components/ui/ScalaLogo';
 import Badge from '@/components/ui/Badge';
@@ -131,9 +131,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     async function loadNotifications() {
       try {
-        const c = await getClients();
-        const inv = await getInvoices();
-        const t = await getTickets();
+        // Use the shared cache — avoids duplicate DB hits when the dashboard
+        // page already fetched the same data within the last 30 seconds.
+        const [c, inv, t] = await Promise.all([
+          getCachedClients(),
+          getCachedInvoices(),
+          getCachedTickets(),
+        ]);
 
         const list: NotificationItem[] = [];
 
@@ -187,7 +191,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     loadNotifications();
-    const interval = setInterval(loadNotifications, 15000); // refresh every 15s
+    // Refresh every 60 s — the shared cache means only one real DB call fires
+    // per 30 s window, so this is effectively a very cheap periodic check.
+    const interval = setInterval(loadNotifications, 60_000);
 
     return () => clearInterval(interval);
   }, []);

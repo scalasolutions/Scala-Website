@@ -23,14 +23,12 @@ const ticketCategoryLabels: Record<string, string> = {
   feature_request: 'Feature request',
 };
 import Link from 'next/link';
+import { MockClient, MockInvoice, MockTicket } from '@/lib/db/queries';
 import {
-  getClients,
-  getInvoices,
-  getTickets,
-  MockClient,
-  MockInvoice,
-  MockTicket
-} from '@/lib/db/queries';
+  getCachedClients,
+  getCachedInvoices,
+  getCachedTickets,
+} from '@/lib/data-cache';
 import { getSubscriptionRemainingMonths } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -50,9 +48,14 @@ export default function DashboardHome() {
   useEffect(() => {
     async function loadData() {
       try {
-        const c = await getClients();
-        const inv = await getInvoices();
-        const t = await getTickets();
+        // Parallel fetch — all three requests fire simultaneously.
+        // The shared cache also deduplicates any concurrent requests
+        // from the notification bell in the layout.
+        const [c, inv, t] = await Promise.all([
+          getCachedClients(),
+          getCachedInvoices(),
+          getCachedTickets(),
+        ]);
         setClients(c);
         setInvoices(inv as MockInvoice[]);
         setTickets(t);

@@ -50,20 +50,15 @@ export const FinanceDashboard: React.FC = () => {
         getPayouts(),
         getInvoices(),
       ]);
-      
-      // Defer state updates to avoid synchronous cascading renders inside useEffect hooks
-      setTimeout(() => {
-        setExpenses(exp as MockExpense[]);
-        setInjections(inj as MockCapitalInjection[]);
-        setPayouts(pay as MockPayout[]);
-        setInvoices(inv as (MockInvoice & { client?: MockClient })[]);
-        setLoading(false);
-      }, 0);
+      // React 18 batches these state updates automatically — no setTimeout needed.
+      setExpenses(exp as MockExpense[]);
+      setInjections(inj as MockCapitalInjection[]);
+      setPayouts(pay as MockPayout[]);
+      setInvoices(inv as (MockInvoice & { client?: MockClient })[]);
+      setLoading(false);
     } catch (err) {
       console.error('Failed to load financial records ledger', err);
-      setTimeout(() => {
-        setLoading(false);
-      }, 0);
+      setLoading(false);
     }
   };
 

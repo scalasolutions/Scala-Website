@@ -28,6 +28,7 @@ import {
   MockClient,
   MockTicketMessage,
 } from '@/lib/db/queries';
+import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -139,8 +140,8 @@ export default function TicketsPage() {
     }
 
     async function loadData() {
-      const t = await getTickets();
-      const c = await getClients();
+      // Parallel fetch — clients and tickets load concurrently.
+      const [t, c] = await Promise.all([getTickets(), getClients()]);
       setTickets(t);
       setClients(c);
       setLoading(false);
@@ -198,7 +199,8 @@ export default function TicketsPage() {
             message: newDescription,
           });
 
-          // Fetch full tickets list again
+          // Fetch full tickets list again — also invalidate cache so notifications bell is fresh.
+          invalidateCache(CACHE_KEYS.TICKETS);
           const updatedList = await getTickets();
           setTickets(updatedList);
 
@@ -271,6 +273,7 @@ export default function TicketsPage() {
     try {
       const updated = await updateTicketStatus(selectedTicketId, status);
       if (updated) {
+        invalidateCache(CACHE_KEYS.TICKETS);
         // Update active ticket locally
         setActiveTicket((prev: any) => {
           if (!prev) return null;

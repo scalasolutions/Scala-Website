@@ -33,6 +33,7 @@ import {
   MockInvoicePagePreset,
   uploadReceiptAction,
 } from '@/lib/db/queries';
+import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
 import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
 import PageHeader from '@/components/ui/PageHeader';
@@ -448,6 +449,7 @@ export default function InvoicesPage() {
           });
 
           if (updatedInv) {
+            invalidateCache(CACHE_KEYS.INVOICES);
             const client = clients.find((c) => c.id === selectedClientId);
             setInvoices((prev) =>
               prev.map((inv) =>
@@ -479,6 +481,7 @@ export default function InvoicesPage() {
           });
 
           if (newInv) {
+            invalidateCache(CACHE_KEYS.INVOICES);
             const client = clients.find((c) => c.id === selectedClientId);
             setInvoices((prev) => [{ ...newInv, client } as any, ...prev]);
             setModalOpen(false);
@@ -803,6 +806,7 @@ export default function InvoicesPage() {
       try {
         const deleted = await deleteInvoice(invoiceToDelete.id);
         if (deleted) {
+          invalidateCache(CACHE_KEYS.INVOICES);
           setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceToDelete.id));
           setDeleteModalOpen(false);
           setInvoiceToDelete(null);
@@ -2058,6 +2062,7 @@ export default function InvoicesPage() {
                         );
 
                         if (updated) {
+                          invalidateCache(CACHE_KEYS.INVOICES);
                           setInvoices(prev =>
                             prev.map(inv =>
                               inv.id === paymentInvoice.id

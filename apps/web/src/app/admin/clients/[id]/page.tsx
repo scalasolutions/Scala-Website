@@ -41,6 +41,7 @@ import {
   getPartners,
   MockPartner,
 } from '@/lib/db/queries';
+import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
 import { getSubscriptionRemainingMonths } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -254,6 +255,8 @@ export default function ClientDetailPage() {
         });
 
         if (updated) {
+          // Invalidate clients cache so next list view is fresh.
+          invalidateCache(CACHE_KEYS.CLIENTS);
           setClient(updated as MockClient);
           setEditModalOpen(false);
         }
@@ -270,6 +273,8 @@ export default function ClientDetailPage() {
     setIsDeleting(true);
     try {
       await deleteClient(client.id);
+      // Invalidate all related caches after deletion.
+      invalidateCache(CACHE_KEYS.CLIENTS, CACHE_KEYS.INVOICES, CACHE_KEYS.TICKETS);
       setDeleteModalOpen(false);
       router.push('/admin/clients');
     } catch (err) {
@@ -343,6 +348,7 @@ export default function ClientDetailPage() {
 
       const updated = await updateClient(client.id, updateData);
       if (updated) {
+        invalidateCache(CACHE_KEYS.CLIENTS);
         setClient(updated as MockClient);
       }
     } catch (e) {
