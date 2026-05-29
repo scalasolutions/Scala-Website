@@ -25,6 +25,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
@@ -33,6 +34,18 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
+                  // Public marketing routes (/, /services) are force-dark —
+                  // see app/(public)/layout.tsx. We mirror that decision here
+                  // pre-hydration so there's no light-mode flash on first
+                  // paint when a user lands on a marketing page with a
+                  // stored 'light' theme preference. The preference stays in
+                  // localStorage untouched, so admin/portal still honor it.
+                  var path = window.location.pathname;
+                  var isPublic = path === '/' || path === '/services' || path.indexOf('/services/') === 0;
+                  if (isPublic) {
+                    document.documentElement.classList.add('dark');
+                    return;
+                  }
                   var theme = localStorage.getItem('theme');
                   if (theme === 'dark') {
                     document.documentElement.classList.add('dark');

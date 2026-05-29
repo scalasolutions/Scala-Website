@@ -1,6 +1,6 @@
 # Vercel Environment Variables Guide - Scala Solutions
 
-This guide outlines the environment variables required to deploy and run the **Scala Solutions** Admin & Client Portal monorepo (`apps/admin`) on Vercel.
+This guide outlines the environment variables required to deploy and run the **Scala Solutions** Admin & Client Portal monorepo (`apps/web`) on Vercel.
 
 ---
 
@@ -41,9 +41,9 @@ Add these key-value pairs in the **Environment Variables** section of your Verce
 
 ## ⚡ Deployment Checklist
 
-1. **Root Directory:** Ensure `apps/admin` is selected as the Root Directory in Vercel.
+1. **Root Directory:** Ensure `apps/web` is selected as the Root Directory in Vercel.
 2. **Framework Preset:** `Next.js` (Vercel will auto-detect).
 3. **Database Schema Sync:** After Vercel successfully builds and deploys your site, sync the database schema to your live database by running the following command locally in your terminal:
    ```bash
-   npm run db:push --workspace=apps/admin
+   npm run db:push --workspace=apps/web
    ```

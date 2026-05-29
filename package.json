@@ -7,9 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/admin",
-    "build": "npm run build --workspace=apps/admin",
-    "start": "npm run start --workspace=apps/admin",
-    "lint": "npm run lint --workspace=apps/admin"
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "start": "npm run start --workspace=apps/web",
+    "lint": "npm run lint --workspace=apps/web"
   }
 }

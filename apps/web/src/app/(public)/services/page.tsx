@@ -22,9 +22,10 @@ import {
   Headphones,
   Mail,
 } from 'lucide-react';
-import PublicNav from '@/components/PublicNav';
-import PublicFooter from '@/components/PublicFooter';
-import LetsTalkBand from '@/components/LetsTalkBand';
+import PublicNav from '@/app/(public)/components/PublicNav';
+import PublicFooter from '@/app/(public)/components/PublicFooter';
+import LetsTalkBand from '@/app/(public)/components/LetsTalkBand';
+import { Reveal, RevealItem } from '@/app/(public)/components/ui/Reveal';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -44,7 +45,7 @@ interface TierCardProps {
 
 function TierCard({ name, price, blurb, bullets, meta, featured, badge }: TierCardProps) {
   return (
-    <div
+    <RevealItem
       className={cn(
         'relative flex flex-col rounded-2xl p-7 transition-colors',
         featured
@@ -100,7 +101,7 @@ function TierCard({ name, price, blurb, bullets, meta, featured, badge }: TierCa
       >
         Get a quote
       </a>
-    </div>
+    </RevealItem>
   );
 }
 
@@ -158,7 +159,7 @@ function AutomationCard({
   badge,
 }: AutomationCardProps) {
   return (
-    <div
+    <RevealItem
       className={cn(
         'relative flex flex-col rounded-2xl p-7 transition-colors',
         featured
@@ -211,7 +212,7 @@ function AutomationCard({
           </li>
         ))}
       </ul>
-    </div>
+    </RevealItem>
   );
 }
 
@@ -267,7 +268,7 @@ export default function ServicesPage() {
 
       {/* ============================== HERO ============================== */}
       <section className="relative px-6 pt-24 pb-16 md:pt-32 md:pb-20 mx-auto max-w-7xl">
-        <div className="max-w-3xl">
+        <Reveal className="max-w-3xl">
           <p className="text-[11px] uppercase tracking-[0.16em] text-primary font-medium mb-3">
             Pricing
           </p>
@@ -287,7 +288,7 @@ export default function ServicesPage() {
               Revisions are bundled into each tier — extras are billed at our hourly rate.
             </span>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ============================== BUILD ============================== */}
@@ -331,7 +332,7 @@ export default function ServicesPage() {
           </div>
 
           {activeBuild === 'websites' && (
-            <div className="grid md:grid-cols-3 gap-5">
+            <Reveal stagger={0.07} className="grid md:grid-cols-3 gap-5">
               <TierCard
                 name="Starter Presence"
                 price="Rp 5.000.000"
@@ -374,11 +375,11 @@ export default function ServicesPage() {
                   'Full SEO & analytics setup',
                 ]}
               />
-            </div>
+            </Reveal>
           )}
 
           {activeBuild === 'ecommerce' && (
-            <div className="grid md:grid-cols-3 gap-5">
+            <Reveal stagger={0.07} className="grid md:grid-cols-3 gap-5">
               <TierCard
                 name="Catalog Store"
                 price="Rp 12.000.000"
@@ -421,11 +422,11 @@ export default function ServicesPage() {
                   'Dedicated technical lead',
                 ]}
               />
-            </div>
+            </Reveal>
           )}
 
           {activeBuild === 'internal' && (
-            <div className="grid md:grid-cols-3 gap-5">
+            <Reveal stagger={0.07} className="grid md:grid-cols-3 gap-5">
               <TierCard
                 name="Admin Dashboard"
                 price="Rp 6.000.000"
@@ -467,7 +468,7 @@ export default function ServicesPage() {
                   'Long-term roadmap partnership',
                 ]}
               />
-            </div>
+            </Reveal>
           )}
         </div>
       </section>
@@ -477,15 +478,17 @@ export default function ServicesPage() {
         <div className="absolute top-1/4 right-[-10%] w-[600px] h-[500px] rounded-full bg-primary/[0.05] blur-[140px] pointer-events-none" />
 
         <div className="relative mx-auto max-w-7xl">
-          <SectionLead
-            eyebrow="Grow"
-            icon={<TrendingUp className="w-4 h-4" />}
-            title="Bring in more customers."
-            description="Add-ons and monthly services that help people find you, hear from you, and buy more often."
-          />
+          <Reveal>
+            <SectionLead
+              eyebrow="Grow"
+              icon={<TrendingUp className="w-4 h-4" />}
+              title="Bring in more customers."
+              description="Add-ons and monthly services that help people find you, hear from you, and buy more often."
+            />
+          </Reveal>
 
           {/* SEO & Marketing à la carte */}
-          <div className="mt-14 rounded-2xl border border-border bg-card p-7">
+          <Reveal className="mt-14 rounded-2xl border border-border bg-card p-7">
             <div className="mb-5">
               <h3 className="text-base font-semibold tracking-tight text-foreground">
                 SEO &amp; Marketing
@@ -538,20 +541,20 @@ export default function ServicesPage() {
                 meta="per SKU"
               />
             </div>
-          </div>
+          </Reveal>
 
           {/* AI & Automation cards */}
           <div className="mt-10">
-            <div className="mb-5">
+            <Reveal className="mb-5">
               <h3 className="text-base font-semibold tracking-tight text-foreground">
                 AI &amp; Automation
               </h3>
               <p className="mt-1 text-xs text-muted-foreground max-w-md">
                 Small, practical tools that save your team hours every week.
               </p>
-            </div>
+            </Reveal>
 
-            <div className="grid md:grid-cols-3 gap-5">
+            <Reveal stagger={0.07} className="grid md:grid-cols-3 gap-5">
               <AutomationCard
                 icon={<MessageSquare className="w-4 h-4" />}
                 title="AI Chatbot Setup"
@@ -593,7 +596,7 @@ export default function ServicesPage() {
                   'Continuous training & tuning',
                 ]}
               />
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -603,15 +606,17 @@ export default function ServicesPage() {
         <div className="absolute top-1/3 left-[-10%] w-[600px] h-[500px] rounded-full bg-primary/[0.05] blur-[140px] pointer-events-none" />
 
         <div className="relative mx-auto max-w-7xl">
-          <SectionLead
-            eyebrow="Run"
-            icon={<Server className="w-4 h-4" />}
-            title="Keep it running smoothly."
-            description="Hosting, email, security, and ongoing support — so you never have to wonder if your site is still working."
-          />
+          <Reveal>
+            <SectionLead
+              eyebrow="Run"
+              icon={<Server className="w-4 h-4" />}
+              title="Keep it running smoothly."
+              description="Hosting, email, security, and ongoing support — so you never have to wonder if your site is still working."
+            />
+          </Reveal>
 
           {/* Infrastructure rows */}
-          <div className="mt-14 rounded-2xl border border-border bg-card p-7">
+          <Reveal className="mt-14 rounded-2xl border border-border bg-card p-7">
             <div className="mb-5">
               <h3 className="text-base font-semibold tracking-tight text-foreground">
                 Infrastructure
@@ -650,20 +655,20 @@ export default function ServicesPage() {
                 meta="one-time"
               />
             </div>
-          </div>
+          </Reveal>
 
           {/* Ongoing Support tiers */}
           <div className="mt-10">
-            <div className="mb-5">
+            <Reveal className="mb-5">
               <h3 className="text-base font-semibold tracking-tight text-foreground">
                 Ongoing Support
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 A monthly plan so you always have someone to call when things change.
               </p>
-            </div>
+            </Reveal>
 
-            <div className="grid md:grid-cols-3 gap-5">
+            <Reveal stagger={0.07} className="grid md:grid-cols-3 gap-5">
               <TierCard
                 name="Essential Care"
                 price="Rp 500.000 / mo"
@@ -704,12 +709,14 @@ export default function ServicesPage() {
                   'Dedicated point of contact',
                 ]}
               />
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>
 
-      <LetsTalkBand />
+      <Reveal>
+        <LetsTalkBand />
+      </Reveal>
 
       <PublicFooter />
     </div>

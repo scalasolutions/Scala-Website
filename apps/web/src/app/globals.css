@@ -27,6 +27,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -39,23 +41,36 @@
 
 :root {
   --radius: 0.75rem;
-  
-  /* Slate/Lime Light-first Palette by default */
-  --background: #f8fafc;
+
+  /* Slate/Lime Light-first Palette by default.
+     Background is a warm off-white (vs pure slate-50) — buys ~10% extra
+     contrast headroom for the lime ink token and helps the pale `primary-soft`
+     tint read as a fill rather than disappearing into the page. */
+  --background: #f8f8f4;
   --foreground: #0f172a;
-  
+
   --card: #ffffff;
   --card-foreground: #0f172a;
-  
+
   --popover: #ffffff;
   --popover-foreground: #0f172a;
-  
-  /* Pure brand lime in both themes per user direction — no darker AA-fallback.
-     Foreground colors that sit ON primary must be dark (#0f172a) for readability,
-     because pure lime is too luminous for white text. Avoid `text-primary` on
-     light backdrops — use `text-foreground` instead. */
+
+  /* --- Two-token lime accent system ---
+     `--primary` is the neon brand lime. Use it ONLY as decoration — sitting
+     on a dark neighbor that provides contrast (dark cards, the lime button
+     with dark text on it, chart peaks, status dots, gradient blurs). It does
+     NOT clear AA on the light page background as text/icons.
+     `--primary-ink` is a darker forest-lime that clears AA (>=4.5:1) on the
+     warm off-white background. Use it for anything that needs to read as
+     meaning on a light surface — link text, light-mode button labels, icons
+     on light bg, eyebrow text, active-state text in accordions, etc.
+     `--primary-soft` is a very pale lime tint for chip/badge backgrounds in
+     light mode (paired with `text-primary-ink` for the label).
+     In dark mode, all three resolve to the neon — dark mode is unchanged. */
   --primary: #CEF84E;
   --primary-foreground: #0f172a;
+  --primary-ink: #638612;
+  --primary-soft: #f0f8d6;
 
   --secondary: #e2e8f0;
   --secondary-foreground: #0f172a;
@@ -91,9 +106,14 @@ html.dark {
   --popover: #11131c;
   --popover-foreground: #f8fafc;
   
-  /* Custom vibrant neon lime brand color for Dark Mode: #CEF84E */
+  /* Custom vibrant neon lime brand color for Dark Mode: #CEF84E.
+     In dark mode the ink and soft tokens collapse back to the neon — on a
+     dark background the neon already clears contrast as text/icons, so the
+     two-token split is only needed in light mode. */
   --primary: #CEF84E;
   --primary-foreground: #090a0f;
+  --primary-ink: #CEF84E;
+  --primary-soft: color-mix(in srgb, #CEF84E 18%, transparent);
   
   --secondary: #1e2130;
   --secondary-foreground: #f8fafc;
@@ -246,14 +266,14 @@ html.dark {
    Tuned for both light and dark themes; pairs well with content over a
    subtle glow blob. Use `.glass` on the surface root. */
 .glass {
-  background-color: color-mix(in srgb, var(--card) 55%, transparent);
+  background-color: color-mix(in srgb, var(--card) 82%, transparent);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 html.dark .glass {
-  background-color: color-mix(in srgb, var(--card) 45%, transparent);
+  background-color: color-mix(in srgb, var(--card) 75%, transparent);
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -311,8 +331,8 @@ html.dark .text-glow-lime {
 }
 
 /* --- Marquee (infinite horizontal scroll) ---
-   Used for the "trusted by" logo strip. Track is duplicated in JSX so the
-   loop is seamless. Pauses on hover for accessibility. */
+   Used for the "trusted by" logo strip and the testimonials carousel.
+   Track is duplicated in JSX so the loop is seamless. */
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -338,7 +358,6 @@ html.dark .text-glow-lime {
     transparent 100%
   );
 }
-.marquee-track:hover { animation-play-state: paused; }
 
 /* --- Scroll reveal ---
    Element starts hidden + offset; `.in-view` (toggled via IntersectionObserver
@@ -434,67 +453,3 @@ details[open] > summary .accordion-chev {
 }
 .fade-soft { animation: fade-soft 400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-/* --- Process step graphics ------------------------------------------------
-   The three "How we work" cards each have a bespoke SVG/HTML illustration
-   that reflects the step. Animations run continuously so a user can land on
-   any card and immediately see motion; the parent fades the graphic down
-   when its step is not active. */
-
-/* Discover — radar / sonar */
-@keyframes radar-pulse {
-  0%   { transform: scale(0.3); opacity: 0.9; }
-  80%  { opacity: 0; }
-  100% { transform: scale(4); opacity: 0; }
-}
-.radar-pulse {
-  transform-origin: 100px 100px;
-  transform-box: fill-box;
-  animation: radar-pulse 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-@keyframes radar-sweep {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-.radar-sweep { animation: radar-sweep 4.5s linear infinite; }
-
-@keyframes radar-blip {
-  0%, 60%, 100% { opacity: 0; transform: scale(0.4); }
-  68%, 85%      { opacity: 1; transform: scale(1.4); filter: drop-shadow(0 0 6px #CEF84E); }
-}
-.radar-blip {
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: radar-blip 4.5s ease-in-out infinite;
-}
-
-/* Build — modular tiles assembling */
-@keyframes build-tile-in {
-  0%, 4%   { opacity: 0; transform: scale(0.7) translateY(10px); }
-  12%, 88% { opacity: 1; transform: scale(1) translateY(0); }
-  96%, 100%{ opacity: 0; transform: scale(0.7) translateY(10px); }
-}
-.build-tile {
-  transform-origin: center;
-  animation: build-tile-in 7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-
-/* Launch — trajectory trail and twinkling stars */
-@keyframes launch-trail-draw {
-  0%       { stroke-dashoffset: 200; opacity: 0; }
-  10%, 80% { opacity: 1; }
-  80%      { stroke-dashoffset: 0; }
-  100%     { stroke-dashoffset: -200; opacity: 0; }
-}
-.launch-trail {
-  stroke-dasharray: 200;
-  animation: launch-trail-draw 6s ease-in-out infinite;
-}
-@keyframes launch-star {
-  0%, 100% { opacity: 0.25; transform: scale(0.7); }
-  50%      { opacity: 1; transform: scale(1.2); }
-}
-.launch-star {
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: launch-star 2.4s ease-in-out infinite;
-}

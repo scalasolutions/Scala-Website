@@ -58,9 +58,9 @@ npm install
 ```
 
 ### 2. Set Up Environment Variables (Optional)
-Create an environment file inside the `apps/admin/` folder:
+Create an environment file inside the `apps/web/` folder:
 ```bash
-cp apps/admin/.env.example apps/admin/.env.local
+cp apps/web/.env.example apps/web/.env.local
 ```
 *(If no `DATABASE_URL` is set, the portal will automatically launch in **in-memory Fallback Mode** with pre-seeded clients, billing logs, and ticket threads so you can test all features instantly!)*
 

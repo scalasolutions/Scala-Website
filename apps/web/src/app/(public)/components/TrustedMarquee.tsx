@@ -42,11 +42,7 @@ export default function TrustedMarquee() {
   const loop = [...items, ...items];
 
   return (
-    <section className="relative px-6 py-14 border-t border-border/60 overflow-hidden">
-      {/* Quiet sky-tinted glow on the right so the marquee strip doesn't
-          read as a hard horizontal slab between lime-heavy sections. */}
-      <div className="absolute top-1/2 right-[-12%] -translate-y-1/2 w-[420px] h-[260px] rounded-full bg-sky-400/[0.05] blur-[120px] pointer-events-none" />
-
+    <section className="relative px-6 py-16 overflow-hidden">
       <div className="relative mx-auto max-w-7xl">
         <p className="text-center text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-8">
           The stack we trust to ship fast, secure software

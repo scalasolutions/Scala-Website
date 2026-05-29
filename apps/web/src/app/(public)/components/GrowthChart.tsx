@@ -7,7 +7,6 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-  Tooltip,
 } from 'recharts';
 import { Sparkles } from 'lucide-react';
 
@@ -90,7 +89,7 @@ export default function GrowthChart() {
           </div>
 
           <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <Sparkles className="w-3 h-3 text-primary" />
+            <Sparkles className="w-3 h-3 text-primary-ink dark:text-primary" />
             <span>Illustrative — every business is different</span>
           </div>
         </div>
@@ -117,23 +116,9 @@ export default function GrowthChart() {
                 interval="preserveStartEnd"
               />
               <YAxis hide />
-              <Tooltip
-                cursor={{
-                  stroke: 'rgba(206, 248, 78, 0.35)',
-                  strokeWidth: 1,
-                  strokeDasharray: '3 3',
-                }}
-                contentStyle={{
-                  background: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 12,
-                  fontSize: 12,
-                  padding: '8px 12px',
-                  boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.25)',
-                }}
-                labelStyle={{ color: 'var(--muted-foreground)', fontWeight: 500 }}
-                itemStyle={{ color: 'var(--foreground)' }}
-              />
+              {/* No Tooltip — the chart is purely illustrative, so hovering
+                  should not reveal any numeric values. The "Illustrative" hint
+                  in the header already sets the expectation. */}
               {/* Sessions area sits behind the revenue area in a muted hue. */}
               <Area
                 type="monotone"
@@ -143,6 +128,7 @@ export default function GrowthChart() {
                 fill="url(#growthGhost)"
                 animationDuration={2200}
                 animationEasing="ease-out"
+                activeDot={false}
               />
               <Area
                 type="monotone"
@@ -152,6 +138,7 @@ export default function GrowthChart() {
                 fill="url(#growthLime)"
                 animationDuration={2600}
                 animationEasing="ease-out"
+                activeDot={false}
               />
             </AreaChart>
           </ResponsiveContainer>

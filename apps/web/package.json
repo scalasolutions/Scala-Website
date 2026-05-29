@@ -1,5 +1,5 @@
 {
-  "name": "admin",
+  "name": "web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -19,6 +19,7 @@
     "date-fns": "^4.3.0",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.16.0",
+    "motion": "^12.40.0",
     "next": "16.2.6",
     "next-auth": "^5.0.0-beta.30",
     "postgres": "^3.4.9",
