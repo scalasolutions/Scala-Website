@@ -8,6 +8,7 @@ const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgr
 // depending on context. Under postgres-js, we define the client:
 const client = postgres(connectionString, {
   max: 10, // Connection pool size limit
+  connect_timeout: 3, // Fast 3-second connection timeout to prevent hanging UI
 });
 
 export const db = drizzle(client, { schema });

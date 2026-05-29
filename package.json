@@ -10,6 +10,9 @@
     "dev": "npm run dev --workspace=apps/web",
     "build": "npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web"
+    "lint": "npm run lint --workspace=apps/web",
+    "db:seed": "npm run db:seed --workspace=apps/web",
+    "db:backup": "npm run db:backup --workspace=apps/web",
+    "db:restore": "npm run db:restore --workspace=apps/web"
   }
 }
