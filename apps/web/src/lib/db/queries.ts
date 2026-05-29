@@ -583,9 +583,9 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
       const existingUrl = existing[0]?.proofOfPaymentUrl;
       let finalUrl = proofOfPaymentUrl;
       if (proofOfPaymentUrl && existingUrl) {
-        const urls = existingUrl.split(',').map(u => u.trim()).filter(Boolean);
+        const urls = existingUrl.split('|').map(u => u.trim()).filter(Boolean);
         if (!urls.includes(proofOfPaymentUrl)) {
-          finalUrl = [...urls, proofOfPaymentUrl].join(',');
+          finalUrl = [...urls, proofOfPaymentUrl].join('|');
         } else {
           finalUrl = existingUrl;
         }
@@ -616,9 +616,9 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
     let finalProofOfPaymentUrl = mockInvoices[idx].proofOfPaymentUrl || null;
     if (proofOfPaymentUrl) {
       if (finalProofOfPaymentUrl) {
-        const urls = finalProofOfPaymentUrl.split(',').map(u => u.trim()).filter(Boolean);
+        const urls = finalProofOfPaymentUrl.split('|').map(u => u.trim()).filter(Boolean);
         if (!urls.includes(proofOfPaymentUrl)) {
-          finalProofOfPaymentUrl = [...urls, proofOfPaymentUrl].join(',');
+          finalProofOfPaymentUrl = [...urls, proofOfPaymentUrl].join('|');
         }
       } else {
         finalProofOfPaymentUrl = proofOfPaymentUrl;

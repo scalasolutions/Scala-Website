@@ -12,25 +12,25 @@ interface InvoiceTCPage2Props {
 }
 
 const TcSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div style={{ marginBottom: 20 }}>
-    <div style={{ fontSize: 14, fontWeight: 700, color: '#111111', marginBottom: 6 }}>{title}</div>
+  <div style={{ marginBottom: 12 }}>
+    <div style={{ fontSize: 14, fontWeight: 700, color: '#111111', marginBottom: 4 }}>{title}</div>
     {children}
   </div>
 );
 
 const TcBody: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: 13, color: '#222222', lineHeight: 1.65, marginBottom: 3 }}>{children}</div>
+  <div style={{ fontSize: 13, color: '#222222', lineHeight: 1.45, marginBottom: 2 }}>{children}</div>
 );
 
 const TcBullets: React.FC<{ items: string[] }> = ({ items }) => (
-  <div style={{ marginBottom: 3 }}>
+  <div style={{ marginBottom: 2 }}>
     {items.map((item, i) => (
       <div
         key={i}
         style={{
           fontSize: 13,
           color: '#222222',
-          lineHeight: 1.65,
+          lineHeight: 1.45,
           display: 'flex',
           gap: 7,
           marginLeft: 4,
@@ -44,14 +44,14 @@ const TcBullets: React.FC<{ items: string[] }> = ({ items }) => (
 );
 
 const TcNumbered: React.FC<{ items: string[] }> = ({ items }) => (
-  <div style={{ marginBottom: 3 }}>
+  <div style={{ marginBottom: 2 }}>
     {items.map((item, i) => (
       <div
         key={i}
         style={{
           fontSize: 13,
           color: '#222222',
-          lineHeight: 1.65,
+          lineHeight: 1.45,
           marginLeft: 4,
         }}
       >
@@ -78,7 +78,7 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
         formattedDate={formattedDate}
       />
 
-      <div style={{ marginTop: 32, paddingBottom: '80px' }}>
+      <div style={{ marginTop: 18, paddingBottom: '70px' }}>
         {htmlContent ? (
           <>
             <style>{`
@@ -86,8 +86,8 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
                 font-size: 14px;
                 font-weight: 700;
                 color: #111111;
-                margin-top: 20px;
-                margin-bottom: 6px;
+                margin-top: 14px;
+                margin-bottom: 4px;
               }
               .dynamic-html-tc h2:first-of-type {
                 margin-top: 0px;
@@ -95,16 +95,16 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
               .dynamic-html-tc p {
                 font-size: 13px;
                 color: #222222;
-                line-height: 1.65;
-                margin-bottom: 6px;
+                line-height: 1.45;
+                margin-bottom: 4px;
               }
               .dynamic-html-tc strong {
                 font-weight: 700;
                 color: #111111;
               }
               .dynamic-html-tc ul, .dynamic-html-tc ol {
-                margin-top: 4px;
-                margin-bottom: 12px;
+                margin-top: 2px;
+                margin-bottom: 8px;
                 padding-left: 4px;
               }
               .dynamic-html-tc ul {
@@ -113,8 +113,8 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
               .dynamic-html-tc ul li {
                 font-size: 13px;
                 color: #222222;
-                line-height: 1.65;
-                margin-bottom: 3px;
+                line-height: 1.45;
+                margin-bottom: 2px;
                 display: flex;
                 gap: 7px;
               }
@@ -130,8 +130,8 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
               .dynamic-html-tc ol li {
                 font-size: 13px;
                 color: #222222;
-                line-height: 1.65;
-                margin-bottom: 3px;
+                line-height: 1.45;
+                margin-bottom: 2px;
               }
             `}</style>
             <div 
@@ -203,10 +203,10 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
 
             {/* 9. Post Launch Support */}
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#111111', marginBottom: 6 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111111', marginBottom: 4 }}>
                 9. Post Launch Support
               </div>
-              <div style={{ fontSize: 13, color: '#222222', lineHeight: 1.65, marginBottom: 3 }}>
+              <div style={{ fontSize: 13, color: '#222222', lineHeight: 1.45, marginBottom: 2 }}>
                 Minor bug fixes after launch are included within the agreed support period.{' '}
                 <strong>(1 Month)</strong>
               </div>

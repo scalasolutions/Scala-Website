@@ -70,7 +70,7 @@ export const InvoicePageHeader: React.FC<InvoicePageHeaderProps> = ({
       </div>
 
       {/* Horizontal divider */}
-      <hr style={{ border: 'none', borderTop: '1px solid #d1d5db', margin: '20px 0 18px 0' }} />
+      <hr style={{ border: 'none', borderTop: '1px solid #d1d5db', margin: '14px 0 12px 0' }} />
 
       {/* TO / DATE row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

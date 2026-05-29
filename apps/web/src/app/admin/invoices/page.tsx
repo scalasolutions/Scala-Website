@@ -1029,7 +1029,7 @@ export default function InvoicesPage() {
                               {/* Receipt Attachments List in Drawer */}
                               {proofOfPaymentUrl && (
                                 <div className="space-y-1.5 mt-1.5">
-                                  {proofOfPaymentUrl.split(',').filter(Boolean).map((url, idx) => (
+                                  {proofOfPaymentUrl.split('|').filter(Boolean).map((url, idx) => (
                                     <div key={idx} className="flex items-center justify-between bg-muted/20 border border-border px-3 py-1.5 rounded-xl text-xs">
                                       <span className="truncate text-muted-foreground max-w-[200px]">
                                         📎 Receipt #{idx + 1} {idx === 0 && status === 'paid' ? "(Down Payment)" : ""} {idx === 1 && status === 'paid' ? "(Final Payment)" : ""}
@@ -1048,7 +1048,7 @@ export default function InvoicesPage() {
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            const updated = proofOfPaymentUrl.split(',').filter((_, i) => i !== idx).join(',');
+                                            const updated = proofOfPaymentUrl.split('|').filter((_, i) => i !== idx).join('|');
                                             setProofOfPaymentUrl(updated);
                                           }}
                                           className="text-red-400 hover:text-red-500 cursor-pointer"
@@ -1823,7 +1823,7 @@ export default function InvoicesPage() {
 
             {/* Tab Switched for Multiple Receipts */}
             {(() => {
-              const urls = receiptPreviewUrl.split(',').filter(Boolean);
+              const urls = receiptPreviewUrl.split('|').filter(Boolean);
               const activeUrl = urls[activeReceiptIdx] || urls[0] || '';
               
               return (
