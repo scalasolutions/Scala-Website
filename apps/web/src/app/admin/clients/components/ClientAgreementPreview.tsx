@@ -515,7 +515,6 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                     {/* Contractor Signature Footer */}
                     <div className="mt-3 border-t border-zinc-100 pt-2 flex items-center justify-between">
                       <span className="text-[9px] font-bold text-zinc-800 uppercase tracking-wider">✓ Approved & Verified</span>
-                      <span className="text-[7px] text-zinc-400 font-mono">System Authorized</span>
                     </div>
                   </div>
 
@@ -527,25 +526,16 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                       <p className="text-zinc-500 text-[10px]">{client.companyName || 'Representative'}</p>
                     </div>
 
-                    {client.tcStatus === 'signed' ? (
-                      <div className="mt-3 border-t border-zinc-100 pt-2">
-                        <div className="border-b border-dashed border-zinc-300 h-8 flex items-end justify-center text-zinc-800 text-xs pb-1 font-serif italic tracking-wider">
-                          / {client.name} /
-                        </div>
-                        <p className="text-[7px] text-zinc-400 font-mono text-center mt-1.5">
-                          Digitally Signed via Client Portal • {signedDateFormatted}
-                        </p>
+                    <div className="mt-3 border-t border-zinc-100 pt-2 flex flex-col gap-1.5">
+                      <div className="flex justify-between gap-4">
+                        <div className="flex-1 border-b border-zinc-300 h-8"></div>
+                        <div className="w-24 border-b border-zinc-300 h-8"></div>
                       </div>
-                    ) : (
-                      <div className="mt-3 border-t border-zinc-100 pt-2">
-                        <div className="border-b border-dashed border-zinc-300 h-8 flex items-end justify-center text-zinc-300 text-[9px] pb-1 italic">
-                          Click to Sign inside Client Portal
-                        </div>
-                        <p className="text-[7px] text-zinc-400 font-mono text-center mt-1.5">
-                          Awaiting Digital Authorization
-                        </p>
+                      <div className="flex justify-between text-[7px] text-zinc-400 font-mono uppercase tracking-wider">
+                        <span>Signature</span>
+                        <span>Date</span>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -624,7 +624,7 @@ export default function ClientDetailPage() {
                   <div className="text-xs">
                     <p className="font-semibold text-foreground">Agreement fully executed</p>
                     <p className="text-muted-foreground mt-0.5">
-                      Digitally signed on{' '}
+                      Signed & executed on{' '}
                       <span className="font-medium text-foreground">
                         {new Date(client.tcSignedAt!).toLocaleDateString('id-ID', {
                           year: 'numeric',
