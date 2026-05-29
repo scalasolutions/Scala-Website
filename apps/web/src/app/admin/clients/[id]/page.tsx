@@ -82,6 +82,7 @@ export default function ClientDetailPage() {
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleteConfirmNameInput, setDeleteConfirmNameInput] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
     async function loadClientData() {
@@ -337,12 +338,18 @@ export default function ClientDetailPage() {
       <Card padding="md">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
           <div className="flex items-center gap-4 min-w-0">
-            {faviconUrl ? (
+            {faviconUrl && !logoFailed ? (
               <img
                 src={faviconUrl}
                 alt={client.name}
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
+                onLoad={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  if (img.naturalWidth <= 16) {
+                    setLogoFailed(true);
+                  }
+                }}
+                onError={() => {
+                  setLogoFailed(true);
                 }}
                 className="w-14 h-14 rounded-xl border border-border object-contain bg-white p-2"
               />

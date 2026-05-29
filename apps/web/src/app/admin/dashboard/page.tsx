@@ -266,6 +266,13 @@ export default function DashboardHome() {
                             src={cFavicon}
                             alt={c.name}
                             className="w-5 h-5 object-contain"
+                            onLoad={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              if (img.naturalWidth <= 16) {
+                                img.style.display = 'none';
+                                img.nextElementSibling?.removeAttribute('style');
+                              }
+                            }}
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style'); }}
                           />
                         ) : null}
@@ -393,6 +400,13 @@ export default function DashboardHome() {
                             src={rFavicon}
                             alt={client.name}
                             className="w-5 h-5 object-contain"
+                            onLoad={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              if (img.naturalWidth <= 16) {
+                                img.style.display = 'none';
+                                img.nextElementSibling?.removeAttribute('style');
+                              }
+                            }}
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style'); }}
                           />
                         ) : null}
@@ -458,6 +472,13 @@ export default function DashboardHome() {
                           src={oFavicon}
                           alt={oName}
                           className="w-5 h-5 object-contain"
+                          onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            if (img.naturalWidth <= 16) {
+                              img.style.display = 'none';
+                              img.nextElementSibling?.removeAttribute('style');
+                            }
+                          }}
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style'); }}
                         />
                       ) : null}

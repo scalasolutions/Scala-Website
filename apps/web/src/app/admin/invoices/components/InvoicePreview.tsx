@@ -423,6 +423,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               pageStyle: PAGE_STYLE,
               pageNumber: pageNo,
               totalPages: numPages,
+              websiteAddress: client?.websiteAddress,
             };
 
             if (page.key === 'billing') {

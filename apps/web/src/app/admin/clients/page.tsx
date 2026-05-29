@@ -454,6 +454,9 @@ export default function ClientsPage() {
                   const sourcedLabel = getSourcedByLabel(client.sourcedBy);
                   const isOrganic = sourcedLabel === 'Organic';
 
+                  const clDomain = client.websiteAddress ? client.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
+                  const clFavicon = clDomain ? `https://www.google.com/s2/favicons?domain=${clDomain}&sz=64` : null;
+
                   return (
                     <div
                       key={client.id}
@@ -463,6 +466,23 @@ export default function ClientsPage() {
                         TABLE_ROW_HOVER,
                       )}
                     >
+                       {/* Logo avatar — only when client has a website */}
+                      {clFavicon && (
+                        <div className="w-9 h-9 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden self-start mt-0.5">
+                          <img
+                            src={clFavicon}
+                            alt={client.name}
+                            className="w-5 h-5 object-contain"
+                            onLoad={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              if (img.naturalWidth <= 16) {
+                                img.parentElement!.style.display = 'none';
+                              }
+                            }}
+                            onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                          />
+                        </div>
+                      )}
                       {/* Left: name + meta */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">

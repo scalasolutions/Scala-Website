@@ -549,7 +549,7 @@ export default function InvoicesPage() {
       console.log("OCR Local Extracted Text:\n", text);
 
       // 1. Split text into lines to look for contextual keywords
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean);
       const amountKeywords = [
         'transfer amount',
         'amount paid',
@@ -978,6 +978,8 @@ export default function InvoicesPage() {
               <div className="divide-y divide-border">
                 {filteredInvoices.map((invoice) => {
                   const client = clients.find((c) => c.id === invoice.clientId);
+                  const invDomain = client?.websiteAddress ? client.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
+                  const invFavicon = invDomain ? `https://www.google.com/s2/favicons?domain=${invDomain}&sz=64` : null;
                   const effectiveStatus = getEffectiveStatus(invoice);
 
                   return (
@@ -996,7 +998,25 @@ export default function InvoicesPage() {
                       )}
                     >
                       {/* Left: client + invoice number */}
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 flex items-center gap-3">
+                        {/* Logo avatar — only when client has a website */}
+                        {invFavicon && (
+                          <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                            <img
+                              src={invFavicon}
+                              alt={client?.name || ''}
+                              className="w-5 h-5 object-contain"
+                              onLoad={(e) => {
+                                const img = e.target as HTMLImageElement;
+                                if (img.naturalWidth <= 16) {
+                                  img.parentElement!.style.display = 'none';
+                                }
+                              }}
+                              onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                            />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium text-foreground truncate">
                             {client?.name || 'Unknown client'}
@@ -1033,6 +1053,7 @@ export default function InvoicesPage() {
                           <span>
                             Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
                           </span>
+                        </div>
                         </div>
                       </div>
 
@@ -1153,6 +1174,36 @@ export default function InvoicesPage() {
                           searchPlaceholder="Search clients by name, email, or company…"
                           emptyMessage="No clients match"
                         />
+
+                        {/* Client logo preview — only shown when selected client has a websiteAddress */}
+                        {(() => {
+                          const selClient = clients.find(c => c.id === selectedClientId);
+                          if (!selClient?.websiteAddress) return null;
+                          const selDomain = selClient.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0];
+                          const selFavicon = `https://www.google.com/s2/favicons?domain=${selDomain}&sz=64`;
+                          return (
+                            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/20 animate-fade-in-scale">
+                              <div className="w-8 h-8 rounded-lg border border-border bg-background flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                                <img
+                                  src={selFavicon}
+                                  alt={selClient.name}
+                                  className="w-5 h-5 object-contain"
+                                  onLoad={(e) => {
+                                    const img = e.target as HTMLImageElement;
+                                    if (img.naturalWidth <= 16) {
+                                      img.parentElement!.style.display = 'none';
+                                    }
+                                  }}
+                                  onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-foreground truncate">{selClient.name}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{selDomain}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <Input

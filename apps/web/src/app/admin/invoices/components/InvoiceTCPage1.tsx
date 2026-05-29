@@ -9,6 +9,7 @@ interface InvoiceTCPage1Props {
   pageNumber: number;
   totalPages: number;
   htmlContent?: string;
+  websiteAddress?: string | null;
 }
 
 // Reusable T&C block: bold section title + children body
@@ -73,6 +74,7 @@ export const InvoiceTCPage1: React.FC<InvoiceTCPage1Props> = ({
   pageNumber,
   totalPages,
   htmlContent,
+  websiteAddress,
 }) => {
   return (
     <div className="invoice-print-page" style={pageStyle}>
@@ -80,6 +82,7 @@ export const InvoiceTCPage1: React.FC<InvoiceTCPage1Props> = ({
         companyName={companyName}
         clientRefCode={clientRefCode}
         formattedDate={formattedDate}
+        websiteAddress={websiteAddress}
       />
 
       <div style={{ marginTop: 18, paddingBottom: '70px' }}>

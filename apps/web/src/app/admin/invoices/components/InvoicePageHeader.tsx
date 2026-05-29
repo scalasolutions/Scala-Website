@@ -4,13 +4,18 @@ interface InvoicePageHeaderProps {
   companyName: string;
   clientRefCode: string;
   formattedDate: string;
+  websiteAddress?: string | null;
 }
 
 export const InvoicePageHeader: React.FC<InvoicePageHeaderProps> = ({
   companyName,
   clientRefCode,
   formattedDate,
+  websiteAddress,
 }) => {
+  const domain = websiteAddress ? websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
+  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+
   return (
     <div>
       {/* Top row: Logo left, INVOICE right */}
@@ -87,7 +92,45 @@ export const InvoicePageHeader: React.FC<InvoicePageHeaderProps> = ({
           >
             TO:
           </div>
-          <div style={{ fontSize: 14, color: '#111111' }}>{companyName}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#111111' }}>
+            {faviconUrl && (
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#f3f4f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  overflow: 'hidden',
+                }}
+              >
+                <img
+                  src={faviconUrl}
+                  alt={companyName}
+                  style={{
+                    width: 12,
+                    height: 12,
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
+                  onLoad={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    if (img.naturalWidth <= 16) {
+                      img.parentElement!.style.display = 'none';
+                    }
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            <span>{companyName}</span>
+          </div>
         </div>
 
         <div style={{ textAlign: 'right' }}>

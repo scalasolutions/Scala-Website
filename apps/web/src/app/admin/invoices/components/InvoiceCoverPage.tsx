@@ -9,6 +9,7 @@ interface InvoiceCoverPageProps {
   pageNumber: number;
   totalPages: number;
   preparedBy: 'nicholas' | 'fredrick' | 'both';
+  websiteAddress?: string | null;
 }
 
 export const InvoiceCoverPage: React.FC<InvoiceCoverPageProps> = ({
@@ -19,6 +20,7 @@ export const InvoiceCoverPage: React.FC<InvoiceCoverPageProps> = ({
   pageNumber,
   totalPages,
   preparedBy,
+  websiteAddress,
 }) => {
   return (
     <div className="invoice-print-page" style={pageStyle}>
@@ -26,6 +28,7 @@ export const InvoiceCoverPage: React.FC<InvoiceCoverPageProps> = ({
         companyName={companyName}
         clientRefCode={clientRefCode}
         formattedDate={formattedDate}
+        websiteAddress={websiteAddress}
       />
 
       {/* Signature + Prepared By / Approved By */}

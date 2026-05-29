@@ -17,6 +17,7 @@ interface InvoiceBillingPageProps {
   amountPaid?: number;
   paidAt?: Date | string | null;
   dpAt?: Date | string | null;
+  websiteAddress?: string | null;
 }
 
 export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
@@ -34,6 +35,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   amountPaid,
   paidAt,
   dpAt,
+  websiteAddress,
 }) => {
   const subtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let discountAmount = 0;
@@ -49,6 +51,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
         companyName={companyName}
         clientRefCode={clientRefCode}
         formattedDate={formattedDate}
+        websiteAddress={websiteAddress}
       />
 
       <div style={{ marginTop: 32, paddingBottom: '80px' }}>
