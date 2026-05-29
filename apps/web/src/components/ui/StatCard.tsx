@@ -62,7 +62,7 @@ export default function StatCard({
         <p className="text-xs font-medium uppercase tracking-[0.06em]">{label}</p>
       </div>
       {/* Value owns the full card width — tone colors it for semantic meaning. */}
-      <p className={cn('mt-3 text-3xl font-semibold tracking-tight tabular-nums', toneClasses[tone])}>
+      <p className={cn('mt-3 text-2xl font-semibold tracking-tight tabular-nums break-all min-w-0', toneClasses[tone])}>
         {value}
       </p>
       {delta && (

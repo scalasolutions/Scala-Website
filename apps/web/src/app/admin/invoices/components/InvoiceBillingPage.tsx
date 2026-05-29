@@ -1,6 +1,6 @@
 import React from 'react';
 import { InvoicePageHeader, InvoicePageFooter } from './InvoicePageHeader';
-import { InvoiceLineItem, formatCurrencyIDR } from './invoice-types';
+import { InvoiceLineItem, formatCurrencyIDR, formatDateClean } from './invoice-types';
 
 interface InvoiceBillingPageProps {
   companyName: string;
@@ -13,6 +13,10 @@ interface InvoiceBillingPageProps {
   discountValue?: number;
   pageNumber: number;
   totalPages: number;
+  status?: 'draft' | 'issued' | 'paid' | 'partially_paid' | 'past_due' | 'written_off';
+  amountPaid?: number;
+  paidAt?: Date | string | null;
+  dpAt?: Date | string | null;
 }
 
 export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
@@ -26,6 +30,10 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   discountValue,
   pageNumber,
   totalPages,
+  status,
+  amountPaid,
+  paidAt,
+  dpAt,
 }) => {
   const subtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let discountAmount = 0;
@@ -196,6 +204,89 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
             <span style={{ fontSize: 14, fontWeight: 800 }}>{formatCurrencyIDR(total)}</span>
           </div>
         </div>
+
+        {/* Payment History and Balance Details */}
+        {(status === 'paid' || status === 'partially_paid') && (() => {
+          const dpAmount = status === 'partially_paid' ? (amountPaid || Math.round(total * 0.5)) : Math.round(total * 0.5);
+          const finalPaymentAmount = total - dpAmount;
+          const balanceDue = status === 'paid' ? 0 : total - (amountPaid || 0);
+
+          const dpDateStr = dpAt ? formatDateClean(dpAt) : (paidAt ? formatDateClean(paidAt) : formattedDate);
+          const finalDateStr = paidAt ? formatDateClean(paidAt) : '';
+
+          return (
+            <div style={{ display: 'flex', marginTop: 16 }}>
+              {/* Spacer matching Description column width */}
+              <div style={{ flex: 7 }} />
+              
+              {/* Premium Payment Details card */}
+              <div
+                style={{
+                  flex: 5,
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px 18px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  Payment Details
+                </div>
+                
+                {/* DP Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 13 }}>
+                  <span style={{ color: '#334155', fontWeight: 600 }}>
+                    50% Down Payment (DP)
+                    <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
+                      Received on {dpDateStr}
+                    </span>
+                  </span>
+                  <span style={{ color: '#0f172a', fontWeight: 700, paddingTop: 1 }}>
+                    {formatCurrencyIDR(dpAmount)}
+                  </span>
+                </div>
+
+                {/* Final Payment Row (if fully paid) */}
+                {status === 'paid' && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 13, borderTop: '1px dashed #e2e8f0', paddingTop: 10 }}>
+                    <span style={{ color: '#334155', fontWeight: 600 }}>
+                      50% Final Payment
+                      <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
+                        Received on {finalDateStr}
+                      </span>
+                    </span>
+                    <span style={{ color: '#0f172a', fontWeight: 700, paddingTop: 1 }}>
+                      {formatCurrencyIDR(finalPaymentAmount)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Balance Due Row */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: 13,
+                    borderTop: '1px solid #cbd5e1',
+                    paddingTop: 10,
+                    marginTop: 2,
+                  }}
+                >
+                  <span style={{ color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>
+                    Balance Due
+                  </span>
+                  <span style={{ color: balanceDue > 0 ? '#ef4444' : '#10b981', fontWeight: 800 }}>
+                    {formatCurrencyIDR(balanceDue)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <InvoicePageFooter pageNumber={pageNumber} totalPages={totalPages} />
       </div>

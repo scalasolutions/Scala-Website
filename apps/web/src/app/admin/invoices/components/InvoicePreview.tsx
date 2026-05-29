@@ -434,6 +434,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   total={invoice.total}
                   discountType={invoice.discountType}
                   discountValue={invoice.discountValue}
+                  status={invoice.status}
+                  amountPaid={invoice.amountPaid}
+                  paidAt={invoice.paidAt}
+                  dpAt={invoice.dpAt}
                 />
               );
             }

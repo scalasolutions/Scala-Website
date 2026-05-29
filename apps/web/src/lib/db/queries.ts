@@ -49,6 +49,7 @@ export interface MockInvoice {
   includedPagesJson?: string | null;
   issuedAt: Date | null;
   dueDate: Date;
+  dpAt?: Date | null;
   paidAt: Date | null;
   discountType: 'percentage' | 'fixed' | null;
   discountValue: number;
@@ -220,6 +221,7 @@ let mockInvoices: MockInvoice[] = [
     ]),
     issuedAt: new Date('2026-05-01T09:00:00Z'),
     dueDate: new Date('2026-05-15T09:00:00Z'),
+    dpAt: new Date('2026-05-02T10:00:00Z'),
     paidAt: new Date('2026-05-10T15:30:00Z'),
     discountType: null,
     discountValue: 0,
@@ -598,6 +600,7 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
           status, 
           amountPaid: status === 'paid' ? undefined : amountPaid,
           proofOfPaymentUrl: finalUrl,
+          dpAt: (status === 'partially_paid' || status === 'paid') ? (existing[0]?.dpAt || new Date()) : null,
           paidAt: status === 'paid' ? new Date() : null,
           updatedAt: new Date() 
         })
@@ -625,11 +628,13 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
       }
     }
 
+    const currentInvoice = mockInvoices[idx];
     mockInvoices[idx] = {
-      ...mockInvoices[idx],
+      ...currentInvoice,
       status,
       amountPaid: finalAmountPaid,
       proofOfPaymentUrl: finalProofOfPaymentUrl,
+      dpAt: (status === 'partially_paid' || status === 'paid') ? (currentInvoice.dpAt || new Date()) : null,
       paidAt: status === 'paid' ? new Date() : null,
       updatedAt: new Date()
     };

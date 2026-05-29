@@ -67,10 +67,10 @@
      `--primary-soft` is a very pale lime tint for chip/badge backgrounds in
      light mode (paired with `text-primary-ink` for the label).
      In dark mode, all three resolve to the neon — dark mode is unchanged. */
-  --primary: #CEF84E;
+  --primary: #93BE0C;
   --primary-foreground: #0f172a;
-  --primary-ink: #638612;
-  --primary-soft: #f0f8d6;
+  --primary-ink: #5A7A07;
+  --primary-soft: #f2fadc;
 
   --secondary: #e2e8f0;
   --secondary-foreground: #0f172a;
@@ -78,22 +78,22 @@
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
 
-  --accent: #CEF84E;
+  --accent: #93BE0C;
   --accent-foreground: #0f172a;
 
   --destructive: #ef4444;
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #CEF84E;
+  --ring: #93BE0C;
 
   --sidebar: #f8fafc;
   --sidebar-foreground: #0f172a;
-  --sidebar-primary: #CEF84E;
+  --sidebar-primary: #93BE0C;
   --sidebar-primary-foreground: #0f172a;
   --sidebar-accent: #f1f5f9;
   --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #e2e8f0;
-  --sidebar-ring: #CEF84E;
+  --sidebar-ring: #93BE0C;
 }
 
 html.dark {

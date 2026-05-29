@@ -44,6 +44,7 @@ export const invoices = pgTable('invoices', {
   includedPagesJson: text('included_pages_json'), // JSON list of included custom/default page keys
   issuedAt: timestamp('issued_at'),
   dueDate: timestamp('due_date').notNull(),
+  dpAt: timestamp('dp_at'),
   paidAt: timestamp('paid_at'),
   discountType: text('discount_type'), // 'percentage' | 'fixed' | null
   discountValue: integer('discount_value').default(0),

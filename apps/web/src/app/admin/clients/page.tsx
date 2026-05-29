@@ -466,36 +466,36 @@ export default function ClientsPage() {
                       {/* Left: name + meta */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-foreground truncate">
                             {client.name}
-                            {hasOutstanding && (
-                              <span 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/admin/invoices?client=${client.id}`);
-                                }}
-                                className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none"
-                              >
-                                Outstanding
-                                
-                                {/* Custom Tooltip on Hover */}
-                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-card border border-border text-foreground text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-40 w-52 leading-relaxed normal-case select-none text-left backdrop-blur-md">
-                                  <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-border mb-1.5 flex justify-between items-center">
-                                    <span>⚠️ Unpaid Bills</span>
-                                    <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
-                                  </div>
-                                  <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
-                                    {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
-                                      <div key={inv.id} className="flex justify-between items-center gap-2">
-                                        <span className="text-muted-foreground truncate">{inv.invoiceNumber}</span>
-                                        <span className="text-foreground shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </span>
-                              </span>
-                            )}
                           </p>
+                          {hasOutstanding && (
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/admin/invoices?client=${client.id}`);
+                              }}
+                              className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none shrink-0"
+                            >
+                              Outstanding
+
+                              {/* Custom Tooltip on Hover */}
+                              <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-52 leading-relaxed normal-case select-none text-left">
+                                <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
+                                  <span>⚠️ Unpaid Bills</span>
+                                  <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
+                                </div>
+                                <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
+                                  {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
+                                    <div key={inv.id} className="flex justify-between items-center gap-2">
+                                      <span className="text-zinc-400 truncate">{inv.invoiceNumber}</span>
+                                      <span className="text-zinc-100 shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </span>
+                            </span>
+                          )}
                           <Badge variant={statusVariant} className="capitalize">
                             {client.status}
                           </Badge>
