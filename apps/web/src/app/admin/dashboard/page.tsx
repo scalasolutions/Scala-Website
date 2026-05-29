@@ -252,12 +252,31 @@ export default function DashboardHome() {
             {expiringClients.map(c => {
               const rem = getSubscriptionRemainingMonths(c);
 
+              const cDomain = c.websiteAddress ? c.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
+              const cFavicon = cDomain ? `https://www.google.com/s2/favicons?domain=${cDomain}&sz=64` : null;
+
               return (
                 <Link key={c.id} href={`/admin/clients/${c.id}`} className="block">
                   <div className="flex items-center justify-between gap-3 py-4 px-2 -mx-2 rounded-lg hover:bg-muted/20 transition-colors">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize mt-1">{c.subscriptionType} hosting</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Logo avatar */}
+                      <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                        {cFavicon ? (
+                          <img
+                            src={cFavicon}
+                            alt={c.name}
+                            className="w-5 h-5 object-contain"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style'); }}
+                          />
+                        ) : null}
+                        <span className="text-xs font-bold text-muted-foreground" style={cFavicon ? { display: 'none' } : {}}>
+                          {c.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize mt-0.5">{c.subscriptionType} hosting</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {rem === 0 ? (
@@ -360,14 +379,33 @@ export default function DashboardHome() {
                 : client.status === 'pending' ? 'warning'
                 : 'neutral';
 
+              const rDomain = client.websiteAddress ? client.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
+              const rFavicon = rDomain ? `https://www.google.com/s2/favicons?domain=${rDomain}&sz=64` : null;
+
               return (
                 <Link key={client.id} href={`/admin/clients/${client.id}`} className="block">
-                  <div className="flex items-center justify-between gap-3 py-5 px-2 -mx-2 rounded-lg hover:bg-muted/20 transition-colors">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-1.5">
-                        {client.companyName || 'No company'}
-                      </p>
+                  <div className="flex items-center justify-between gap-3 py-4 px-2 -mx-2 rounded-lg hover:bg-muted/20 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Logo avatar */}
+                      <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                        {rFavicon ? (
+                          <img
+                            src={rFavicon}
+                            alt={client.name}
+                            className="w-5 h-5 object-contain"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style'); }}
+                          />
+                        ) : null}
+                        <span className="text-xs font-bold text-muted-foreground" style={rFavicon ? { display: 'none' } : {}}>
+                          {client.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {client.companyName || 'No company'}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={statusVariant} className="capitalize">
@@ -406,13 +444,33 @@ export default function DashboardHome() {
               const client = clients.find(c => c.id === invoice.clientId);
               const statusVariant: 'danger' | 'warning' = invoice.status === 'past_due' ? 'danger' : 'warning';
 
+              const oDomain = client?.websiteAddress ? client.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
+              const oFavicon = oDomain ? `https://www.google.com/s2/favicons?domain=${oDomain}&sz=64` : null;
+              const oName = client?.name || 'Unknown Client';
+
               return (
                 <div key={invoice.id} className="flex items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{client?.name || 'Unknown Client'}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {invoice.invoiceNumber} · Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
-                    </p>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Logo avatar */}
+                    <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                      {oFavicon ? (
+                        <img
+                          src={oFavicon}
+                          alt={oName}
+                          className="w-5 h-5 object-contain"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style'); }}
+                        />
+                      ) : null}
+                      <span className="text-xs font-bold text-muted-foreground" style={oFavicon ? { display: 'none' } : {}}>
+                        {oName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{oName}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {invoice.invoiceNumber} · Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <Badge variant={statusVariant} className="capitalize">
