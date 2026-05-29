@@ -30,8 +30,11 @@ import {
   updatePartner,
   deletePartner,
   MockPartner,
+  getInvoices,
+  MockInvoice,
 } from '@/lib/db/queries';
 import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER } from '@/lib/utils';
+import { formatCurrencyIDR } from '@/app/admin/invoices/components/invoice-types';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -67,6 +70,9 @@ export default function ClientsPage() {
   const [partners, setPartners] = useState<MockPartner[]>([]);
   const [partnersLoading, setPartnersLoading] = useState(true);
   const [partnersSearch, setPartnersSearch] = useState('');
+
+  // Invoices State
+  const [invoices, setInvoices] = useState<MockInvoice[]>([]);
 
   // Create/Edit Client Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -110,9 +116,10 @@ export default function ClientsPage() {
 
     async function loadAllData() {
       try {
-        const [c, p] = await Promise.all([getClients(), getPartners()]);
+        const [c, p, inv] = await Promise.all([getClients(), getPartners(), getInvoices()]);
         setClients(c);
         setPartners(p as MockPartner[]);
+        setInvoices(inv as MockInvoice[]);
       } catch (err) {
         console.error('Failed to load directory data', err);
       } finally {
@@ -428,6 +435,12 @@ export default function ClientsPage() {
                   const remaining = getSubscriptionRemainingMonths(client);
                   const isExpiring = remaining !== null && remaining < 3;
 
+                  // Calculate outstanding invoices
+                  const clientInvoices = invoices.filter(inv => inv.clientId === client.id);
+                  const hasOutstanding = clientInvoices.some(inv => 
+                    inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid'
+                  );
+
                   const statusVariant:
                     | 'success'
                     | 'warning'
@@ -453,8 +466,35 @@ export default function ClientsPage() {
                       {/* Left: name + meta */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-foreground truncate">
+                          <p className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
                             {client.name}
+                            {hasOutstanding && (
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/admin/invoices?client=${client.id}`);
+                                }}
+                                className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none"
+                              >
+                                Outstanding
+                                
+                                {/* Custom Tooltip on Hover */}
+                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-card border border-border text-foreground text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-40 w-52 leading-relaxed normal-case select-none text-left backdrop-blur-md">
+                                  <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-border mb-1.5 flex justify-between items-center">
+                                    <span>⚠️ Unpaid Bills</span>
+                                    <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
+                                  </div>
+                                  <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
+                                    {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
+                                      <div key={inv.id} className="flex justify-between items-center gap-2">
+                                        <span className="text-muted-foreground truncate">{inv.invoiceNumber}</span>
+                                        <span className="text-foreground shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </span>
+                              </span>
+                            )}
                           </p>
                           <Badge variant={statusVariant} className="capitalize">
                             {client.status}
@@ -829,7 +869,7 @@ export default function ClientsPage() {
                         {(
                           [
                             { key: '', label: 'No plan' },
-                            { key: 'static', label: 'Static · 150k/mo' },
+                            { key: 'static', label: 'Static · 200k/mo' },
                             { key: 'dynamic', label: 'Dynamic · 350k/mo' },
                           ] as const
                         ).map((type) => (

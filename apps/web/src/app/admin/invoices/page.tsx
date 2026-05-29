@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   Sliders,
   Loader2,
+  CreditCard,
+  Pencil,
 } from 'lucide-react';
 import {
   getInvoices,
@@ -29,8 +31,9 @@ import {
   MockInvoiceLinePreset,
   getInvoicePagePresets,
   MockInvoicePagePreset,
+  uploadReceiptAction,
 } from '@/lib/db/queries';
-import { InvoiceLineItem, formatCurrencyIDR } from './components/invoice-types';
+import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -46,7 +49,7 @@ import FilterBar, { FilterOption } from '@/components/ui/FilterBar';
 import ActionMenu, { ActionMenuItem } from '@/components/ui/ActionMenu';
 import { cn, TABLE_ROW_HOVER } from '@/lib/utils';
 
-type InvoiceStatusFilter = 'all' | 'draft' | 'issued' | 'past_due' | 'paid';
+type InvoiceStatusFilter = 'all' | 'draft' | 'issued' | 'partially_paid' | 'past_due' | 'paid';
 type EffectiveStatus = MockInvoice['status'];
 
 // Map an effective invoice status -> Badge variant. Calm, semantic, no custom hex.
@@ -120,12 +123,30 @@ export default function InvoicesPage() {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [status, setStatus] = useState<
-    'draft' | 'issued' | 'paid' | 'past_due' | 'written_off'
+    'draft' | 'issued' | 'paid' | 'partially_paid' | 'past_due' | 'written_off'
   >('draft');
   const [dueDate, setDueDate] = useState('');
   const [hostingType, setHostingType] = useState<'static' | 'dynamic' | 'none'>('none');
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'none'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
+
+  // Partially paid fields
+  const [amountPaid, setAmountPaid] = useState<number>(0);
+  const [proofOfPaymentUrl, setProofOfPaymentUrl] = useState<string>('');
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+
+  // Record Payment Modal State
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState<MockInvoice | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'partially_paid'>('paid');
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [receiptFileBase64, setReceiptFileBase64] = useState<string>('');
+  const [receiptFileName, setReceiptFileName] = useState<string>('');
+  const [isLoggingPayment, setIsLoggingPayment] = useState(false);
+
+  // Image/PDF previewer state
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
+  const [activeReceiptIdx, setActiveReceiptIdx] = useState<number>(0);
 
   // Line items
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
@@ -145,6 +166,8 @@ export default function InvoicesPage() {
     setDueDate(
       invoice.dueDate ? new Date(invoice.dueDate).toISOString().substring(0, 10) : ''
     );
+    setAmountPaid(invoice.amountPaid || 0);
+    setProofOfPaymentUrl(invoice.proofOfPaymentUrl || '');
 
     const items = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
     setLineItems(items);
@@ -196,7 +219,7 @@ export default function InvoicesPage() {
       const type = client.subscriptionType;
       setHostingType(type);
 
-      const price = type === 'static' ? 150000 : 350000;
+      const price = type === 'static' ? 200000 : 350000;
       const name =
         type === 'static' ? 'Static Hosting Subscription' : 'Dynamic Hosting Subscription';
       const description = `${type === 'static' ? 'Static' : 'Dynamic'} Hosting Services Plan`;
@@ -230,7 +253,7 @@ export default function InvoicesPage() {
         prev.filter((item) => !item.name.toLowerCase().includes('hosting'))
       );
     } else {
-      const price = type === 'static' ? 150000 : 350000;
+      const price = type === 'static' ? 200000 : 350000;
       const name =
         type === 'static' ? 'Static Hosting Subscription' : 'Dynamic Hosting Subscription';
       const description = `${type === 'static' ? 'Static' : 'Dynamic'} Hosting Services Plan`;
@@ -373,6 +396,9 @@ export default function InvoicesPage() {
     setHostingType('none');
     setDiscountType('none');
     setDiscountValue(0);
+    setAmountPaid(0);
+    setProofOfPaymentUrl('');
+    setReceiptFileName('');
     setLineItems([
       {
         name: 'Starter Company Profile Package',
@@ -413,6 +439,8 @@ export default function InvoicesPage() {
             dueDate: new Date(dueDate),
             discountType: discountType === 'none' ? null : discountType,
             discountValue: Number(discountValue),
+            amountPaid,
+            proofOfPaymentUrl: proofOfPaymentUrl || null,
           });
 
           if (updatedInv) {
@@ -442,6 +470,8 @@ export default function InvoicesPage() {
             paidAt: status === 'paid' ? new Date() : null,
             discountType: discountType === 'none' ? null : discountType,
             discountValue: Number(discountValue),
+            amountPaid,
+            proofOfPaymentUrl: proofOfPaymentUrl || null,
           });
 
           if (newInv) {
@@ -461,14 +491,104 @@ export default function InvoicesPage() {
   };
 
   // ── Status helpers ─────────────────────────────────────────
-  const handleMarkAsPaid = async (id: string) => {
-    const updated = await updateInvoiceStatus(id, 'paid').catch(() => null);
-    if (updated)
-      setInvoices((prev) =>
-        prev.map((inv) =>
-          inv.id === id ? { ...inv, status: 'paid', paidAt: new Date() } : inv
-        )
-      );
+  const handleMarkAsPaid = (invoice: MockInvoice) => {
+    setPaymentInvoice(invoice);
+    setPaymentStatus('paid');
+    setPaymentAmount(invoice.total);
+    setReceiptFileBase64('');
+    setReceiptFileName('');
+    setPaymentModalOpen(true);
+  };
+
+  // ── Client-side image compressor & drawer uploader ───────────
+  const handleCompressAndSetFile = (file: File) => {
+    if (!file) return;
+    setReceiptFileName(file.name);
+    setUploadingReceipt(true);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          setReceiptFileBase64(dataUrl);
+        }
+        setUploadingReceipt(false);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCompressAndUploadForDrawer = (file: File) => {
+    if (!file) return;
+    setReceiptFileName(file.name);
+    setUploadingReceipt(true);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          
+          try {
+            const url = await uploadReceiptAction(file.name, dataUrl);
+            setProofOfPaymentUrl((prev) => (prev ? `${prev},${url}` : url));
+          } catch (err) {
+            console.error("Failed to upload drawer receipt: ", err);
+          }
+        }
+        setUploadingReceipt(false);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const triggerDeleteConfirmation = (invoice: MockInvoice) => {
@@ -525,6 +645,7 @@ export default function InvoicesPage() {
     all: invoices.length,
     draft: invoices.filter((i) => i.status === 'draft').length,
     issued: invoices.filter((i) => getEffectiveStatus(i) === 'issued').length,
+    partially_paid: invoices.filter((i) => i.status === 'partially_paid').length,
     past_due: invoices.filter((i) => getEffectiveStatus(i) === 'past_due').length,
     paid: invoices.filter((i) => i.status === 'paid').length,
   };
@@ -533,6 +654,7 @@ export default function InvoicesPage() {
     { value: 'all', label: 'All', count: counts.all },
     { value: 'draft', label: 'Draft', count: counts.draft },
     { value: 'issued', label: 'Issued', count: counts.issued },
+    { value: 'partially_paid', label: 'Partially paid', count: counts.partially_paid },
     { value: 'past_due', label: 'Past due', count: counts.past_due },
     { value: 'paid', label: 'Paid', count: counts.paid },
   ];
@@ -662,16 +784,15 @@ export default function InvoicesPage() {
                 {filteredInvoices.map((invoice) => {
                   const client = clients.find((c) => c.id === invoice.clientId);
                   const effectiveStatus = getEffectiveStatus(invoice);
-                  const badgeVariant = statusToBadgeVariant(effectiveStatus);
 
                   return (
                     <div
                       key={invoice.id}
                       onClick={() => {
-                        if (effectiveStatus === 'paid') {
-                          setPreviewInvoice(invoice);
-                        } else {
+                        if (effectiveStatus === 'draft') {
                           startEditInvoice(invoice);
+                        } else {
+                          setPreviewInvoice(invoice);
                         }
                       }}
                       className={cn(
@@ -685,20 +806,28 @@ export default function InvoicesPage() {
                           <p className="text-sm font-medium text-foreground truncate">
                             {client?.name || 'Unknown client'}
                           </p>
-                          <Badge variant={badgeVariant} className="capitalize">
+                          <span className={cn(
+                            "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold border capitalize select-none",
+                            getStatusBadge(effectiveStatus)
+                          )}>
                             {effectiveStatus.replace('_', ' ')}
-                          </Badge>
+                          </span>
+                          {invoice.proofOfPaymentUrl && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-medium select-none animate-pulse-subtle">
+                              📎 Receipt Attached
+                            </span>
+                          )}
                         </div>
-                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                           <span className="font-mono">{invoice.invoiceNumber}</span>
-                          <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
                           <span>
                             Issued:{' '}
                             {invoice.issuedAt
                               ? new Date(invoice.issuedAt).toLocaleDateString('id-ID')
                               : 'Draft'}
                           </span>
-                          <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
                           <span>
                             Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
                           </span>
@@ -713,7 +842,7 @@ export default function InvoicesPage() {
                       </div>
 
                       {/* Right: actions — single 3-dot menu with labeled items */}
-                      <div className="shrink-0">
+                      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                         <ActionMenu
                           ariaLabel="Invoice actions"
                           items={[
@@ -725,10 +854,29 @@ export default function InvoicesPage() {
                             },
                             ...(effectiveStatus !== 'paid'
                               ? [{
+                                  key: 'edit',
+                                  label: 'Edit invoice',
+                                  icon: <Pencil size={14} />,
+                                  onSelect: () => startEditInvoice(invoice),
+                                } as ActionMenuItem]
+                              : []),
+                            ...(effectiveStatus !== 'paid'
+                              ? [{
                                   key: 'mark-paid',
                                   label: 'Mark as paid',
                                   icon: <Check size={14} />,
-                                  onSelect: () => handleMarkAsPaid(invoice.id),
+                                  onSelect: () => handleMarkAsPaid(invoice),
+                                } as ActionMenuItem]
+                              : []),
+                            ...(invoice.proofOfPaymentUrl
+                              ? [{
+                                  key: 'receipt',
+                                  label: 'View receipt',
+                                  icon: <CreditCard size={14} />,
+                                  onSelect: () => {
+                                    setActiveReceiptIdx(0);
+                                    setReceiptPreviewUrl(invoice.proofOfPaymentUrl!);
+                                  },
                                 } as ActionMenuItem]
                               : []),
                             {
@@ -827,8 +975,93 @@ export default function InvoicesPage() {
                           >
                             <option value="draft">Draft</option>
                             <option value="issued">Issued — awaiting payment</option>
+                            <option value="partially_paid">Partially paid — milestone collection</option>
                             <option value="paid">Paid — fully collected</option>
                           </Select>
+
+                          {status === 'partially_paid' && (
+                            <div className="sm:col-span-2 animate-fade-in-scale">
+                              <Input
+                                label="Amount Paid (IDR) *"
+                                type="number"
+                                required
+                                min={1}
+                                max={total}
+                                value={amountPaid}
+                                onChange={(e) => setAmountPaid(Number(e.target.value))}
+                              />
+                            </div>
+                          )}
+
+                          {(status === 'partially_paid' || status === 'paid') && (
+                            <div className="sm:col-span-2 flex flex-col justify-end animate-fade-in-scale">
+                              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                                Proof of Payment Attachment
+                              </label>
+                              <div className="flex items-center gap-2 border border-border rounded-xl p-2 bg-muted/10 h-[42px] mb-2.5">
+                                <input
+                                  type="file"
+                                  id="drawer-receipt-upload"
+                                  accept="image/*,application/pdf"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleCompressAndUploadForDrawer(file);
+                                  }}
+                                />
+                                <label
+                                  htmlFor="drawer-receipt-upload"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-card border border-border hover:bg-muted active-press transition-all cursor-pointer text-xs font-bold text-foreground shadow-xs shrink-0"
+                                >
+                                  Upload Receipt
+                                </label>
+                                {uploadingReceipt ? (
+                                  <span className="text-[10px] text-primary font-semibold animate-pulse">
+                                    ⌛ Compressing...
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground truncate">
+                                    Attach payment receipts (down payment, final billing, etc.)
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Receipt Attachments List in Drawer */}
+                              {proofOfPaymentUrl && (
+                                <div className="space-y-1.5 mt-1.5">
+                                  {proofOfPaymentUrl.split(',').filter(Boolean).map((url, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-muted/20 border border-border px-3 py-1.5 rounded-xl text-xs">
+                                      <span className="truncate text-muted-foreground max-w-[200px]">
+                                        📎 Receipt #{idx + 1} {idx === 0 && status === 'paid' ? "(Down Payment)" : ""} {idx === 1 && status === 'paid' ? "(Final Payment)" : ""}
+                                      </span>
+                                      <div className="flex items-center gap-2 font-bold shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveReceiptIdx(idx);
+                                            setReceiptPreviewUrl(url);
+                                          }}
+                                          className="text-primary hover:underline cursor-pointer"
+                                        >
+                                          View
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updated = proofOfPaymentUrl.split(',').filter((_, i) => i !== idx).join(',');
+                                            setProofOfPaymentUrl(updated);
+                                          }}
+                                          className="text-red-400 hover:text-red-500 cursor-pointer"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </section>
 
@@ -850,7 +1083,7 @@ export default function InvoicesPage() {
                             }
                           >
                             <option value="none">None (no hosting billed)</option>
-                            <option value="static">Static · IDR 150.000/mo</option>
+                            <option value="static">Static · IDR 200.000/mo</option>
                             <option value="dynamic">Dynamic · IDR 350.000/mo</option>
                           </Select>
                           <p className="text-xs text-muted-foreground leading-relaxed sm:mt-7">
@@ -1359,6 +1592,291 @@ export default function InvoicesPage() {
               </div>,
               document.body
             )}
+
+      {/* ── Record Payment Modal ── */}
+      {mounted && paymentModalOpen && paymentInvoice && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-md"
+            onClick={() => {
+              if (!isLoggingPayment) {
+                setPaymentModalOpen(false);
+                setPaymentInvoice(null);
+              }
+            }}
+          />
+
+          <div className="relative w-full max-w-md rounded-2xl bg-card border border-border p-6 shadow-2xl animate-fade-in-scale">
+            <div className="flex items-center gap-3 pb-3 border-b border-border mb-4">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                <CreditCard size={18} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-foreground">
+                  Record Client Payment
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                  {paymentInvoice.invoiceNumber} • Total: {formatCurrencyIDR(paymentInvoice.total)}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Payment Type selection */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                  Payment Type
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatus('paid');
+                      setPaymentAmount(paymentInvoice.total);
+                    }}
+                    className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${
+                      paymentStatus === 'paid'
+                        ? 'bg-primary/10 border-primary text-primary' 
+                        : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    Full Payment (100%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatus('partially_paid');
+                      setPaymentAmount(Math.round(paymentInvoice.total * 0.5)); // Default to 50% Down Payment
+                    }}
+                    className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${
+                      paymentStatus === 'partially_paid'
+                        ? 'bg-primary/10 border-primary text-primary' 
+                        : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    Partial Payment (Milestone)
+                  </button>
+                </div>
+              </div>
+
+              {/* Amount input for partial payment */}
+              {paymentStatus === 'partially_paid' && (
+                <div className="animate-fade-in-scale">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Amount Collected (IDR) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={paymentInvoice.total}
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg bg-muted/40 border border-border text-xs focus:outline-none text-foreground font-semibold"
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-1.5 block">
+                    Remaining unpaid balance: <strong>{formatCurrencyIDR(Math.max(0, paymentInvoice.total - paymentAmount))}</strong>
+                  </span>
+                </div>
+              )}
+
+              {/* File Attachment Upload */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Attach Proof of Payment (Screenshot / Image)
+                </label>
+                <div className="p-3.5 rounded-xl border border-dashed border-border bg-muted/10 text-center space-y-2">
+                  <input
+                    type="file"
+                    id="receipt-upload"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleCompressAndSetFile(file);
+                    }}
+                  />
+                  <label
+                    htmlFor="receipt-upload"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-muted active-press transition-all cursor-pointer text-xs font-bold text-foreground shadow-xs"
+                  >
+                    Select Receipt Image
+                  </label>
+                  {uploadingReceipt && (
+                    <p className="text-[10px] text-primary font-semibold animate-pulse">
+                      ⌛ Compressing &amp; preparing screenshot...
+                    </p>
+                  )}
+                  {receiptFileName && !uploadingReceipt && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-emerald-400 font-bold truncate max-w-[280px] mx-auto">
+                        ✓ {receiptFileName} (Compressed!)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReceiptFileBase64('');
+                          setReceiptFileName('');
+                        }}
+                        className="text-[9px] text-red-400 hover:underline cursor-pointer font-bold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-border">
+              <button
+                type="button"
+                disabled={isLoggingPayment}
+                onClick={() => {
+                  setPaymentModalOpen(false);
+                  setPaymentInvoice(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isLoggingPayment || uploadingReceipt}
+                onClick={async () => {
+                  setIsLoggingPayment(true);
+                  try {
+                    let receiptUrl = '';
+                    if (receiptFileBase64) {
+                      receiptUrl = await uploadReceiptAction(receiptFileName || 'receipt.jpg', receiptFileBase64);
+                    }
+                    
+                    const finalAmountPaid = paymentStatus === 'paid' ? paymentInvoice.total : paymentAmount;
+                    
+                    const updated = await updateInvoiceStatus(
+                      paymentInvoice.id,
+                      paymentStatus,
+                      finalAmountPaid,
+                      receiptUrl || undefined
+                    );
+                    
+                    if (updated) {
+                      setInvoices(prev =>
+                        prev.map(inv =>
+                          inv.id === paymentInvoice.id
+                            ? ({
+                                ...inv,
+                                status: paymentStatus,
+                                amountPaid: finalAmountPaid,
+                                proofOfPaymentUrl: receiptUrl || inv.proofOfPaymentUrl,
+                                paidAt: paymentStatus === 'paid' ? new Date() : null,
+                                updatedAt: new Date()
+                              } as any)
+                            : inv
+                        )
+                      );
+                      setPaymentModalOpen(false);
+                      setPaymentInvoice(null);
+                    }
+                  } catch (err) {
+                    console.error("Failed to log client payment", err);
+                  } finally {
+                    setIsLoggingPayment(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 active-press transition-all cursor-pointer flex items-center gap-1.5"
+                style={{ boxShadow: '0 0 10px rgba(206, 248, 78, 0.15)' }}
+              >
+                {isLoggingPayment ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin" />
+                ) : (
+                  <Check size={13} />
+                )}
+                Save Receipt &amp; Log Payment
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Receipt Image Secure Popup Viewer Modal ── */}
+      {mounted && receiptPreviewUrl && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-background/90 backdrop-blur-md"
+            onClick={() => setReceiptPreviewUrl(null)}
+          />
+
+          <div className="relative w-full max-w-2xl rounded-2xl bg-card border border-border p-4 shadow-2xl animate-fade-in-scale flex flex-col items-center">
+            {/* Header / Dismiss */}
+            <div className="w-full flex items-center justify-between pb-3 border-b border-border mb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-semibold">
+                Proof of Payment Receipt Attachment
+              </span>
+              <button
+                onClick={() => setReceiptPreviewUrl(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:bg-muted cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Tab Switched for Multiple Receipts */}
+            {(() => {
+              const urls = receiptPreviewUrl.split(',').filter(Boolean);
+              const activeUrl = urls[activeReceiptIdx] || urls[0] || '';
+              
+              return (
+                <>
+                  {urls.length > 1 && (
+                    <div className="flex gap-2 mb-3.5 w-full">
+                      {urls.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setActiveReceiptIdx(idx)}
+                          className={cn(
+                            "flex-1 py-1.5 border text-xs font-bold rounded-lg transition-all cursor-pointer",
+                            activeReceiptIdx === idx
+                              ? "bg-primary/10 border-primary text-primary"
+                              : "bg-muted/40 border-border text-muted-foreground hover:bg-muted"
+                          )}
+                        >
+                          Receipt #{idx + 1} {idx === 0 ? "(Down Payment)" : idx === 1 ? "(Final Payment)" : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Content preview */}
+                  <div className="w-full overflow-hidden flex items-center justify-center min-h-[250px] max-h-[70vh] bg-muted/20 border border-border/80 rounded-xl relative p-1">
+                    {activeUrl.startsWith('data:application/pdf') ? (
+                      <div className="text-center p-6 space-y-3">
+                        <CreditCard size={48} className="text-primary mx-auto animate-pulse" />
+                        <p className="text-xs font-semibold">PDF Receipt Document</p>
+                        <a
+                          href={activeUrl}
+                          download={`receipt-${activeReceiptIdx + 1}.pdf`}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 active-press transition-all"
+                        >
+                          Download PDF Receipt
+                        </a>
+                      </div>
+                    ) : (
+                      <img
+                        src={activeUrl}
+                        alt="Proof of payment receipt screenshot"
+                        className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm"
+                      />
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>,
+        document.body
+      )}
         </>
       )}
     </div>

@@ -46,6 +46,8 @@ export const getStatusBadge = (stat: string): string => {
   switch (stat) {
     case 'paid':
       return 'bg-teal-500/10 text-teal-400 border-teal-500/20';
+    case 'partially_paid':
+      return 'bg-primary/10 text-primary border-primary/20';
     case 'issued':
       return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     case 'past_due':

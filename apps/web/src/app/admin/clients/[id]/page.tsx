@@ -538,7 +538,7 @@ export default function ClientDetailPage() {
                     <p className="text-xs text-muted-foreground">Monthly rate</p>
                     <p className="text-lg font-semibold text-foreground mt-1 tabular-nums">
                       {client.subscriptionType === 'static'
-                        ? formatCurrencyIDR(150000)
+                        ? formatCurrencyIDR(200000)
                         : formatCurrencyIDR(350000)}
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">
@@ -928,7 +928,7 @@ export default function ClientDetailPage() {
                         {(
                           [
                             { key: '', label: 'No plan' },
-                            { key: 'static', label: 'Static · 150k/mo' },
+                            { key: 'static', label: 'Static · 200k/mo' },
                             { key: 'dynamic', label: 'Dynamic · 350k/mo' },
                           ] as const
                         ).map((type) => (

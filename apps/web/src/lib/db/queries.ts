@@ -3,6 +3,7 @@
 import { db } from './index';
 import * as schema from './schema';
 import { desc, eq } from 'drizzle-orm';
+import { put } from '@vercel/blob';
 
 // Check if a real database connection is available and configured
 const isDbConfigured = () => {
@@ -41,7 +42,9 @@ export interface MockInvoice {
   subtotal: number;
   tax: number;
   total: number;
-  status: 'draft' | 'issued' | 'paid' | 'past_due' | 'written_off';
+  amountPaid: number;
+  proofOfPaymentUrl?: string | null;
+  status: 'draft' | 'issued' | 'paid' | 'partially_paid' | 'past_due' | 'written_off';
   itemsJson: string;
   includedPagesJson?: string | null;
   issuedAt: Date | null;
@@ -208,6 +211,8 @@ let mockInvoices: MockInvoice[] = [
     subtotal: 12500000,
     tax: 1375000,
     total: 13875000,
+    amountPaid: 13875000,
+    proofOfPaymentUrl: null,
     status: 'paid',
     itemsJson: JSON.stringify([
       { name: 'Managed Cloud Hosting - Professional Plan', price: 7500000, quantity: 1 },
@@ -228,6 +233,8 @@ let mockInvoices: MockInvoice[] = [
     subtotal: 9000000,
     tax: 990000,
     total: 9990000,
+    amountPaid: 0,
+    proofOfPaymentUrl: null,
     status: 'issued',
     itemsJson: JSON.stringify([
       { name: 'Custom React Frontend Development', price: 9000000, quantity: 1 }
@@ -247,6 +254,8 @@ let mockInvoices: MockInvoice[] = [
     subtotal: 5000000,
     tax: 550000,
     total: 5550000,
+    amountPaid: 0,
+    proofOfPaymentUrl: null,
     status: 'past_due',
     itemsJson: JSON.stringify([
       { name: 'SEO Optimization Package & Content Audit', price: 5000000, quantity: 1 }
@@ -266,6 +275,8 @@ let mockInvoices: MockInvoice[] = [
     subtotal: 25000000,
     tax: 2750000,
     total: 27750000,
+    amountPaid: 0,
+    proofOfPaymentUrl: null,
     status: 'draft',
     itemsJson: JSON.stringify([
       { name: 'Enterprise Architecture & SLA Advisory Retainer', price: 25000000, quantity: 1 }
@@ -285,6 +296,8 @@ let mockInvoices: MockInvoice[] = [
     subtotal: 7000000,
     tax: 770000,
     total: 7770000,
+    amountPaid: 7770000,
+    proofOfPaymentUrl: null,
     status: 'paid',
     itemsJson: JSON.stringify([
       { 
@@ -546,6 +559,8 @@ export async function createInvoice(data: schema.NewInvoice) {
     subtotal: data.subtotal,
     tax: data.tax || 0,
     total: data.total,
+    amountPaid: data.amountPaid !== undefined && data.amountPaid !== null ? Number(data.amountPaid) : 0,
+    proofOfPaymentUrl: data.proofOfPaymentUrl || null,
     status: data.status || 'draft',
     itemsJson: data.itemsJson,
     includedPagesJson: data.includedPagesJson || null,
@@ -561,12 +576,28 @@ export async function createInvoice(data: schema.NewInvoice) {
   return newInvoice;
 }
 
-export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued' | 'paid' | 'past_due' | 'written_off') {
+export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued' | 'paid' | 'partially_paid' | 'past_due' | 'written_off', amountPaid?: number, proofOfPaymentUrl?: string) {
   if (isDbConfigured()) {
     try {
+      const existing = await db.select().from(schema.invoices).where(eq(schema.invoices.id, id));
+      const existingUrl = existing[0]?.proofOfPaymentUrl;
+      let finalUrl = proofOfPaymentUrl;
+      if (proofOfPaymentUrl && existingUrl) {
+        const urls = existingUrl.split(',').map(u => u.trim()).filter(Boolean);
+        if (!urls.includes(proofOfPaymentUrl)) {
+          finalUrl = [...urls, proofOfPaymentUrl].join(',');
+        } else {
+          finalUrl = existingUrl;
+        }
+      } else if (existingUrl && !proofOfPaymentUrl) {
+        finalUrl = existingUrl;
+      }
+
       const results = await db.update(schema.invoices)
         .set({ 
           status, 
+          amountPaid: status === 'paid' ? undefined : amountPaid,
+          proofOfPaymentUrl: finalUrl,
           paidAt: status === 'paid' ? new Date() : null,
           updatedAt: new Date() 
         })
@@ -579,9 +610,26 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
   }
   const idx = mockInvoices.findIndex(inv => inv.id === id);
   if (idx !== -1) {
+    const total = mockInvoices[idx].total;
+    const finalAmountPaid = status === 'paid' ? total : (amountPaid !== undefined ? amountPaid : mockInvoices[idx].amountPaid);
+    
+    let finalProofOfPaymentUrl = mockInvoices[idx].proofOfPaymentUrl || null;
+    if (proofOfPaymentUrl) {
+      if (finalProofOfPaymentUrl) {
+        const urls = finalProofOfPaymentUrl.split(',').map(u => u.trim()).filter(Boolean);
+        if (!urls.includes(proofOfPaymentUrl)) {
+          finalProofOfPaymentUrl = [...urls, proofOfPaymentUrl].join(',');
+        }
+      } else {
+        finalProofOfPaymentUrl = proofOfPaymentUrl;
+      }
+    }
+
     mockInvoices[idx] = {
       ...mockInvoices[idx],
       status,
+      amountPaid: finalAmountPaid,
+      proofOfPaymentUrl: finalProofOfPaymentUrl,
       paidAt: status === 'paid' ? new Date() : null,
       updatedAt: new Date()
     };
@@ -604,9 +652,15 @@ export async function updateInvoice(id: string, data: Partial<schema.NewInvoice>
   }
   const idx = mockInvoices.findIndex(inv => inv.id === id);
   if (idx !== -1) {
+    const updatedStatus = data.status || mockInvoices[idx].status;
+    const total = data.total !== undefined ? data.total : mockInvoices[idx].total;
+    const updatedAmountPaid = updatedStatus === 'paid' ? total : (data.amountPaid !== undefined && data.amountPaid !== null ? Number(data.amountPaid) : mockInvoices[idx].amountPaid);
+    
     mockInvoices[idx] = {
       ...mockInvoices[idx],
       ...data,
+      amountPaid: updatedAmountPaid,
+      proofOfPaymentUrl: data.proofOfPaymentUrl !== undefined ? data.proofOfPaymentUrl : mockInvoices[idx].proofOfPaymentUrl,
       dueDate: data.dueDate ? new Date(data.dueDate) : mockInvoices[idx].dueDate,
       issuedAt: data.status ? (data.status !== 'draft' ? new Date() : null) : mockInvoices[idx].issuedAt,
       paidAt: data.status ? (data.status === 'paid' ? new Date() : null) : mockInvoices[idx].paidAt,
@@ -638,6 +692,35 @@ export async function deleteInvoice(id: string) {
     return deleted;
   }
   return null;
+}
+
+export async function uploadReceiptAction(name: string, base64Data: string) {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    console.warn("BLOB_READ_WRITE_TOKEN is missing. Falling back to storing Base64 receipt data directly in the database.");
+    return base64Data;
+  }
+  
+  try {
+    const base64Content = base64Data.split(';base64,').pop() || base64Data;
+    const buffer = Buffer.from(base64Content, 'base64');
+    
+    let contentType = 'image/jpeg';
+    if (base64Data.startsWith('data:image/png')) contentType = 'image/png';
+    else if (base64Data.startsWith('data:image/webp')) contentType = 'image/webp';
+    else if (base64Data.startsWith('data:application/pdf')) contentType = 'application/pdf';
+    
+    const blob = await put(`receipts/${crypto.randomUUID()}-${name}`, buffer, {
+      access: 'public',
+      contentType: contentType,
+      token: token
+    });
+    
+    return blob.url;
+  } catch (err) {
+    console.error("Vercel Blob upload failed, falling back to Base64: ", err);
+    return base64Data;
+  }
 }
 
 // --- SUPPORT TICKETS QUERIES ---

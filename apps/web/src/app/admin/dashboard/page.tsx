@@ -120,10 +120,10 @@ export default function DashboardHome() {
   const totalClients = clients.length;
   const activeClients = clients.filter(c => c.status === 'active').length;
 
-  // Calculate MRR from actual active subscriptions: Static = 150k, Dynamic = 350k
+  // Calculate MRR from actual active subscriptions: Static = 200k, Dynamic = 350k
   const calculatedMRR = clients.reduce((sum, c) => {
     if (c.status !== 'active') return sum;
-    if (c.subscriptionType === 'static') return sum + 150000;
+    if (c.subscriptionType === 'static') return sum + 200000;
     if (c.subscriptionType === 'dynamic') return sum + 350000;
     return sum;
   }, 0);

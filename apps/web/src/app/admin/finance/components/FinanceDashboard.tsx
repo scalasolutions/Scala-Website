@@ -95,12 +95,18 @@ export const FinanceDashboard: React.FC = () => {
 
   // Financial Split Arithmetic Calculations
   const totalPaidRevenue = invoices
-    .filter(inv => inv.status === 'paid')
-    .reduce((sum, inv) => sum + inv.total, 0);
+    .reduce((sum, inv) => {
+      if (inv.status === 'paid') return sum + inv.total;
+      if (inv.status === 'partially_paid') return sum + (inv.amountPaid || 0);
+      return sum;
+    }, 0);
 
   const awaitingCollection = invoices
-    .filter(inv => inv.status === 'issued' || inv.status === 'past_due')
-    .reduce((sum, inv) => sum + inv.total, 0);
+    .reduce((sum, inv) => {
+      if (inv.status === 'issued' || inv.status === 'past_due') return sum + inv.total;
+      if (inv.status === 'partially_paid') return sum + Math.max(0, inv.total - (inv.amountPaid || 0));
+      return sum;
+    }, 0);
 
   const totalOperatingCosts = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 

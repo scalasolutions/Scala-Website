@@ -3,7 +3,7 @@ import { relations } from 'drizzle-orm';
 
 // Enums
 export const clientStatusEnum = pgEnum('client_status', ['pending', 'active', 'inactive']);
-export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'issued', 'paid', 'past_due', 'written_off']);
+export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'issued', 'paid', 'partially_paid', 'past_due', 'written_off']);
 export const ticketStatusEnum = pgEnum('ticket_status', ['open', 'in_progress', 'resolved', 'closed']);
 export const ticketPriorityEnum = pgEnum('ticket_priority', ['low', 'medium', 'high', 'urgent']);
 export const ticketCategoryEnum = pgEnum('ticket_category', ['billing', 'technical', 'general', 'feature_request']);
@@ -37,6 +37,8 @@ export const invoices = pgTable('invoices', {
   subtotal: bigint('subtotal', { mode: 'number' }).notNull(),
   tax: bigint('tax', { mode: 'number' }).notNull().default(0),
   total: bigint('total', { mode: 'number' }).notNull(),
+  amountPaid: bigint('amount_paid', { mode: 'number' }).notNull().default(0),
+  proofOfPaymentUrl: text('proof_of_payment_url'),
   status: invoiceStatusEnum('status').notNull().default('draft'),
   itemsJson: text('items_json').notNull(), // JSON string for billing line items
   includedPagesJson: text('included_pages_json'), // JSON list of included custom/default page keys
