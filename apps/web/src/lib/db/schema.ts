@@ -25,6 +25,18 @@ export const clients = pgTable('clients', {
   subscriptionStartDate: timestamp('subscription_start_date'),
   portalPassword: text('portal_password'),
   sourcedBy: text('sourced_by').notNull().default('organic'),
+  // SLA & T&C fields
+  tcStatus: text('tc_status').notNull().default('pending'), // 'pending' | 'signed'
+  tcSignedAt: timestamp('tc_signed_at'),
+  tcCustomTerms: text('tc_custom_terms'),
+  slaCustomTerms: text('sla_custom_terms'),
+  // Maintenance reminder intervals (in months) and last completion dates
+  envRotationInterval: integer('env_rotation_interval').notNull().default(6),
+  envRotationLastAt: timestamp('env_rotation_last_at'),
+  stabilityCheckInterval: integer('stability_check_interval').notNull().default(1),
+  stabilityCheckLastAt: timestamp('stability_check_last_at'),
+  expectationsCheckInterval: integer('expectations_check_interval').notNull().default(3),
+  expectationsCheckLastAt: timestamp('expectations_check_last_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

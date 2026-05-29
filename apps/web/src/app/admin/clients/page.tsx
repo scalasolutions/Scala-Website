@@ -20,7 +20,9 @@ import {
   Pencil,
   Trash2,
   Briefcase,
+  FileText,
 } from 'lucide-react';
+import { ClientAgreementPreview } from './components/ClientAgreementPreview';
 import {
   getClients,
   createClient,
@@ -92,6 +94,12 @@ export default function ClientsPage() {
   );
   const [portalPassword, setPortalPassword] = useState('');
   const [sourcedBy, setSourcedBy] = useState('organic');
+
+  // SLA Agreement & Maintenance Reminders configuration states
+  const [selectedAgreementClient, setSelectedAgreementClient] = useState<MockClient | null>(null);
+  const [envRotationInterval, setEnvRotationInterval] = useState<number>(6);
+  const [stabilityCheckInterval, setStabilityCheckInterval] = useState<number>(1);
+  const [expectationsCheckInterval, setExpectationsCheckInterval] = useState<number>(3);
 
   // Create/Edit Partner Modal State
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
@@ -165,6 +173,13 @@ export default function ClientsPage() {
           subscriptionStartDate: subscriptionType ? new Date(subscriptionStartDate) : null,
           portalPassword: portalPassword || null,
           sourcedBy: sourcedBy || 'organic',
+          tcStatus: 'pending',
+          envRotationInterval: Number(envRotationInterval),
+          stabilityCheckInterval: Number(stabilityCheckInterval),
+          expectationsCheckInterval: Number(expectationsCheckInterval),
+          envRotationLastAt: new Date(),
+          stabilityCheckLastAt: new Date(),
+          expectationsCheckLastAt: new Date(),
         });
 
         if (newClient) {
@@ -181,6 +196,9 @@ export default function ClientsPage() {
           setSubscriptionStartDate(new Date().toISOString().substring(0, 10));
           setPortalPassword('');
           setSourcedBy('organic');
+          setEnvRotationInterval(6);
+          setStabilityCheckInterval(1);
+          setExpectationsCheckInterval(3);
           setModalOpen(false);
 
           // Clear query string
@@ -336,8 +354,9 @@ export default function ClientsPage() {
   const isClients = activeTab === 'clients';
 
   return (
-    <div className="space-y-8 animate-fade-up">
-      {/* Tab switcher — calm FilterBar, not aggressive coloured tab strip */}
+    <>
+      <div className={cn("space-y-8 animate-fade-up", selectedAgreementClient && "print:hidden")}>
+        {/* Tab switcher — calm FilterBar, not aggressive coloured tab strip */}
       <FilterBar<TabValue>
         options={tabOptions}
         value={activeTab}
@@ -441,6 +460,48 @@ export default function ClientsPage() {
                     inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid'
                   );
 
+                  // Calculate if any maintenance task is overdue
+                  const isMaintenanceOverdue = (() => {
+                    if (client.status !== 'active') return false; // only alert for active clients
+                    
+                    const now = new Date();
+                    
+                    // Env rotation overdue check
+                    if (client.envRotationLastAt) {
+                      const envDue = new Date(client.envRotationLastAt);
+                      envDue.setMonth(envDue.getMonth() + (client.envRotationInterval || 6));
+                      if (now > envDue) return true;
+                    } else if (client.createdAt) {
+                      const envDue = new Date(client.createdAt);
+                      envDue.setMonth(envDue.getMonth() + (client.envRotationInterval || 6));
+                      if (now > envDue) return true;
+                    }
+
+                    // Stability check overdue check
+                    if (client.stabilityCheckLastAt) {
+                      const stabDue = new Date(client.stabilityCheckLastAt);
+                      stabDue.setMonth(stabDue.getMonth() + (client.stabilityCheckInterval || 1));
+                      if (now > stabDue) return true;
+                    } else if (client.createdAt) {
+                      const stabDue = new Date(client.createdAt);
+                      stabDue.setMonth(stabDue.getMonth() + (client.stabilityCheckInterval || 1));
+                      if (now > stabDue) return true;
+                    }
+
+                    // Expectations check overdue check
+                    if (client.expectationsCheckLastAt) {
+                      const expDue = new Date(client.expectationsCheckLastAt);
+                      expDue.setMonth(expDue.getMonth() + (client.expectationsCheckInterval || 3));
+                      if (now > expDue) return true;
+                    } else if (client.createdAt) {
+                      const expDue = new Date(client.createdAt);
+                      expDue.setMonth(expDue.getMonth() + (client.expectationsCheckInterval || 3));
+                      if (now > expDue) return true;
+                    }
+
+                    return false;
+                  })();
+
                   const statusVariant:
                     | 'success'
                     | 'warning'
@@ -460,124 +521,162 @@ export default function ClientsPage() {
                   return (
                     <div
                       key={client.id}
-                      onClick={() => router.push(`/admin/clients/${client.id}`)}
                       className={cn(
-                        'group flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg cursor-pointer border border-transparent active-press',
+                        'group flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg border border-transparent',
                         TABLE_ROW_HOVER,
                       )}
                     >
-                       {/* Logo avatar — only when client has a website */}
-                      {clFavicon && (
+                      {/* Left + Middle Clickable Region */}
+                      <div
+                        onClick={() => router.push(`/admin/clients/${client.id}`)}
+                        className="min-w-0 flex-1 flex items-center justify-between gap-4 cursor-pointer active-press"
+                      >
+                        {/* Logo avatar */}
                         <div className="w-9 h-9 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden self-start mt-0.5">
-                          <img
-                            src={clFavicon}
-                            alt={client.name}
-                            className="w-5 h-5 object-contain"
-                            onLoad={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              if (img.naturalWidth <= 16) {
-                                img.parentElement!.style.display = 'none';
-                              }
-                            }}
-                            onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
-                          />
-                        </div>
-                      )}
-                      {/* Left: name + meta */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {client.name}
-                          </p>
-                          {hasOutstanding && (
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/admin/invoices?client=${client.id}`);
-                              }}
-                              className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none shrink-0"
-                            >
-                              Outstanding
-
-                              {/* Custom Tooltip on Hover */}
-                              <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-52 leading-relaxed normal-case select-none text-left">
-                                <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
-                                  <span>⚠️ Unpaid Bills</span>
-                                  <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
-                                </div>
-                                <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
-                                  {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
-                                    <div key={inv.id} className="flex justify-between items-center gap-2">
-                                      <span className="text-zinc-400 truncate">{inv.invoiceNumber}</span>
-                                      <span className="text-zinc-100 shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </span>
-                            </span>
-                          )}
-                          <Badge variant={statusVariant} className="capitalize">
-                            {client.status}
-                          </Badge>
-                          {!isOrganic && (
-                            <Badge variant="neutral">via {sourcedLabel}</Badge>
-                          )}
-                        </div>
-                        <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1 truncate">
-                            <Building size={11} className="shrink-0" />
-                            {client.companyName || 'No company'}
-                          </span>
-                          {client.subscriptionType && (
-                            <span className="inline-flex items-center gap-1 capitalize">
-                              <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                              {client.subscriptionType} hosting
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Middle: quota */}
-                      <div className="hidden md:flex flex-col items-end shrink-0 min-w-[140px]">
-                        {remaining !== null ? (
-                          <>
-                            <div className="flex items-center gap-2">
-                              {isExpiring && (
-                                <AlertTriangle
-                                  size={12}
-                                  className={
-                                    remaining === 0 ? 'text-red-500' : 'text-amber-500'
+                          {clFavicon ? (
+                            <>
+                              <img
+                                src={clFavicon}
+                                alt={client.name}
+                                className="w-5 h-5 object-contain"
+                                onLoad={(e) => {
+                                  const img = e.target as HTMLImageElement;
+                                  if (img.naturalWidth <= 16) {
+                                    img.style.display = 'none';
+                                    img.nextElementSibling?.removeAttribute('style');
                                   }
-                                />
-                              )}
-                              <span className="text-sm font-medium text-foreground tabular-nums">
-                                {remaining}
-                                <span className="text-muted-foreground font-normal">
-                                  {' '}/ {client.subscriptionMonths} mo
-                                </span>
-                              </span>
-                            </div>
-                            <div className="mt-1.5 w-24 h-1 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  remaining === 0
-                                    ? 'bg-red-500'
-                                    : isExpiring
-                                    ? 'bg-amber-500'
-                                    : 'bg-foreground/30'
-                                }`}
-                                style={{
-                                  width: `${Math.min(
-                                    100,
-                                    (remaining / (client.subscriptionMonths || 12)) * 100
-                                  )}%`,
+                                }}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style');
                                 }}
                               />
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">No plan</span>
-                        )}
+                              <span className="text-xs font-bold text-muted-foreground" style={{ display: 'none' }}>
+                                {client.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs font-bold text-muted-foreground">
+                              {client.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        {/* Left: name + meta */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {client.name}
+                            </p>
+                            {hasOutstanding && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/admin/invoices?client=${client.id}`);
+                                }}
+                                className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none shrink-0"
+                              >
+                                Outstanding
+                                {/* Custom Tooltip on Hover */}
+                                <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-52 leading-relaxed normal-case select-none text-left">
+                                  <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
+                                    <span>⚠️ Unpaid Bills</span>
+                                    <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
+                                  </div>
+                                  <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
+                                    {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
+                                      <div key={inv.id} className="flex justify-between items-center gap-2">
+                                        <span className="text-zinc-400 truncate">{inv.invoiceNumber}</span>
+                                        <span className="text-zinc-100 shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </span>
+                              </span>
+                            )}
+                            {isMaintenanceOverdue && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/admin/clients/${client.id}?focus=maintenance`);
+                                }}
+                                className="relative group/maint cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider transition-all select-none shrink-0 hover:bg-amber-500/25 active:scale-95 animate-pulse-subtle"
+                              >
+                                ⚠️ Maint. Due
+                                {/* Custom Tooltip on Hover */}
+                                <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/maint:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-56 leading-relaxed normal-case select-none text-left">
+                                  <div className="text-[10px] uppercase tracking-wider text-amber-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
+                                    <span>⚠️ Maintenance Alert</span>
+                                    <span className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 rounded">Click to Resolve</span>
+                                  </div>
+                                  <div className="space-y-1 text-zinc-400 text-[10px] font-medium leading-relaxed">
+                                    Environment variables, stability checkups, or client reviews are overdue. Click to open operations panel.
+                                  </div>
+                                </span>
+                              </span>
+                            )}
+                            <Badge variant={statusVariant} className="capitalize">
+                              {client.status}
+                            </Badge>
+                            {!isOrganic && (
+                              <Badge variant="neutral">via {sourcedLabel}</Badge>
+                            )}
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1 truncate">
+                              <Building size={11} className="shrink-0" />
+                              {client.companyName || 'No company'}
+                            </span>
+                            {client.subscriptionType && (
+                              <span className="inline-flex items-center gap-1 capitalize">
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                                {client.subscriptionType} hosting
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Middle: quota */}
+                        <div className="hidden md:flex flex-col items-end shrink-0 min-w-[140px]">
+                          {remaining !== null ? (
+                            <>
+                              <div className="flex items-center gap-2">
+                                {isExpiring && (
+                                  <AlertTriangle
+                                    size={12}
+                                    className={
+                                      remaining === 0 ? 'text-red-500' : 'text-amber-500'
+                                    }
+                                  />
+                                )}
+                                <span className="text-sm font-medium text-foreground tabular-nums">
+                                  {remaining}
+                                  <span className="text-muted-foreground font-normal">
+                                    {' '}/ {client.subscriptionMonths} mo
+                                  </span>
+                                </span>
+                              </div>
+                              <div className="mt-1.5 w-24 h-1 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    remaining === 0
+                                      ? 'bg-red-500'
+                                      : isExpiring
+                                      ? 'bg-amber-500'
+                                      : 'bg-foreground/30'
+                                  }`}
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      (remaining / (client.subscriptionMonths || 12)) * 100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No plan</span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Right: actions — single 3-dot menu with labeled items */}
@@ -602,6 +701,12 @@ export default function ClientsPage() {
                               label: 'Support tickets',
                               icon: <Ticket size={14} />,
                               href: `/admin/tickets?client=${client.id}`,
+                            },
+                            {
+                              key: 'agreement',
+                              label: 'Download T&C / SLA',
+                              icon: <FileText size={14} />,
+                              onSelect: () => setSelectedAgreementClient(client),
                             },
                           ]}
                         />
@@ -933,6 +1038,38 @@ export default function ClientsPage() {
                       </div>
                     )}
 
+                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                        Operations & Maintenance (Interval in Months)
+                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <Input
+                          label="Env Rotation"
+                          type="number"
+                          min="1"
+                          required
+                          value={envRotationInterval}
+                          onChange={(e) => setEnvRotationInterval(Number(e.target.value))}
+                        />
+                        <Input
+                          label="Stability Check"
+                          type="number"
+                          min="1"
+                          required
+                          value={stabilityCheckInterval}
+                          onChange={(e) => setStabilityCheckInterval(Number(e.target.value))}
+                        />
+                        <Input
+                          label="Client Review"
+                          type="number"
+                          min="1"
+                          required
+                          value={expectationsCheckInterval}
+                          onChange={(e) => setExpectationsCheckInterval(Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+
                     <Input
                       label="Portal password (optional)"
                       placeholder="Leave blank to auto-generate"
@@ -1067,6 +1204,16 @@ export default function ClientsPage() {
           </div>,
           document.body
         )}
-    </div>
+
+      </div>
+
+      {/* SLA / T&C Print Modal */}
+      {selectedAgreementClient && (
+        <ClientAgreementPreview
+          client={selectedAgreementClient}
+          onClose={() => setSelectedAgreementClient(null)}
+        />
+      )}
+    </>
   );
 }

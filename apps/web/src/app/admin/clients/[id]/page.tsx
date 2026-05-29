@@ -22,7 +22,13 @@ import {
   Clock,
   User,
   Loader2,
+  FileText,
+  Check,
+  RotateCcw,
+  Settings,
+  Printer,
 } from 'lucide-react';
+import { ClientAgreementPreview } from '../components/ClientAgreementPreview';
 import {
   getClientById,
   getInvoices,
@@ -77,6 +83,19 @@ export default function ClientDetailPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [sourcedBy, setSourcedBy] = useState('organic');
 
+  // SLA & T&C States
+  const [agreementModalOpen, setAgreementModalOpen] = useState(false);
+  const [tcStatus, setTcStatus] = useState<'pending' | 'signed'>('pending');
+  const [tcCustomTerms, setTcCustomTerms] = useState('');
+  const [slaCustomTerms, setSlaCustomTerms] = useState('');
+  const [agreementPreviewOpen, setAgreementPreviewOpen] = useState(false);
+
+  // Operations & Maintenance States
+  const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
+  const [envRotationInterval, setEnvRotationInterval] = useState(6);
+  const [stabilityCheckInterval, setStabilityCheckInterval] = useState(1);
+  const [expectationsCheckInterval, setExpectationsCheckInterval] = useState(3);
+
   // Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
@@ -127,6 +146,14 @@ export default function ClientDetailPage() {
             ? 'organic'
             : loadedSourcedBy
         );
+
+        // Load custom terms & interval states
+        setTcStatus((c.tcStatus as 'pending' | 'signed') || 'pending');
+        setTcCustomTerms(c.tcCustomTerms || '');
+        setSlaCustomTerms(c.slaCustomTerms || '');
+        setEnvRotationInterval(c.envRotationInterval !== undefined ? c.envRotationInterval : 6);
+        setStabilityCheckInterval(c.stabilityCheckInterval !== undefined ? c.stabilityCheckInterval : 1);
+        setExpectationsCheckInterval(c.expectationsCheckInterval !== undefined ? c.expectationsCheckInterval : 3);
       } catch (err) {
         console.error('Failed to load client profile details', err);
       } finally {
@@ -136,10 +163,10 @@ export default function ClientDetailPage() {
     loadClientData();
   }, [id]);
 
-  // Prevent background scrolling when Edit or Delete modal is open
+  // Prevent background scrolling when any modal is open
   useEffect(() => {
     const mainEl = document.querySelector('main');
-    if (editModalOpen || deleteModalOpen) {
+    if (editModalOpen || deleteModalOpen || agreementModalOpen || maintenanceModalOpen || agreementPreviewOpen) {
       if (mainEl) mainEl.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
     } else {
@@ -150,7 +177,7 @@ export default function ClientDetailPage() {
       if (mainEl) mainEl.style.overflow = '';
       document.body.style.overflow = '';
     };
-  }, [editModalOpen, deleteModalOpen]);
+  }, [editModalOpen, deleteModalOpen, agreementModalOpen, maintenanceModalOpen, agreementPreviewOpen]);
 
   if (loading) {
     return (
@@ -280,6 +307,83 @@ export default function ClientDetailPage() {
 
   const sourcedLabel = getSourcedByLabel(client.sourcedBy);
   const isOrganic = sourcedLabel === 'Organic';
+
+  // Helper to calculate non-mutating due dates
+  const getDueDate = (lastDateStr: Date | null, createdAtStr: Date, intervalMonths: number) => {
+    const baseDate = lastDateStr ? new Date(lastDateStr) : new Date(createdAtStr);
+    const dueDate = new Date(baseDate);
+    dueDate.setMonth(baseDate.getMonth() + intervalMonths);
+    return dueDate;
+  };
+
+  const now = new Date();
+  
+  const envDue = getDueDate(client.envRotationLastAt, client.createdAt, client.envRotationInterval || 6);
+  const isEnvOverdue = client.status === 'active' && now > envDue;
+  const envOverdueDays = Math.ceil((now.getTime() - envDue.getTime()) / (1000 * 60 * 60 * 24));
+
+  const stabDue = getDueDate(client.stabilityCheckLastAt, client.createdAt, client.stabilityCheckInterval || 1);
+  const isStabOverdue = client.status === 'active' && now > stabDue;
+  const stabOverdueDays = Math.ceil((now.getTime() - stabDue.getTime()) / (1000 * 60 * 60 * 24));
+
+  const expDue = getDueDate(client.expectationsCheckLastAt, client.createdAt, client.expectationsCheckInterval || 3);
+  const isExpOverdue = client.status === 'active' && now > expDue;
+  const expOverdueDays = Math.ceil((now.getTime() - expDue.getTime()) / (1000 * 60 * 60 * 24));
+
+  const handleMarkTaskComplete = async (task: 'env' | 'stability' | 'expectations') => {
+    try {
+      const updateData: any = {};
+      if (task === 'env') {
+        updateData.envRotationLastAt = new Date();
+      } else if (task === 'stability') {
+        updateData.stabilityCheckLastAt = new Date();
+      } else if (task === 'expectations') {
+        updateData.expectationsCheckLastAt = new Date();
+      }
+
+      const updated = await updateClient(client.id, updateData);
+      if (updated) {
+        setClient(updated as MockClient);
+      }
+    } catch (e) {
+      console.error('Failed to complete maintenance task', e);
+    }
+  };
+
+  const handleSaveIntervals = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const updated = await updateClient(client.id, {
+        envRotationInterval: Number(envRotationInterval),
+        stabilityCheckInterval: Number(stabilityCheckInterval),
+        expectationsCheckInterval: Number(expectationsCheckInterval),
+      });
+      if (updated) {
+        setClient(updated as MockClient);
+        setMaintenanceModalOpen(false);
+      }
+    } catch (e) {
+      console.error('Failed to update maintenance intervals', e);
+    }
+  };
+
+  const handleSaveAgreementTerms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const updated = await updateClient(client.id, {
+        tcStatus: tcStatus,
+        tcSignedAt: tcStatus === 'signed' ? new Date() : null,
+        tcCustomTerms: tcCustomTerms || null,
+        slaCustomTerms: slaCustomTerms || null,
+      });
+      if (updated) {
+        setClient(updated as MockClient);
+        setAgreementModalOpen(false);
+      }
+    } catch (e) {
+      console.error('Failed to update agreement terms', e);
+    }
+  };
 
   const statusVariant: 'success' | 'warning' | 'neutral' =
     client.status === 'active'
@@ -500,10 +604,236 @@ export default function ClientDetailPage() {
               </Badge>
             </div>
           </Card>
+
+          {/* SLA & T&C Agreement Card */}
+          <Card padding="md" className="relative">
+            <SectionHeading
+              title="SLA & T&C Agreement"
+              icon={<FileText size={16} />}
+              action={
+                <Badge variant={client.tcStatus === 'signed' ? 'success' : 'warning'} className="capitalize">
+                  {client.tcStatus === 'signed' ? 'Signed' : 'Pending Signature'}
+                </Badge>
+              }
+            />
+
+            <div className="space-y-4 text-sm mt-3">
+              {client.tcStatus === 'signed' ? (
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 flex items-start gap-2.5">
+                  <CheckCircle size={15} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-semibold text-foreground">Agreement fully executed</p>
+                    <p className="text-muted-foreground mt-0.5">
+                      Digitally signed on{' '}
+                      <span className="font-medium text-foreground">
+                        {new Date(client.tcSignedAt!).toLocaleDateString('id-ID', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3.5 flex items-start gap-2.5">
+                  <Clock size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div className="text-xs text-muted-foreground">
+                    <p className="font-semibold text-foreground">Awaiting client signature</p>
+                    <p className="mt-0.5 leading-relaxed">
+                      This client's Master SLA & T&C document is pending signature sign-off.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-xs space-y-2 border-t border-border/60 pt-3">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Hosting Tier:</span>
+                  <span className="font-semibold capitalize text-foreground">{client.subscriptionType || 'None'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SLA Target:</span>
+                  <span className="font-semibold text-foreground">
+                    {client.subscriptionType === 'dynamic' ? '99.99% Uptime' : client.subscriptionType === 'static' ? '99.90% Uptime' : 'N/A'}
+                  </span>
+                </div>
+                {client.tcCustomTerms && (
+                  <div className="bg-muted/30 border border-border rounded-lg p-2.5 text-[11px] text-muted-foreground italic mt-2">
+                    <span className="font-bold block normal-case text-foreground/80 not-italic mb-0.5">★ Custom Rider Attached:</span>
+                    "{client.tcCustomTerms.substring(0, 80)}..."
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Printer size={13} />}
+                  onClick={() => setAgreementPreviewOpen(true)}
+                  className="w-full text-center flex justify-center items-center"
+                >
+                  View / Print
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Edit size={13} />}
+                  onClick={() => {
+                    setTcStatus((client.tcStatus as 'pending' | 'signed') || 'pending');
+                    setTcCustomTerms(client.tcCustomTerms || '');
+                    setSlaCustomTerms(client.slaCustomTerms || '');
+                    setAgreementModalOpen(true);
+                  }}
+                  className="w-full text-center flex justify-center items-center"
+                >
+                  Edit Terms
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
 
         {/* Right Columns: Subscription Details & Linked records */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Operations & Maintenance Reminders Card */}
+          <Card padding="md">
+            <SectionHeading
+              title="Operations & Maintenance Checklist"
+              icon={<RotateCcw size={16} />}
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Settings size={13} />}
+                  onClick={() => {
+                    setEnvRotationInterval(client.envRotationInterval || 6);
+                    setStabilityCheckInterval(client.stabilityCheckInterval || 1);
+                    setExpectationsCheckInterval(client.expectationsCheckInterval || 3);
+                    setMaintenanceModalOpen(true);
+                  }}
+                  className="!h-8 !px-2 text-xs flex justify-center items-center"
+                >
+                  Configure Intervals
+                </Button>
+              }
+            />
+
+            <div className="space-y-4 mt-4 divide-y divide-border/50">
+              {/* Row 1: Env Rotation */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 first:pt-0">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isEnvOverdue ? 'bg-amber-505 bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      Environment Variables Rotation
+                      <Badge variant="neutral">Every {client.envRotationInterval || 6} mo</Badge>
+                    </h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Rotate sensitive client keys, database passwords, and API credentials to maintain peak security.
+                  </p>
+                  <div className="text-[11px] font-mono text-muted-foreground flex gap-3 pt-0.5">
+                    <span>Last Rotated: {client.envRotationLastAt ? new Date(client.envRotationLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
+                    <span>&bull;</span>
+                    <span className={isEnvOverdue ? 'text-amber-500 font-bold' : ''}>Next Due: {envDue.toLocaleDateString('id-ID')}</span>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-2 self-start sm:self-center">
+                  {isEnvOverdue && (
+                    <Badge variant="warning" className="animate-pulse-subtle font-black uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded">
+                      ⚠️ Overdue by {envOverdueDays}d
+                    </Badge>
+                  )}
+                  <Button
+                    variant={isEnvOverdue ? 'primary' : 'secondary'}
+                    size="sm"
+                    leftIcon={<Check size={12} />}
+                    onClick={() => handleMarkTaskComplete('env')}
+                    className="h-8 text-xs shrink-0 flex items-center justify-center"
+                  >
+                    Mark Done
+                  </Button>
+                </div>
+              </div>
+
+              {/* Row 2: Stability Checks */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isStabOverdue ? 'bg-amber-505 bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      Stability & Dependency Checkup
+                      <Badge variant="neutral">Every {client.stabilityCheckInterval || 1} mo</Badge>
+                    </h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Verify server logs, check NPM dependency vulnerabilities, run speed/Lighthouse tests, and verify backups.
+                  </p>
+                  <div className="text-[11px] font-mono text-muted-foreground flex gap-3 pt-0.5">
+                    <span>Last Checked: {client.stabilityCheckLastAt ? new Date(client.stabilityCheckLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
+                    <span>&bull;</span>
+                    <span className={isStabOverdue ? 'text-amber-500 font-bold' : ''}>Next Due: {stabDue.toLocaleDateString('id-ID')}</span>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-2 self-start sm:self-center">
+                  {isStabOverdue && (
+                    <Badge variant="warning" className="animate-pulse-subtle font-black uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded">
+                      ⚠️ Overdue by {stabOverdueDays}d
+                    </Badge>
+                  )}
+                  <Button
+                    variant={isStabOverdue ? 'primary' : 'secondary'}
+                    size="sm"
+                    leftIcon={<Check size={12} />}
+                    onClick={() => handleMarkTaskComplete('stability')}
+                    className="h-8 text-xs shrink-0 flex items-center justify-center"
+                  >
+                    Mark Done
+                  </Button>
+                </div>
+              </div>
+
+              {/* Row 3: Client Satisfaction Expectations Checkup */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isExpOverdue ? 'bg-amber-505 bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      Client Expectations Checkup
+                      <Badge variant="neutral">Every {client.expectationsCheckInterval || 3} mo</Badge>
+                    </h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Reach out directly to the client, confirm if hosting expectations and SLA response targets are fully met.
+                  </p>
+                  <div className="text-[11px] font-mono text-muted-foreground flex gap-3 pt-0.5">
+                    <span>Last Checked: {client.expectationsCheckLastAt ? new Date(client.expectationsCheckLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
+                    <span>&bull;</span>
+                    <span className={isExpOverdue ? 'text-amber-500 font-bold' : ''}>Next Due: {expDue.toLocaleDateString('id-ID')}</span>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-2 self-start sm:self-center">
+                  {isExpOverdue && (
+                    <Badge variant="warning" className="animate-pulse-subtle font-black uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded">
+                      ⚠️ Overdue by {expOverdueDays}d
+                    </Badge>
+                  )}
+                  <Button
+                    variant={isExpOverdue ? 'primary' : 'secondary'}
+                    size="sm"
+                    leftIcon={<Check size={12} />}
+                    onClick={() => handleMarkTaskComplete('expectations')}
+                    className="h-8 text-xs shrink-0 flex items-center justify-center"
+                  >
+                    Mark Done
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
           {/* Subscription */}
           <Card padding="md">
             <SectionHeading
@@ -1041,6 +1371,197 @@ export default function ClientDetailPage() {
           </div>,
           document.body
         )}
+
+      {/* --- SLA & T&C CUSTOMIZATION MODAL --- */}
+      {mounted &&
+        agreementModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 bg-background/85 backdrop-blur-md"
+              onClick={() => setAgreementModalOpen(false)}
+            />
+
+            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
+              <div className="p-6 sm:p-8">
+                <SectionHeading
+                  title="Customize SLA & T&C"
+                  description="Modify specific contractual agreements and signature sign-off."
+                  action={
+                    <button
+                      onClick={() => setAgreementModalOpen(false)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
+                      aria-label="Close"
+                    >
+                      <X size={16} />
+                    </button>
+                  }
+                />
+
+                <form onSubmit={handleSaveAgreementTerms} className="space-y-5">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      Signature status
+                    </label>
+                    <div className="flex gap-2">
+                      {(['pending', 'signed'] as const).map((stat) => (
+                        <button
+                          key={stat}
+                          type="button"
+                          onClick={() => setTcStatus(stat)}
+                          className={`flex-1 px-3 py-2.5 rounded-lg border text-xs font-semibold capitalize transition-all cursor-pointer ${
+                            tcStatus === stat
+                              ? 'border-primary bg-primary text-primary-foreground font-extrabold'
+                              : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {stat === 'signed' ? '✓ Signed & Executed' : 'Awaiting Signature'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                        Custom Clauses & Riders
+                      </p>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Special Terms & Conditions</label>
+                          <textarea
+                            placeholder="Add specific terms, data requirements, or liability modifications..."
+                            value={tcCustomTerms}
+                            onChange={(e) => setTcCustomTerms(e.target.value)}
+                            rows={3}
+                            className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Custom SLA Adjustments</label>
+                          <textarea
+                            placeholder="Add specific support response times, uptime targets, or escalation chains..."
+                            value={slaCustomTerms}
+                            onChange={(e) => setSlaCustomTerms(e.target.value)}
+                            rows={3}
+                            className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 justify-end pt-4 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="md"
+                      onClick={() => setAgreementModalOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                    >
+                      Save Agreements
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* --- CONFIGURE INTERVALS MODAL --- */}
+      {mounted &&
+        maintenanceModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 bg-background/85 backdrop-blur-md"
+              onClick={() => setMaintenanceModalOpen(false)}
+            />
+
+            <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
+              <div className="p-6">
+                <SectionHeading
+                  title="Configure Maintenance Intervals"
+                  description="Set recurrence durations (in months) for standard operational checks."
+                  action={
+                    <button
+                      onClick={() => setMaintenanceModalOpen(false)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
+                      aria-label="Close"
+                    >
+                      <X size={16} />
+                    </button>
+                  }
+                />
+
+                <form onSubmit={handleSaveIntervals} className="space-y-4 mt-3">
+                  <Input
+                    label="Environment Variables Rotation (Months)"
+                    type="number"
+                    min="1"
+                    required
+                    value={envRotationInterval}
+                    onChange={(e) => setEnvRotationInterval(Number(e.target.value))}
+                  />
+
+                  <Input
+                    label="Stability & Security Check (Months)"
+                    type="number"
+                    min="1"
+                    required
+                    value={stabilityCheckInterval}
+                    onChange={(e) => setStabilityCheckInterval(Number(e.target.value))}
+                  />
+
+                  <Input
+                    label="Expectations & Review (Months)"
+                    type="number"
+                    min="1"
+                    required
+                    value={expectationsCheckInterval}
+                    onChange={(e) => setExpectationsCheckInterval(Number(e.target.value))}
+                  />
+
+                  <div className="flex gap-2 justify-end pt-4 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="md"
+                      onClick={() => setMaintenanceModalOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                    >
+                      Save Intervals
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* --- SLA / T&C AGREEMENT PREVIEW OVERLAY --- */}
+      {agreementPreviewOpen && (
+        <ClientAgreementPreview
+          client={client}
+          onClose={() => setAgreementPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }

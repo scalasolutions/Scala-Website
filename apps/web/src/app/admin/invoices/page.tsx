@@ -985,83 +985,101 @@ export default function InvoicesPage() {
                   return (
                     <div
                       key={invoice.id}
-                      onClick={() => {
-                        if (effectiveStatus === 'draft') {
-                          startEditInvoice(invoice);
-                        } else {
-                          setPreviewInvoice(invoice);
-                        }
-                      }}
                       className={cn(
-                        'group flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg cursor-pointer border border-transparent active-press',
+                        'group flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg border border-transparent',
                         TABLE_ROW_HOVER,
                       )}
                     >
-                      {/* Left: client + invoice number */}
-                      <div className="min-w-0 flex-1 flex items-center gap-3">
-                        {/* Logo avatar — only when client has a website */}
-                        {invFavicon && (
+                      {/* Left + Middle Clickable Region */}
+                      <div
+                        onClick={() => {
+                          if (effectiveStatus === 'draft') {
+                            startEditInvoice(invoice);
+                          } else {
+                            setPreviewInvoice(invoice);
+                          }
+                        }}
+                        className="min-w-0 flex-1 flex items-center justify-between gap-4 cursor-pointer active-press"
+                      >
+                        {/* Left: client + invoice number */}
+                        <div className="min-w-0 flex-1 flex items-center gap-3">
+                          {/* Logo avatar container */}
                           <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-                            <img
-                              src={invFavicon}
-                              alt={client?.name || ''}
-                              className="w-5 h-5 object-contain"
-                              onLoad={(e) => {
-                                const img = e.target as HTMLImageElement;
-                                if (img.naturalWidth <= 16) {
-                                  img.parentElement!.style.display = 'none';
-                                }
-                              }}
-                              onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
-                            />
+                            {invFavicon ? (
+                              <>
+                                <img
+                                  src={invFavicon}
+                                  alt={client?.name || ''}
+                                  className="w-5 h-5 object-contain"
+                                  onLoad={(e) => {
+                                    const img = e.target as HTMLImageElement;
+                                    if (img.naturalWidth <= 16) {
+                                      img.style.display = 'none';
+                                      img.nextElementSibling?.removeAttribute('style');
+                                    }
+                                  }}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style');
+                                  }}
+                                />
+                                <span className="text-[10px] font-bold text-muted-foreground" style={{ display: 'none' }}>
+                                  {(client?.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[10px] font-bold text-muted-foreground">
+                                {(client?.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </span>
+                            )}
                           </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {client?.name || 'Unknown client'}
-                          </p>
-                          <span className={cn(
-                            "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold border capitalize select-none",
-                            getStatusBadge(effectiveStatus)
-                          )}>
-                            {effectiveStatus.replace('_', ' ')}
-                          </span>
-                          {((effectiveStatus === 'paid' || effectiveStatus === 'partially_paid') && !invoice.proofOfPaymentUrl) && (
-                            <span 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkAsPaid(invoice);
-                              }}
-                              className="inline-flex items-center gap-0.5 text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-bold select-none animate-pulse-subtle hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40 active:scale-95 transition-all duration-150 cursor-pointer"
-                              title="Click to quickly upload receipt or log payment"
-                            >
-                              ⚠️ Missing Receipt
+                          <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {client?.name || 'Unknown client'}
+                            </p>
+                            <span className={cn(
+                              "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold border capitalize select-none",
+                              getStatusBadge(effectiveStatus)
+                            )}>
+                              {effectiveStatus.replace('_', ' ')}
                             </span>
-                          )}
+                            {((effectiveStatus === 'paid' || effectiveStatus === 'partially_paid') && !invoice.proofOfPaymentUrl) && (
+                              <span 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMarkAsPaid(invoice);
+                                }}
+                                className="inline-flex items-center gap-0.5 text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-bold select-none animate-pulse-subtle hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40 active:scale-95 transition-all duration-150 cursor-pointer"
+                                title="Click to quickly upload receipt or log payment"
+                              >
+                                ⚠️ Missing Receipt
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                            <span className="font-mono">{invoice.invoiceNumber}</span>
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
+                            <span>
+                              Issued:{' '}
+                              {invoice.issuedAt
+                                ? new Date(invoice.issuedAt).toLocaleDateString('id-ID')
+                                : 'Draft'}
+                            </span>
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
+                            <span>
+                              Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
+                            </span>
+                          </div>
+                          </div>
                         </div>
-                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                          <span className="font-mono">{invoice.invoiceNumber}</span>
-                          <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
-                          <span>
-                            Issued:{' '}
-                            {invoice.issuedAt
-                              ? new Date(invoice.issuedAt).toLocaleDateString('id-ID')
-                              : 'Draft'}
-                          </span>
-                          <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
-                          <span>
-                            Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
-                          </span>
-                        </div>
-                        </div>
-                      </div>
 
-                      {/* Middle: amount */}
-                      <div className="hidden sm:block text-right shrink-0">
-                        <p className="text-sm font-medium text-foreground tabular-nums">
-                          {formatCurrencyIDR(invoice.total)}
-                        </p>
+                        {/* Middle: amount */}
+                        <div className="hidden sm:block text-right shrink-0">
+                          <p className="text-sm font-medium text-foreground tabular-nums">
+                            {formatCurrencyIDR(invoice.total)}
+                          </p>
+                        </div>
                       </div>
 
                       {/* Right: actions — single 3-dot menu with labeled items */}

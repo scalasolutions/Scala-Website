@@ -31,6 +31,16 @@ export interface MockClient {
   subscriptionStartDate: Date | null;
   portalPassword: string | null;
   sourcedBy: string | null;
+  tcStatus: string;
+  tcSignedAt: Date | null;
+  tcCustomTerms: string | null;
+  slaCustomTerms: string | null;
+  envRotationInterval: number;
+  envRotationLastAt: Date | null;
+  stabilityCheckInterval: number;
+  stabilityCheckLastAt: Date | null;
+  expectationsCheckInterval: number;
+  expectationsCheckLastAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -128,9 +138,19 @@ let mockClients: MockClient[] = [
     status: 'active',
     subscriptionType: 'dynamic',
     subscriptionMonths: 12,
-    subscriptionStartDate: new Date('2025-06-01T08:00:00Z'), // Expires June 2026 (~1 month remaining as of May 2026)
+    subscriptionStartDate: new Date('2025-06-01T08:00:00Z'),
     portalPassword: 'scala-fredrick-2026',
     sourcedBy: 'organic',
+    tcStatus: 'signed',
+    tcSignedAt: new Date('2025-06-05T10:00:00Z'),
+    tcCustomTerms: null,
+    slaCustomTerms: null,
+    envRotationInterval: 6,
+    envRotationLastAt: new Date('2025-11-15T09:00:00Z'), // Overdue (last rotated > 6 mo ago)
+    stabilityCheckInterval: 1,
+    stabilityCheckLastAt: new Date('2026-05-10T09:00:00Z'),
+    expectationsCheckInterval: 3,
+    expectationsCheckLastAt: new Date('2026-04-01T09:00:00Z'),
     createdAt: new Date('2025-06-01T08:00:00Z'),
     updatedAt: new Date('2026-05-15T08:00:00Z'),
   },
@@ -145,9 +165,19 @@ let mockClients: MockClient[] = [
     status: 'active',
     subscriptionType: 'static',
     subscriptionMonths: 12,
-    subscriptionStartDate: new Date('2026-01-01T10:00:00Z'), // Expires Jan 2027 (~7-8 months remaining as of May 2026)
+    subscriptionStartDate: new Date('2026-01-01T10:00:00Z'),
     portalPassword: 'scala-sarah-2026',
     sourcedBy: 'p1111111-1111-1111-1111-111111111111',
+    tcStatus: 'signed',
+    tcSignedAt: new Date('2026-02-12T10:00:00Z'),
+    tcCustomTerms: 'Cyberdyne requests strict client-side data protection and regular vulnerability scans.',
+    slaCustomTerms: 'Scala guarantees 99.99% network uptime for Static Hosting. Critical tickets must be addressed within 1 hour.',
+    envRotationInterval: 6,
+    envRotationLastAt: new Date('2026-02-15T09:00:00Z'),
+    stabilityCheckInterval: 1,
+    stabilityCheckLastAt: new Date('2026-04-10T09:00:00Z'), // Overdue (last check > 1 mo ago)
+    expectationsCheckInterval: 3,
+    expectationsCheckLastAt: new Date('2026-02-15T09:00:00Z'), // Overdue (last check > 3 mo ago)
     createdAt: new Date('2026-02-10T10:00:00Z'),
     updatedAt: new Date('2026-05-20T10:00:00Z'),
   },
@@ -165,6 +195,16 @@ let mockClients: MockClient[] = [
     subscriptionStartDate: null,
     portalPassword: 'scala-tony-2026',
     sourcedBy: 'organic',
+    tcStatus: 'pending',
+    tcSignedAt: null,
+    tcCustomTerms: null,
+    slaCustomTerms: null,
+    envRotationInterval: 6,
+    envRotationLastAt: null,
+    stabilityCheckInterval: 1,
+    stabilityCheckLastAt: null,
+    expectationsCheckInterval: 3,
+    expectationsCheckLastAt: null,
     createdAt: new Date('2025-11-01T09:00:00Z'),
     updatedAt: new Date('2026-04-12T09:00:00Z'),
   },
@@ -179,9 +219,19 @@ let mockClients: MockClient[] = [
     status: 'pending',
     subscriptionType: 'static',
     subscriptionMonths: 12,
-    subscriptionStartDate: new Date('2026-05-24T14:30:00Z'), // Just started (~12 months remaining)
+    subscriptionStartDate: new Date('2026-05-24T14:30:00Z'),
     portalPassword: 'scala-bruce-2026',
     sourcedBy: 'organic',
+    tcStatus: 'pending',
+    tcSignedAt: null,
+    tcCustomTerms: null,
+    slaCustomTerms: null,
+    envRotationInterval: 6,
+    envRotationLastAt: new Date('2026-05-24T14:30:00Z'),
+    stabilityCheckInterval: 1,
+    stabilityCheckLastAt: new Date('2026-05-24T14:30:00Z'),
+    expectationsCheckInterval: 3,
+    expectationsCheckLastAt: new Date('2026-05-24T14:30:00Z'),
     createdAt: new Date('2026-05-24T14:30:00Z'),
     updatedAt: new Date('2026-05-24T14:30:00Z'),
   },
@@ -196,9 +246,19 @@ let mockClients: MockClient[] = [
     status: 'active',
     subscriptionType: 'dynamic',
     subscriptionMonths: 3,
-    subscriptionStartDate: new Date('2026-04-15T08:00:00Z'), // Expires July 2026 (~1.5 months remaining)
+    subscriptionStartDate: new Date('2026-04-15T08:00:00Z'),
     portalPassword: 'scala-aspire-2026',
     sourcedBy: 'organic',
+    tcStatus: 'signed',
+    tcSignedAt: new Date('2026-04-20T10:00:00Z'),
+    tcCustomTerms: null,
+    slaCustomTerms: null,
+    envRotationInterval: 6,
+    envRotationLastAt: new Date('2026-04-20T10:00:00Z'),
+    stabilityCheckInterval: 1,
+    stabilityCheckLastAt: new Date('2026-05-20T10:00:00Z'),
+    expectationsCheckInterval: 3,
+    expectationsCheckLastAt: new Date('2026-04-20T10:00:00Z'),
     createdAt: new Date('2026-05-20T08:00:00Z'),
     updatedAt: new Date('2026-05-20T08:00:00Z'),
   }
@@ -449,6 +509,16 @@ export async function createClient(data: schema.NewClient) {
     subscriptionStartDate: data.subscriptionStartDate ? new Date(data.subscriptionStartDate) : null,
     portalPassword: data.portalPassword || `scala-${data.name.split(' ')[0].toLowerCase()}-2026`,
     sourcedBy: data.sourcedBy || 'organic',
+    tcStatus: (data.tcStatus as 'pending' | 'signed') || 'pending',
+    tcSignedAt: data.tcSignedAt ? new Date(data.tcSignedAt) : null,
+    tcCustomTerms: data.tcCustomTerms || null,
+    slaCustomTerms: data.slaCustomTerms || null,
+    envRotationInterval: data.envRotationInterval !== undefined ? Number(data.envRotationInterval) : 6,
+    envRotationLastAt: data.envRotationLastAt ? new Date(data.envRotationLastAt) : new Date(),
+    stabilityCheckInterval: data.stabilityCheckInterval !== undefined ? Number(data.stabilityCheckInterval) : 1,
+    stabilityCheckLastAt: data.stabilityCheckLastAt ? new Date(data.stabilityCheckLastAt) : new Date(),
+    expectationsCheckInterval: data.expectationsCheckInterval !== undefined ? Number(data.expectationsCheckInterval) : 3,
+    expectationsCheckLastAt: data.expectationsCheckLastAt ? new Date(data.expectationsCheckLastAt) : new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -477,6 +547,10 @@ export async function updateClient(id: string, data: Partial<schema.NewClient>) 
       subscriptionMonths: data.subscriptionMonths !== undefined && data.subscriptionMonths !== null ? Number(data.subscriptionMonths) : mockClients[idx].subscriptionMonths,
       portalPassword: data.portalPassword !== undefined ? data.portalPassword : mockClients[idx].portalPassword,
       sourcedBy: data.sourcedBy !== undefined ? data.sourcedBy : mockClients[idx].sourcedBy,
+      tcSignedAt: data.tcSignedAt !== undefined ? (data.tcSignedAt ? new Date(data.tcSignedAt) : null) : mockClients[idx].tcSignedAt,
+      envRotationLastAt: data.envRotationLastAt !== undefined ? (data.envRotationLastAt ? new Date(data.envRotationLastAt) : null) : mockClients[idx].envRotationLastAt,
+      stabilityCheckLastAt: data.stabilityCheckLastAt !== undefined ? (data.stabilityCheckLastAt ? new Date(data.stabilityCheckLastAt) : null) : mockClients[idx].stabilityCheckLastAt,
+      expectationsCheckLastAt: data.expectationsCheckLastAt !== undefined ? (data.expectationsCheckLastAt ? new Date(data.expectationsCheckLastAt) : null) : mockClients[idx].expectationsCheckLastAt,
       updatedAt: new Date()
     } as MockClient;
     return mockClients[idx];
