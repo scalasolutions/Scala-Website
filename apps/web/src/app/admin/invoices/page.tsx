@@ -32,6 +32,7 @@ import {
   MockInvoicePagePreset,
   uploadReceiptAction,
   createPayout,
+  syncInvoicePayoutAction,
 } from '@/lib/db/queries';
 import {
   invalidateCache,
@@ -553,7 +554,7 @@ export default function InvoicesPage() {
           });
 
           if (updatedInv) {
-            invalidateCache(CACHE_KEYS.INVOICES);
+            invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
             const client = clients.find((c) => c.id === selectedClientId);
             setInvoices((prev) =>
               prev.map((inv) =>
@@ -563,22 +564,9 @@ export default function InvoicesPage() {
               )
             );
 
-            // Log smart payout if payment received by a founder personally
-            const finalPayoutAmount = status === 'paid' ? total : amountPaid;
-            const wasAlreadyPaid = editingInvoice.status === 'paid' || editingInvoice.status === 'partially_paid';
-            const amountDiff = finalPayoutAmount - (editingInvoice.amountPaid || 0);
-
-            if ((status === 'paid' || status === 'partially_paid') && (receivedBy === 'fredrick' || receivedBy === 'nicholas')) {
-              const payoutAmount = wasAlreadyPaid ? amountDiff : finalPayoutAmount;
-              if (payoutAmount > 0) {
-                await createPayout({
-                  founderName: receivedBy,
-                  amount: payoutAmount,
-                  date: new Date(),
-                  description: `Direct payment received from client for invoice ${invoiceNumber} (Form Edit)`,
-                });
-              }
-            }
+            // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
+            const finalPayoutAmount = (status === 'paid' || status === 'partially_paid') ? (status === 'paid' ? total : amountPaid) : 0;
+            await syncInvoicePayoutAction(invoiceNumber, receivedBy, finalPayoutAmount, dueDate ? new Date(dueDate) : new Date());
 
             setModalOpen(false);
             resetForm();
@@ -604,20 +592,13 @@ export default function InvoicesPage() {
           });
 
           if (newInv) {
-            invalidateCache(CACHE_KEYS.INVOICES);
+            invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
             const client = clients.find((c) => c.id === selectedClientId);
             setInvoices((prev) => [{ ...newInv, client } as any, ...prev]);
 
-            // Log smart payout if payment received by a founder personally
-            const finalPayoutAmount = status === 'paid' ? total : amountPaid;
-            if ((status === 'paid' || status === 'partially_paid') && (receivedBy === 'fredrick' || receivedBy === 'nicholas') && finalPayoutAmount > 0) {
-              await createPayout({
-                founderName: receivedBy,
-                amount: finalPayoutAmount,
-                date: new Date(),
-                description: `Direct payment received from client for invoice ${invoiceNumber} (Form Create)`,
-              });
-            }
+            // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
+            const finalPayoutAmount = (status === 'paid' || status === 'partially_paid') ? (status === 'paid' ? total : amountPaid) : 0;
+            await syncInvoicePayoutAction(invoiceNumber, receivedBy, finalPayoutAmount, dueDate ? new Date(dueDate) : new Date());
 
             setModalOpen(false);
             resetForm();
@@ -666,7 +647,8 @@ export default function InvoicesPage() {
       });
 
       if (updated) {
-        invalidateCache(CACHE_KEYS.INVOICES);
+        await syncInvoicePayoutAction(invoiceToRevert.invoiceNumber, invoiceToRevert.receivedBy, finalAmountPaid, new Date());
+        invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
         setInvoices((prev) =>
           prev.map((inv) =>
             inv.id === invoiceToRevert.id
@@ -990,7 +972,8 @@ export default function InvoicesPage() {
       try {
         const deleted = await deleteInvoice(invoiceToDelete.id);
         if (deleted) {
-          invalidateCache(CACHE_KEYS.INVOICES);
+          await syncInvoicePayoutAction(invoiceToDelete.invoiceNumber, 'company', 0);
+          invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
           setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceToDelete.id));
           setDeleteModalOpen(false);
           setInvoiceToDelete(null);
@@ -2423,11 +2406,14 @@ export default function InvoicesPage() {
                           paymentInvoice.id,
                           paymentStatus,
                           finalAmountPaid,
-                          receiptUrl || undefined
+                          receiptUrl || undefined,
+                          paymentReceivedBy
                         );
 
                         if (updated) {
-                          invalidateCache(CACHE_KEYS.INVOICES);
+                          // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
+                          await syncInvoicePayoutAction(paymentInvoice.invoiceNumber, paymentReceivedBy, finalAmountPaid, new Date());
+                          invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
                           setInvoices(prev =>
                             prev.map(inv =>
                               inv.id === paymentInvoice.id
@@ -2436,6 +2422,7 @@ export default function InvoicesPage() {
                                   status: paymentStatus,
                                   amountPaid: finalAmountPaid,
                                   proofOfPaymentUrl: receiptUrl || inv.proofOfPaymentUrl,
+                                  receivedBy: paymentReceivedBy,
                                   paidAt: paymentStatus === 'paid' ? new Date() : null,
                                   updatedAt: new Date()
                                 } as any)

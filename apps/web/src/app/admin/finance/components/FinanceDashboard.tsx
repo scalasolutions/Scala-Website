@@ -3,10 +3,6 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import { Landmark, Plus, BookOpen, Loader2 } from 'lucide-react';
 import {
-  getExpenses,
-  getCapitalInjections,
-  getPayouts,
-  getInvoices,
   deleteExpense,
   MockExpense,
   MockCapitalInjection,
@@ -14,6 +10,14 @@ import {
   MockInvoice,
   MockClient,
 } from '@/lib/db/queries';
+import {
+  getCachedExpenses,
+  getCachedInjections,
+  getCachedPayouts,
+  getCachedInvoices,
+  invalidateCache,
+  CACHE_KEYS,
+} from '@/lib/data-cache';
 import { FinanceOverviewCards } from './FinanceOverviewCards';
 import { FounderSplitCards } from './FounderSplitCards';
 import { PartnershipSplitGuide } from './PartnershipSplitGuide';
@@ -45,10 +49,10 @@ export const FinanceDashboard: React.FC = () => {
   const loadFinanceLedger = async () => {
     try {
       const [exp, inj, pay, inv] = await Promise.all([
-        getExpenses(),
-        getCapitalInjections(),
-        getPayouts(),
-        getInvoices(),
+        getCachedExpenses(),
+        getCachedInjections(),
+        getCachedPayouts(),
+        getCachedInvoices(),
       ]);
       // React 18 batches these state updates automatically — no setTimeout needed.
       setExpenses(exp as MockExpense[]);
@@ -81,6 +85,7 @@ export const FinanceDashboard: React.FC = () => {
     startTransition(async () => {
       try {
         await deleteExpense(id);
+        invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
         await loadFinanceLedger();
       } catch (err) {
         console.error('Failed to delete expense entry', err);
@@ -111,8 +116,27 @@ export const FinanceDashboard: React.FC = () => {
   
   const totalPayoutsDrawn = payouts.reduce((sum, pay) => sum + pay.amount, 0);
 
-  // Available cash = (Paid Invoices Revenue + Personal Cash Injected) - (Operating Costs + Payout Distributions)
-  const treasuryCash = Math.max(0, (totalPaidRevenue + totalCapitalInjections) - (totalOperatingCosts + totalPayoutsDrawn));
+  // 1. Operating Model Toggle State
+  const [bothPayoutsForCompanyRevenue, setBothPayoutsForCompanyRevenue] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('scala:finance:both_payouts_revenue');
+      return saved === 'true';
+    }
+    return false;
+  });
+
+  const handleToggleModel = (checked: boolean) => {
+    setBothPayoutsForCompanyRevenue(checked);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('scala:finance:both_payouts_revenue', String(checked));
+    }
+  };
+
+  // Available cash = (Paid Invoices Revenue + Personal Cash Injected) - Operating Costs
+  // In standard model, Payout Distributions are also subtracted. In no-company-card model, payouts are company revenue held personally by founders, so they are not subtracted from treasuryCash.
+  const treasuryCash = bothPayoutsForCompanyRevenue
+    ? Math.max(0, (totalPaidRevenue + totalCapitalInjections) - totalOperatingCosts)
+    : Math.max(0, (totalPaidRevenue + totalCapitalInjections) - (totalOperatingCosts + totalPayoutsDrawn));
 
   // Partner splits
   const payoutsFredrick = payouts
@@ -177,6 +201,35 @@ export const FinanceDashboard: React.FC = () => {
         }
       />
 
+      {/* Modern Premium Model Toggle Widget */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-3xl border border-border/70 bg-card/65 backdrop-blur-md relative overflow-hidden animate-fade-in-scale">
+        {/* Glow */}
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-primary/5 blur-[100px] pointer-events-none" />
+        
+        <div className="space-y-1 relative z-10">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+            💼 Co-Founder Revenue Split Model
+          </h4>
+          <p className="text-[11px] text-muted-foreground leading-relaxed max-w-2xl">
+            Toggle how payout drawings affect corporate cash. Enable <strong>"both pay outs are for the company revenue"</strong> if there is no company card, and all cash drawn/distributed remains part of accumulated company treasury assets.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0 relative z-10">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            {bothPayoutsForCompanyRevenue ? 'both pay outs are for the company revenue' : 'Standard Central Treasury'}
+          </span>
+          <button
+            type="button"
+            onClick={() => handleToggleModel(!bothPayoutsForCompanyRevenue)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/20 ${bothPayoutsForCompanyRevenue ? "bg-primary" : "bg-muted-foreground/30"}`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-card shadow-lg ring-0 transition duration-200 ease-in-out ${bothPayoutsForCompanyRevenue ? "translate-x-5" : "translate-x-0"}`}
+            />
+          </button>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
           <Loader2 className="animate-spin text-muted-foreground" size={20} />
@@ -220,6 +273,7 @@ export const FinanceDashboard: React.FC = () => {
             treasury={treasuryCash}
             payoutsFredrick={payoutsFredrick}
             payoutsNicholas={payoutsNicholas}
+            bothPayoutsForCompanyRevenue={bothPayoutsForCompanyRevenue}
           />
 
           {/* 4. Filterable Transactions tabs index lists */}

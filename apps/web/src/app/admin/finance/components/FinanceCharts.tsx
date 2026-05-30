@@ -19,6 +19,9 @@ interface InvoiceData {
   status: string;
   total: number;
   paidAt: string | Date | null;
+  amountPaid?: number | null;
+  dpAt?: string | Date | null;
+  createdAt?: string | Date | null;
 }
 
 interface ExpenseData {
@@ -32,6 +35,7 @@ interface FinanceChartsProps {
   treasury: number;
   payoutsFredrick: number;
   payoutsNicholas: number;
+  bothPayoutsForCompanyRevenue: boolean;
 }
 
 interface CustomTooltipProps {
@@ -84,6 +88,7 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
   treasury,
   payoutsFredrick,
   payoutsNicholas,
+  bothPayoutsForCompanyRevenue,
 }) => {
   // 1. DYNAMICALLY GENERATE LAST 6 MONTHS CHART DATA
   const getChartData = () => {
@@ -100,14 +105,25 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
     ];
 
     return monthConfigs.map(config => {
-      // Aggregate paid invoices in this month & year
+      // Aggregate paid and partially paid invoices in this month & year
       const monthlyRevenue = invoices
         .filter(inv => {
-          if (inv.status !== 'paid' || !inv.paidAt) return false;
-          const paidDate = new Date(inv.paidAt);
+          const isPaid = inv.status === 'paid';
+          const isPartiallyPaid = inv.status === 'partially_paid';
+          if (!isPaid && !isPartiallyPaid) return false;
+          
+          const dateToUse = isPaid 
+            ? (inv.paidAt || inv.dpAt || inv.createdAt)
+            : (inv.dpAt || inv.createdAt);
+            
+          if (!dateToUse) return false;
+          const paidDate = new Date(dateToUse);
           return paidDate.getMonth() === config.monthIndex && paidDate.getFullYear() === config.year;
         })
-        .reduce((sum, inv) => sum + inv.total, 0);
+        .reduce((sum, inv) => {
+          if (inv.status === 'paid') return sum + inv.total;
+          return sum + (inv.amountPaid || 0);
+        }, 0);
 
       // Aggregate expenses in this month & year
       const monthlyExpenses = expenses
@@ -129,13 +145,19 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
   const chartData = getChartData();
 
   // 2. PIE CHART DATA (Treasury vs. Draws Allocation)
+  const retainedEarnings = bothPayoutsForCompanyRevenue
+    ? Math.max(0, treasury - (payoutsFredrick + payoutsNicholas))
+    : treasury;
+
   const pieData = [
-    { name: 'Retained Earnings (Treasury)', value: treasury, color: 'var(--primary)' },
+    { name: 'Retained Earnings (Treasury)', value: retainedEarnings, color: 'var(--primary)' },
     { name: 'Fredrick Draws', value: payoutsFredrick, color: '#38bdf8' },
     { name: 'Nicholas Draws', value: payoutsNicholas, color: '#60a5fa' },
   ];
 
-  const totalAllocation = treasury + payoutsFredrick + payoutsNicholas;
+  const totalAllocation = bothPayoutsForCompanyRevenue
+    ? treasury
+    : (treasury + payoutsFredrick + payoutsNicholas);
   const totalRevenue = chartData.reduce((s, d) => s + d.Revenue, 0);
   const totalExpenses = chartData.reduce((s, d) => s + d.Expenses, 0);
 

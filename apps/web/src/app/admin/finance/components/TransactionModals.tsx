@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { X, ArrowUpRight, ArrowDownRight, CreditCard, AlertTriangle, Loader2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { createExpense, createCapitalInjection, createPayout, uploadReceiptAction } from '@/lib/db/queries';
+import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import SectionHeading from '@/components/ui/SectionHeading';
@@ -326,6 +327,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
         });
       }
 
+      invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
       onSuccess();
       onClose();
       setTitle('');
@@ -561,6 +563,7 @@ export const InjectionModal: React.FC<InjectionModalProps> = ({
         date: new Date(date),
         description: description || 'Owner cash contribution injection',
       });
+      invalidateCache(CACHE_KEYS.INJECTIONS);
       onSuccess();
       onClose();
       setAmountStr('');
@@ -696,6 +699,7 @@ export const PayoutModal: React.FC<PayoutModalProps> = ({
         date: new Date(date),
         description: description || 'Founder profit share draw payout',
       });
+      invalidateCache(CACHE_KEYS.PAYOUTS);
       onSuccess();
       onClose();
       setAmountStr('');

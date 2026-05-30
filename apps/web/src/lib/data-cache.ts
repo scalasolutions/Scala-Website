@@ -88,14 +88,17 @@ export function clearAllCache(): void {
 // you want cross-component caching.
 // ---------------------------------------------------------------------------
 
-import type { MockClient, MockInvoice, MockPartner } from './db/queries';
-import { getClients, getInvoices, getTickets, getPartners } from './db/queries';
+import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout } from './db/queries';
+import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts } from './db/queries';
 
 export const CACHE_KEYS = {
   CLIENTS: 'admin:clients',
   INVOICES: 'admin:invoices',
   TICKETS: 'admin:tickets',
   PARTNERS: 'admin:partners',
+  EXPENSES: 'admin:expenses',
+  INJECTIONS: 'admin:injections',
+  PAYOUTS: 'admin:payouts',
 } as const;
 
 export const getCachedClients = (): Promise<MockClient[]> =>
@@ -109,3 +112,12 @@ export const getCachedTickets = (): Promise<any[]> =>
 
 export const getCachedPartners = (): Promise<MockPartner[]> =>
   getCached(CACHE_KEYS.PARTNERS, getPartners as () => Promise<MockPartner[]>);
+
+export const getCachedExpenses = (): Promise<MockExpense[]> =>
+  getCached(CACHE_KEYS.EXPENSES, getExpenses as () => Promise<MockExpense[]>);
+
+export const getCachedInjections = (): Promise<MockCapitalInjection[]> =>
+  getCached(CACHE_KEYS.INJECTIONS, getCapitalInjections as () => Promise<MockCapitalInjection[]>);
+
+export const getCachedPayouts = (): Promise<MockPayout[]> =>
+  getCached(CACHE_KEYS.PAYOUTS, getPayouts as () => Promise<MockPayout[]>);

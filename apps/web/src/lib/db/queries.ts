@@ -2,7 +2,7 @@
 
 import { db } from './index';
 import * as schema from './schema';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, like } from 'drizzle-orm';
 import { put } from '@vercel/blob';
 
 // Check if a real database connection is available and configured
@@ -751,6 +751,50 @@ export async function createPayout(data: schema.NewPayout) {
   };
   mockPayouts.push(newPayout);
   return newPayout;
+}
+
+export async function syncInvoicePayoutAction(
+  invoiceNumber: string,
+  receivedBy: 'company' | 'fredrick' | 'nicholas',
+  amountPaid: number,
+  date?: Date | null
+) {
+  const matchDesc = `%invoice ${invoiceNumber}%`;
+  
+  if (isDbConfigured()) {
+    try {
+      // 1. Delete any existing payouts for this invoice number
+      await db.delete(schema.payouts).where(like(schema.payouts.description, matchDesc));
+      
+      // 2. If received by a founder personally and amount > 0, create new payout
+      if ((receivedBy === 'fredrick' || receivedBy === 'nicholas') && amountPaid > 0) {
+        await db.insert(schema.payouts).values({
+          founderName: receivedBy,
+          amount: amountPaid,
+          date: date ? new Date(date) : new Date(),
+          description: `Direct payment received from client for invoice ${invoiceNumber} (Auto Sync)`,
+        });
+      }
+      return true;
+    } catch (e) {
+      console.warn("DB sync payout failed, falling back to mock: ", e);
+    }
+  }
+
+  // Mock Fallback
+  mockPayouts = mockPayouts.filter(p => !p.description || !p.description.includes(`invoice ${invoiceNumber}`));
+  if ((receivedBy === 'fredrick' || receivedBy === 'nicholas') && amountPaid > 0) {
+    mockPayouts.push({
+      id: crypto.randomUUID(),
+      founderName: receivedBy,
+      amount: amountPaid,
+      date: date ? new Date(date) : new Date(),
+      description: `Direct payment received from client for invoice ${invoiceNumber} (Auto Sync)`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+  return true;
 }
 
 // ============================================================================
