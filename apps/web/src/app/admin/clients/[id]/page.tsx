@@ -30,18 +30,21 @@ import {
 } from 'lucide-react';
 import { ClientAgreementPreview } from '../components/ClientAgreementPreview';
 import {
-  getClientById,
-  getInvoices,
-  getTickets,
   updateClient,
   deleteClient,
   MockClient,
   MockInvoice,
   MockTicket,
-  getPartners,
   MockPartner,
 } from '@/lib/db/queries';
-import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
+import {
+  invalidateCache,
+  CACHE_KEYS,
+  getCachedClients,
+  getCachedInvoices,
+  getCachedTickets,
+  getCachedPartners,
+} from '@/lib/data-cache';
 import { getSubscriptionRemainingMonths } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -108,18 +111,19 @@ export default function ClientDetailPage() {
     async function loadClientData() {
       if (!id) return;
       try {
-        const c = await getClientById(id);
+        const allClients = await getCachedClients();
+        const c = allClients.find(client => client.id === id);
         if (!c) {
           setLoading(false);
           return;
         }
         setClient(c);
 
-        // Load Invoices, Tickets, Partners to filter for this client
+        // Load Invoices, Tickets, Partners to filter for this client from the cache layer
         const [allInvoices, allTickets, allPartners] = await Promise.all([
-          getInvoices(),
-          getTickets(),
-          getPartners(),
+          getCachedInvoices(),
+          getCachedTickets(),
+          getCachedPartners(),
         ]);
 
         setInvoices(allInvoices.filter((inv) => inv.clientId === id) as MockInvoice[]);

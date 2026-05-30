@@ -19,8 +19,6 @@ import {
   Loader2,
 } from 'lucide-react';
 import {
-  getTickets,
-  getClients,
   getTicketDetails,
   createTicket,
   createTicketMessage,
@@ -28,7 +26,12 @@ import {
   MockClient,
   MockTicketMessage,
 } from '@/lib/db/queries';
-import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
+import {
+  invalidateCache,
+  CACHE_KEYS,
+  getCachedClients,
+  getCachedTickets,
+} from '@/lib/data-cache';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -140,8 +143,8 @@ export default function TicketsPage() {
     }
 
     async function loadData() {
-      // Parallel fetch — clients and tickets load concurrently.
-      const [t, c] = await Promise.all([getTickets(), getClients()]);
+      // Parallel fetch — clients and tickets load concurrently from the cache layer.
+      const [t, c] = await Promise.all([getCachedTickets(), getCachedClients()]);
       setTickets(t);
       setClients(c);
       setLoading(false);
@@ -201,7 +204,7 @@ export default function TicketsPage() {
 
           // Fetch full tickets list again — also invalidate cache so notifications bell is fresh.
           invalidateCache(CACHE_KEYS.TICKETS);
-          const updatedList = await getTickets();
+          const updatedList = await getCachedTickets();
           setTickets(updatedList);
 
           // Reset form fields
@@ -252,8 +255,9 @@ export default function TicketsPage() {
         // Clear input field
         setReplyText('');
 
-        // Refresh list in sidebar
-        const updatedList = await getTickets();
+        // Refresh list in sidebar — invalidate first since thread state has changed.
+        invalidateCache(CACHE_KEYS.TICKETS);
+        const updatedList = await getCachedTickets();
         setTickets(updatedList);
 
         // Scroll to bottom
@@ -284,7 +288,7 @@ export default function TicketsPage() {
         });
 
         // Refresh list in sidebar
-        const updatedList = await getTickets();
+        const updatedList = await getCachedTickets();
         setTickets(updatedList);
       }
     } catch (err) {

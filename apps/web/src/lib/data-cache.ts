@@ -83,18 +83,19 @@ export function clearAllCache(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Typed cache-aware wrappers for the three hot admin query functions.
+// Typed cache-aware wrappers for the four hot admin query functions.
 // Import these instead of calling the raw query functions directly when
 // you want cross-component caching.
 // ---------------------------------------------------------------------------
 
-import type { MockClient, MockInvoice, MockTicket } from './db/queries';
-import { getClients, getInvoices, getTickets } from './db/queries';
+import type { MockClient, MockInvoice, MockPartner } from './db/queries';
+import { getClients, getInvoices, getTickets, getPartners } from './db/queries';
 
 export const CACHE_KEYS = {
   CLIENTS: 'admin:clients',
   INVOICES: 'admin:invoices',
   TICKETS: 'admin:tickets',
+  PARTNERS: 'admin:partners',
 } as const;
 
 export const getCachedClients = (): Promise<MockClient[]> =>
@@ -105,3 +106,6 @@ export const getCachedInvoices = (): Promise<(MockInvoice & { client?: MockClien
 
 export const getCachedTickets = (): Promise<any[]> =>
   getCached(CACHE_KEYS.TICKETS, getTickets);
+
+export const getCachedPartners = (): Promise<MockPartner[]> =>
+  getCached(CACHE_KEYS.PARTNERS, getPartners as () => Promise<MockPartner[]>);

@@ -24,18 +24,21 @@ import {
 } from 'lucide-react';
 import { ClientAgreementPreview } from './components/ClientAgreementPreview';
 import {
-  getClients,
   createClient,
   MockClient,
-  getPartners,
   createPartner,
   updatePartner,
   deletePartner,
   MockPartner,
-  getInvoices,
   MockInvoice,
 } from '@/lib/db/queries';
-import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
+import {
+  invalidateCache,
+  CACHE_KEYS,
+  getCachedClients,
+  getCachedPartners,
+  getCachedInvoices,
+} from '@/lib/data-cache';
 import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER } from '@/lib/utils';
 import { formatCurrencyIDR } from '@/app/admin/invoices/components/invoice-types';
 import PageHeader from '@/components/ui/PageHeader';
@@ -125,7 +128,11 @@ export default function ClientsPage() {
 
     async function loadAllData() {
       try {
-        const [c, p, inv] = await Promise.all([getClients(), getPartners(), getInvoices()]);
+        const [c, p, inv] = await Promise.all([
+          getCachedClients(),
+          getCachedPartners(),
+          getCachedInvoices(),
+        ]);
         setClients(c);
         setPartners(p as MockPartner[]);
         setInvoices(inv as MockInvoice[]);
@@ -248,6 +255,8 @@ export default function ClientsPage() {
           }
         }
 
+        invalidateCache(CACHE_KEYS.PARTNERS);
+
         // Reset fields & close
         setPartnerName('');
         setPartnerEmail('');
@@ -287,8 +296,8 @@ export default function ClientsPage() {
         await deletePartner(partnerId);
         setPartners((prev) => prev.filter((p) => p.id !== partnerId));
         // Refresh clients — some may now show 'organic' sourcing.
-        invalidateCache(CACHE_KEYS.CLIENTS);
-        const c = await getClients();
+        invalidateCache(CACHE_KEYS.PARTNERS, CACHE_KEYS.CLIENTS);
+        const c = await getCachedClients();
         setClients(c);
       } catch (err) {
         console.error('Failed to delete partner', err);
