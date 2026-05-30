@@ -177,7 +177,7 @@ export default function FAQAccordion({
               as="h2"
               className="text-4xl md:text-5xl font-semibold tracking-tight text-foreground leading-[1.05]"
             >
-              Questions we get a lot.
+              Questions about Scala.
             </WipeIn>
           </div>
           <Reveal delay={0.15} className="shrink-0">

@@ -42,7 +42,7 @@ export default function TrustedMarquee() {
   const loop = [...items, ...items];
 
   return (
-    <section className="relative px-6 py-16 overflow-hidden">
+    <section className="relative px-6 py-10 sm:py-12 md:py-16 overflow-hidden">
       <div className="relative mx-auto max-w-7xl">
         <p className="text-center text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-8">
           The stack we trust to ship fast, secure software

@@ -90,7 +90,7 @@ function OfferTile({ kind, title, description }: OfferTileProps) {
   return (
     <RevealItem
       distance={48}
-      className="relative rounded-2xl border border-foreground/15 bg-card/40 p-8 md:p-9 overflow-hidden"
+      className="relative rounded-2xl border border-foreground/15 bg-card/40 p-6 sm:p-8 md:p-9 overflow-hidden"
     >
       {/* Two-stage lime glow — big primary spotlight in the top-right plus a
           smaller cool wash in the bottom-left so the card has real depth
@@ -106,10 +106,10 @@ function OfferTile({ kind, title, description }: OfferTileProps) {
       <div className="relative mb-6" aria-hidden>
         <CardGraphic kind={kind} />
       </div>
-      <h3 className="relative text-2xl md:text-[28px] font-semibold tracking-tight text-foreground leading-[1.15]">
+      <h3 className="relative text-xl sm:text-2xl md:text-[28px] font-semibold tracking-tight text-foreground leading-[1.15]">
         {title}
       </h3>
-      <p className="relative mt-4 text-[15px] text-muted-foreground leading-relaxed">
+      <p className="relative mt-3 sm:mt-4 text-sm sm:text-[15px] text-muted-foreground leading-relaxed">
         {description}
       </p>
     </RevealItem>
@@ -202,14 +202,7 @@ export default function LandingPage() {
 
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-x-clip">
-      <PublicNav
-        links={[
-          { href: '/services', label: 'Services' },
-          { href: '/services#pricing', label: 'Pricing' },
-          { href: '#faq', label: 'FAQ' },
-          { href: '#contact', label: 'Contact' },
-        ]}
-      />
+      <PublicNav />
 
       {/* ============================== HERO ============================== */}
       <section className="relative min-h-screen flex flex-col justify-center px-6 pt-28 pb-16 md:pt-32 md:pb-20 overflow-hidden">

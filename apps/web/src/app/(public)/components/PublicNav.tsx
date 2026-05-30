@@ -44,7 +44,7 @@ interface PublicNavProps {
 export default function PublicNav({
   links = [
     { href: '/services', label: 'Services' },
-    { href: '/services#pricing', label: 'Pricing' },
+    { href: '/#faq', label: 'FAQ' },
     { href: '/#contact', label: 'Contact' },
   ],
 }: PublicNavProps) {

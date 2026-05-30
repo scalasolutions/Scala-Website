@@ -119,15 +119,15 @@ function CountUp({ stat, inView }: { stat: Stat; inView: boolean }) {
   return (
     <div className="flex items-baseline gap-1">
       {stat.prefix && (
-        <span className="text-2xl md:text-3xl font-medium text-muted-foreground">
+        <span className="text-xl sm:text-2xl md:text-3xl font-medium text-muted-foreground">
           {stat.prefix}
         </span>
       )}
-      <span className="text-7xl md:text-8xl lg:text-9xl font-semibold tracking-tight tabular-nums leading-[0.9] text-foreground">
+      <span className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-semibold tracking-tight tabular-nums leading-[0.9] text-foreground">
         {formatted}
       </span>
       {stat.suffix && (
-        <span className="text-4xl md:text-5xl lg:text-6xl font-semibold text-primary-ink dark:text-primary text-glow-lime">
+        <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold text-primary-ink dark:text-primary text-glow-lime">
           {stat.suffix}
         </span>
       )}
@@ -160,7 +160,7 @@ export default function StatsCounter({
             {eyebrow && <SectionEyebrow number={eyebrow.number} label={eyebrow.label} />}
             <WipeIn
               as="h2"
-              className="text-6xl md:text-7xl lg:text-8xl font-semibold tracking-tight text-foreground leading-[1.02]"
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-semibold tracking-tight text-foreground leading-[1.02]"
             >
               Scale with confidence.
             </WipeIn>

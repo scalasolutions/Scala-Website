@@ -26,7 +26,7 @@ export default function LetsTalkBand({
               as="h2"
               className="text-4xl md:text-5xl font-semibold tracking-tight text-foreground leading-[1.05]"
             >
-              Let&apos;s talk.
+              Let&apos;s scale.
             </WipeIn>
             <Reveal delay={0.1}>
               <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed">
