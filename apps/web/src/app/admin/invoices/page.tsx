@@ -394,6 +394,12 @@ export default function InvoicesPage() {
   }
   const total = Math.max(0, subtotal - discountAmount);
 
+  // Hosting line item reference (shared with the line-items list below)
+  const hostingIndex = lineItems.findIndex((item) =>
+    item.name.toLowerCase().includes('hosting')
+  );
+  const hostingItem = hostingIndex >= 0 ? lineItems[hostingIndex] : null;
+
   const resetForm = () => {
     setEditingInvoice(null);
     setSelectedClientId('');
@@ -1377,12 +1383,56 @@ export default function InvoicesPage() {
                             <option value="dynamic">Dynamic · IDR 350.000/mo</option>
                           </Select>
                           <p className="text-xs text-muted-foreground leading-relaxed sm:mt-7">
-                            Selecting a plan adds or updates a hosting line below at the
-                            standard rate, defaulting quantity to{' '}
-                            <span className="text-foreground font-medium">12 months</span>{' '}
-                            (editable).
+                            Selecting a plan adds a hosting line below at the standard
+                            rate (qty defaults to{' '}
+                            <span className="text-foreground font-medium">12 months</span>
+                            ). Override the monthly price and number of months below.
                           </p>
                         </div>
+
+                        {hostingType !== 'none' && hostingItem && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start rounded-xl border border-border bg-muted/10 p-4 animate-fade-in-scale">
+                            {/* Custom monthly price */}
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em] mb-1 block">
+                                Custom price / month (IDR)
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={formatInputNumberIDR(hostingItem.price)}
+                                onChange={(e) => {
+                                  const rawVal = e.target.value.replace(/[^0-9]/g, '');
+                                  handleLineItemChange(
+                                    hostingIndex,
+                                    'price',
+                                    rawVal ? Number(rawVal) : 0
+                                  );
+                                }}
+                                className="w-full h-9 rounded-lg bg-background border border-border px-3 text-sm text-foreground tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors"
+                              />
+                            </div>
+                            {/* Quantity (months) */}
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em] mb-1 block">
+                                Quantity (months)
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={hostingItem.quantity}
+                                onChange={(e) =>
+                                  handleLineItemChange(
+                                    hostingIndex,
+                                    'quantity',
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full h-9 rounded-lg bg-background border border-border px-3 text-sm text-foreground tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </section>
 
                       <hr className="border-border" />
