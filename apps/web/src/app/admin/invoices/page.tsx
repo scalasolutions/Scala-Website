@@ -1226,9 +1226,20 @@ export default function InvoicesPage() {
 
                         {/* Middle: amount */}
                         <div className="hidden sm:block text-right shrink-0">
-                          <p className="text-sm font-medium text-foreground tabular-nums">
-                            {formatCurrencyIDR(invoice.total)}
-                          </p>
+                          {invoice.status === 'partially_paid' ? (
+                            <div className="flex flex-col items-end">
+                              <span className="text-xs line-through text-muted-foreground tabular-nums">
+                                {formatCurrencyIDR(invoice.total)}
+                              </span>
+                              <span className="text-sm font-bold text-primary tabular-nums">
+                                {formatCurrencyIDR(invoice.total - (invoice.amountPaid || 0))} left
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-medium text-foreground tabular-nums">
+                              {formatCurrencyIDR(invoice.total)}
+                            </p>
+                          )}
                         </div>
                       </div>
 

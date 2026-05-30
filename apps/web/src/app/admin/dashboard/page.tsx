@@ -131,10 +131,10 @@ export default function DashboardHome() {
     return sum;
   }, 0);
 
-  // Total Outstanding Invoices (issued + past_due)
+  // Total Outstanding Invoices (issued + past_due + partially_paid)
   const outstandingInvoicesTotal = invoices
-    .filter(inv => inv.status === 'issued' || inv.status === 'past_due')
-    .reduce((sum, inv) => sum + inv.total, 0);
+    .filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid')
+    .reduce((sum, inv) => sum + (inv.total - (inv.amountPaid || 0)), 0);
 
   // Unresolved support tickets
   const unresolvedTickets = tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length;
@@ -155,7 +155,7 @@ export default function DashboardHome() {
   };
 
   const openTickets = tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').slice(0, 3);
-  const outstandingInvoices = invoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due').slice(0, 4);
+  const outstandingInvoices = invoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').slice(0, 4);
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -500,9 +500,20 @@ export default function DashboardHome() {
                     <Badge variant={statusVariant} className="capitalize">
                       {invoice.status.replace('_', ' ')}
                     </Badge>
-                    <p className="text-sm font-medium text-foreground tabular-nums">
-                      {formatCurrencyIDR(invoice.total)}
-                    </p>
+                    {invoice.status === 'partially_paid' ? (
+                      <div className="flex flex-col items-end">
+                        <span className="text-[11px] line-through text-muted-foreground tabular-nums">
+                          {formatCurrencyIDR(invoice.total)}
+                        </span>
+                        <span className="text-sm font-bold text-primary tabular-nums">
+                          {formatCurrencyIDR(invoice.total - (invoice.amountPaid || 0))} left
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-medium text-foreground tabular-nums">
+                        {formatCurrencyIDR(invoice.total)}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
