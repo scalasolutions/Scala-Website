@@ -76,6 +76,54 @@ const statusToBadgeVariant = (
   }
 };
 
+// ── Copy-paste parser helper ──────────────────────────────────
+const parsePastedItems = (text: string): InvoiceLineItem[] => {
+  const parsedItems: InvoiceLineItem[] = [];
+  const lines = text.split('\n').map((line) => line.trim());
+
+  let currentTitle = '';
+  let currentDescLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+
+    // Detect price: starts with Rp/IDR/Rp./IDR. (optional), followed by numbers and dots/commas
+    const isPrice = /^(?:rp\.?|idr\.?)?\s*[\d,.-]+$/i.test(line) && /[\d]/.test(line);
+
+    if (isPrice) {
+      const priceVal = parseInt(line.replace(/[^0-9]/g, ''), 10) || 0;
+      if (currentTitle) {
+        parsedItems.push({
+          name: currentTitle,
+          description: currentDescLines.join('\n'),
+          price: priceVal,
+          quantity: 1,
+        });
+        currentTitle = '';
+        currentDescLines = [];
+      }
+    } else {
+      if (!currentTitle) {
+        currentTitle = line;
+      } else {
+        currentDescLines.push(line);
+      }
+    }
+  }
+
+  if (currentTitle) {
+    parsedItems.push({
+      name: currentTitle,
+      description: currentDescLines.join('\n'),
+      price: 0,
+      quantity: 1,
+    });
+  }
+
+  return parsedItems;
+};
+
 // ── Page component ────────────────────────────────────────────
 export default function InvoicesPage() {
   const formatInputNumberIDR = (val: number | string): string => {
@@ -177,6 +225,10 @@ export default function InvoicesPage() {
     },
   ]);
 
+  // Copy-paste parser states
+  const [pasteMode, setPasteMode] = useState(false);
+  const [pastedText, setPastedText] = useState('');
+
   const startEditInvoice = (invoice: MockInvoice) => {
     setEditingInvoice(invoice);
     setSelectedClientId(invoice.clientId);
@@ -218,6 +270,8 @@ export default function InvoicesPage() {
       setIncludedPages(['cover', 'tc1', 'tc2']);
     }
 
+    setPasteMode(false);
+    setPastedText('');
     setModalOpen(true);
   };
 
@@ -394,6 +448,28 @@ export default function InvoicesPage() {
     );
   };
 
+  const handleImportPastedText = () => {
+    if (!pastedText.trim()) return;
+
+    const parsed = parsePastedItems(pastedText);
+    if (parsed.length === 0) return;
+
+    const isDefaultSingleItem =
+      lineItems.length === 1 &&
+      lineItems[0].name === 'Starter Company Profile Package' &&
+      lineItems[0].price === 5500000 &&
+      lineItems[0].description === '';
+
+    if (isDefaultSingleItem) {
+      setLineItems(parsed);
+    } else {
+      setLineItems((prev) => [...prev, ...parsed]);
+    }
+
+    setPasteMode(false);
+    setPastedText('');
+  };
+
   // ── Invoice totals ─────────────────────────────────────────
   const subtotal = lineItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -432,6 +508,8 @@ export default function InvoicesPage() {
         quantity: 1,
       },
     ]);
+    setPasteMode(false);
+    setPastedText('');
     setInvoiceNumber(`INV-2026-${String(invoices.length + 2).padStart(3, '0')}`);
     const activeKeys = allPagePresets
       .filter((p) => p.sectionKey === 'full_page_html')
@@ -1677,6 +1755,91 @@ export default function InvoicesPage() {
                               </div>
                             </div>
                           ))}
+
+                          {/* Elegant Ghost Card UI */}
+                          <div className="rounded-xl border-2 border-dashed border-border hover:border-primary/40 bg-muted/5 hover:bg-muted/10 p-5 transition-all duration-300 group flex flex-col gap-4">
+                            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                              <div className="space-y-1">
+                                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                  <PlusCircle size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                                  Add invoice items
+                                </h4>
+                                <p className="text-xs text-muted-foreground">
+                                  Add empty items or paste list to auto-parse multiple items.
+                                </p>
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleAddLineItem}
+                                  className="border border-border bg-background hover:bg-muted/50 text-xs"
+                                  leftIcon={<Plus size={14} />}
+                                >
+                                  Add empty item
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => setPasteMode(!pasteMode)}
+                                  className={cn(
+                                    "text-xs transition-colors",
+                                    pasteMode ? "bg-primary/10 border-primary text-primary" : ""
+                                  )}
+                                  leftIcon={<Sliders size={14} />}
+                                >
+                                  {pasteMode ? "Cancel Paste" : "Quick Paste Parser"}
+                                </Button>
+                              </div>
+                            </div>
+
+                            {pasteMode && (
+                              <div className="space-y-3 pt-4 border-t border-border/50 animate-fade-in-scale">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em] block">
+                                    Paste text list (Format: Title, Description [can be multi-line], Price)
+                                  </label>
+                                  <span className="text-[10px] text-muted-foreground/80 leading-relaxed block bg-muted/20 rounded-md p-2 border border-border/30">
+                                    💡 <strong>Tip:</strong> Copy-paste the exact milestone list. We will auto-detect prices like <code>Rp 1,500,000</code> or <code>500,000</code> and separate titles and multi-line descriptions!
+                                  </span>
+                                </div>
+                                
+                                <textarea
+                                  placeholder={`Discovery & Basic System Planning\nRequirement mapping, page structure planning...\nRp 1,500,000\n\nCustom UI/UX Design\nHomepage design, catalog page design...\nRp 3,500,000`}
+                                  value={pastedText}
+                                  onChange={(e) => setPastedText(e.target.value)}
+                                  rows={8}
+                                  className="w-full rounded-lg bg-background border border-border px-3 py-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors resize-y font-mono"
+                                />
+                                
+                                <div className="flex justify-end gap-2">
+                                  {pastedText.trim() && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setPastedText('')}
+                                      className="text-xs hover:text-red-500"
+                                    >
+                                      Clear text
+                                    </Button>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    disabled={!pastedText.trim()}
+                                    onClick={handleImportPastedText}
+                                    className="text-xs px-4"
+                                  >
+                                    Parse & Import {pastedText.trim() && parsePastedItems(pastedText).length > 0 ? `(${parsePastedItems(pastedText).length} items)` : ''}
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </section>
 

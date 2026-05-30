@@ -128,6 +128,77 @@ const PRINT_CSS = `
   }
 `;
 
+// Helper to estimate height of an invoice line item in the preview page (in pixels)
+const estimateItemHeight = (item: InvoiceLineItem): number => {
+  let height = 22 * 2 + 14 * 1.4; // top/bottom padding + title font height = 64px
+  if (item.description) {
+    const descLines = item.description.split('\n').filter(Boolean);
+    if (descLines.length > 0) {
+      height += 12; // margin-top for description container
+      height += descLines.length * 26; // line height 1.8 with size 13px plus margins
+    }
+  }
+  return height + 4; // plus bottom margin of 4px
+};
+
+interface BillingPageChunk {
+  items: InvoiceLineItem[];
+  showTotals: boolean;
+  pageNumber: number;
+}
+
+// Splits the billing items into chunks that fit on A4 pages without overlapping the footer
+const splitBillingItems = (lineItems: InvoiceLineItem[], hasPayments: boolean): BillingPageChunk[] => {
+  const chunks: BillingPageChunk[] = [];
+  const USABLE_HEIGHT = 710; // safe A4 content vertical space
+  const TOTALS_HEIGHT = hasPayments ? 360 : 120; // safe totals & payments card space allocation
+
+  let currentPageItems: InvoiceLineItem[] = [];
+  let currentHeight = 0;
+
+  for (let i = 0; i < lineItems.length; i++) {
+    const item = lineItems[i];
+    const itemHeight = estimateItemHeight(item);
+
+    if (currentHeight + itemHeight > USABLE_HEIGHT) {
+      chunks.push({
+        items: currentPageItems,
+        showTotals: false,
+        pageNumber: chunks.length + 1,
+      });
+      currentPageItems = [item];
+      currentHeight = itemHeight;
+    } else {
+      currentPageItems.push(item);
+      currentHeight += itemHeight;
+    }
+  }
+
+  // Check if totals fit on the final page, otherwise split totals into a new final page
+  if (currentHeight + TOTALS_HEIGHT > USABLE_HEIGHT) {
+    if (currentPageItems.length > 0) {
+      chunks.push({
+        items: currentPageItems,
+        showTotals: false,
+        pageNumber: chunks.length + 1,
+      });
+    }
+    chunks.push({
+      items: [],
+      showTotals: true,
+      pageNumber: chunks.length + 1,
+    });
+  } else {
+    chunks.push({
+      items: currentPageItems,
+      showTotals: true,
+      pageNumber: chunks.length + 1,
+    });
+  }
+
+  return chunks;
+};
+
 // ── Props ─────────────────────────────────────────────────────
 interface InvoicePreviewProps {
   invoice: MockInvoice;
@@ -226,13 +297,30 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     return key;
   };
 
+  // Resolve client details
+  const client = clients.find(c => c.id === invoice.clientId);
+  const clientName = client?.name || 'Unknown Client';
+  const companyName = client?.companyName || 'No Company';
+  const parsedItems = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
+  const clientRefCode = getClientRefCode(companyName || clientName, invoice.invoiceNumber);
+  const formattedDate = formatDateClean(invoice.createdAt || invoice.issuedAt || new Date());
+
   const includedPageKeys = getIncludedPageKeys();
 
   // Composing dynamic pages catalog
-  const activePages: Array<{ key: string; label: string; content?: string }> = [];
+  const activePages: Array<{ key: string; label: string; content?: string; chunk?: BillingPageChunk }> = [];
   
-  // 1. Billing is always included
-  activePages.push({ key: 'billing', label: 'Billing' });
+  // 1. Billing is always included (split into pages dynamically if needed to prevent overlap)
+  const hasPayments = invoice.status === 'paid' || invoice.status === 'partially_paid';
+  const billingChunks = splitBillingItems(parsedItems, hasPayments);
+  
+  billingChunks.forEach(chunk => {
+    activePages.push({
+      key: `billing_${chunk.pageNumber}`,
+      label: billingChunks.length > 1 ? `Billing - Page ${chunk.pageNumber}` : 'Billing',
+      chunk,
+    });
+  });
 
   // 2. Cover is optional
   if (includedPageKeys.includes('cover')) {
@@ -305,13 +393,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     setCurrentPage(pageIndex);
   };
 
-  // Resolve client details
-  const client = clients.find(c => c.id === invoice.clientId);
-  const clientName = client?.name || 'Unknown Client';
-  const companyName = client?.companyName || 'No Company';
-  const parsedItems = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
-  const clientRefCode = getClientRefCode(companyName || clientName, invoice.invoiceNumber);
-  const formattedDate = formatDateClean(invoice.createdAt || invoice.issuedAt || new Date());
+
 
   const handlePrint = () => {
     window.print();
@@ -426,12 +508,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               websiteAddress: client?.websiteAddress,
             };
 
-            if (page.key === 'billing') {
+            if (page.key.startsWith('billing')) {
+              const chunk = page.chunk!;
               return (
                 <InvoiceBillingPage
-                  key="billing"
+                  key={page.key}
                   {...sharedProps}
-                  lineItems={parsedItems}
+                  lineItems={chunk.items}
                   total={invoice.total}
                   discountType={invoice.discountType}
                   discountValue={invoice.discountValue}
@@ -439,6 +522,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   amountPaid={invoice.amountPaid}
                   paidAt={invoice.paidAt}
                   dpAt={invoice.dpAt}
+                  showTotals={chunk.showTotals}
                 />
               );
             }
