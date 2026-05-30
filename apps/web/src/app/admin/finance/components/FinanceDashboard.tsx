@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { Landmark, Plus, BookOpen, Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Landmark, Plus, BookOpen, Loader2, AlertTriangle } from 'lucide-react';
 import {
   deleteExpense,
+  deleteCapitalInjection,
+  deletePayout,
   MockExpense,
   MockCapitalInjection,
   MockPayout,
@@ -37,6 +40,15 @@ export const FinanceDashboard: React.FC = () => {
   
   // Transitions for deleting/actions
   const [, startTransition] = useTransition();
+
+  // Confirmation delete modal state
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    type: 'expense' | 'injection' | 'payout';
+    title: string;
+    amount: number;
+  } | null>(null);
 
   // Modals state
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -80,15 +92,56 @@ export const FinanceDashboard: React.FC = () => {
     }
   };
 
-  // Delete expense helper
-  const handleDeleteExpense = async (id: string) => {
+  // Trigger delete helpers to open confirmation modal
+  const triggerDeleteExpense = (id: string, title: string, amount: number) => {
+    setDeleteTarget({ id, type: 'expense', title, amount });
+    setConfirmDeleteOpen(true);
+  };
+
+  const triggerDeleteInjection = (id: string, founderName: string, amount: number) => {
+    const namePretty = founderName === 'fredrick' ? 'Fredrick Yang' : 'Nicholas Chairnando';
+    setDeleteTarget({
+      id,
+      type: 'injection',
+      title: `Capital Injection for ${namePretty}`,
+      amount,
+    });
+    setConfirmDeleteOpen(true);
+  };
+
+  const triggerDeletePayout = (id: string, founderName: string, amount: number) => {
+    const namePretty = founderName === 'fredrick' ? 'Fredrick Yang' : 'Nicholas Chairnando';
+    setDeleteTarget({
+      id,
+      type: 'payout',
+      title: `Profit Draw Payout for ${namePretty}`,
+      amount,
+    });
+    setConfirmDeleteOpen(true);
+  };
+
+  // Unified deletion confirmation execution
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { id, type } = deleteTarget;
+
     startTransition(async () => {
       try {
-        await deleteExpense(id);
-        invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
+        if (type === 'expense') {
+          await deleteExpense(id);
+          invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
+        } else if (type === 'injection') {
+          await deleteCapitalInjection(id);
+          invalidateCache(CACHE_KEYS.INJECTIONS);
+        } else if (type === 'payout') {
+          await deletePayout(id);
+          invalidateCache(CACHE_KEYS.PAYOUTS);
+        }
         await loadFinanceLedger();
+        setConfirmDeleteOpen(false);
+        setDeleteTarget(null);
       } catch (err) {
-        console.error('Failed to delete expense entry', err);
+        console.error(`Failed to delete ${type} entry`, err);
       }
     });
   };
@@ -286,7 +339,9 @@ export const FinanceDashboard: React.FC = () => {
               expenses={expenses}
               injections={injections}
               payouts={payouts}
-              onDeleteExpense={handleDeleteExpense}
+              onDeleteExpense={triggerDeleteExpense}
+              onDeleteInjection={triggerDeleteInjection}
+              onDeletePayout={triggerDeletePayout}
             />
           </div>
         </>
@@ -311,6 +366,69 @@ export const FinanceDashboard: React.FC = () => {
         defaultFounder={selectedFounder}
         maxAllowedDraw={remainingAllowedDraw}
       />
+
+      {/* Unified Destructive Action Confirmation Modal */}
+      {confirmDeleteOpen && deleteTarget && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-background/85 backdrop-blur-md"
+            onClick={() => setConfirmDeleteOpen(false)}
+          />
+
+          <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card shadow-2xl animate-fade-in-scale relative z-50">
+            <div className="p-6">
+              <div className="flex items-start gap-3.5 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Confirm deletion
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                    This destructive action cannot be undone and will permanently remove this record from the financial ledger.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/80 bg-muted/10 p-3.5 space-y-1.5">
+                <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">
+                  {deleteTarget.type === 'expense' ? 'Expense item' : deleteTarget.type === 'injection' ? 'Capital injection credit' : 'Profit draw payout'}
+                </p>
+                <div className="flex items-start justify-between gap-3 text-xs">
+                  <span className="text-foreground font-semibold truncate max-w-[200px]" title={deleteTarget.title}>
+                    {deleteTarget.title}
+                  </span>
+                  <span className="font-bold text-foreground tabular-nums shrink-0">
+                    {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(deleteTarget.amount)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmDeleteOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  className="!bg-red-500 hover:!bg-red-600 !text-white border-none shadow-sm shadow-red-500/10 active-press animate-none"
+                  onClick={handleConfirmDelete}
+                >
+                  Yes, delete record
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

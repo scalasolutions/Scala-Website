@@ -717,6 +717,24 @@ export async function createCapitalInjection(data: schema.NewCapitalInjection) {
   return newInjection;
 }
 
+export async function deleteCapitalInjection(id: string) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.delete(schema.capitalInjections).where(eq(schema.capitalInjections.id, id)).returning();
+      return results[0] || null;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  const idx = mockCapitalInjections.findIndex(inj => inj.id === id);
+  if (idx !== -1) {
+    const deleted = mockCapitalInjections[idx];
+    mockCapitalInjections = mockCapitalInjections.filter(inj => inj.id !== id);
+    return deleted;
+  }
+  return null;
+}
+
 // --- PAYOUTS ---
 export async function getPayouts() {
   if (isDbConfigured()) {
@@ -751,6 +769,24 @@ export async function createPayout(data: schema.NewPayout) {
   };
   mockPayouts.push(newPayout);
   return newPayout;
+}
+
+export async function deletePayout(id: string) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.delete(schema.payouts).where(eq(schema.payouts.id, id)).returning();
+      return results[0] || null;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  const idx = mockPayouts.findIndex(pay => pay.id === id);
+  if (idx !== -1) {
+    const deleted = mockPayouts[idx];
+    mockPayouts = mockPayouts.filter(pay => pay.id !== id);
+    return deleted;
+  }
+  return null;
 }
 
 export async function syncInvoicePayoutAction(

@@ -47,7 +47,9 @@ interface TransactionTabsProps {
   expenses: ExpenseItem[];
   injections: InjectionItem[];
   payouts: PayoutItem[];
-  onDeleteExpense: (id: string) => void;
+  onDeleteExpense: (id: string, title: string, amount: number) => void;
+  onDeleteInjection?: (id: string, founderName: string, amount: number) => void;
+  onDeletePayout?: (id: string, founderName: string, amount: number) => void;
 }
 
 type TabId = 'expenses' | 'injections' | 'payouts';
@@ -58,6 +60,8 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
   injections,
   payouts,
   onDeleteExpense,
+  onDeleteInjection,
+  onDeletePayout,
 }) => {
   const [activeTab, setActiveTab] = useState<TabId>('expenses');
   const [expenseFilter, setExpenseFilter] = useState('all');
@@ -233,7 +237,7 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
                     size="sm"
                     className="!p-0 !h-8 !w-8 hover:!text-red-500"
                     aria-label="Delete expense"
-                    onClick={() => onDeleteExpense(exp.id)}
+                    onClick={() => onDeleteExpense(exp.id, exp.title, exp.amount)}
                   >
                     <Trash2 size={14} />
                   </Button>
@@ -275,9 +279,22 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
                         )}
                       </div>
                     </div>
-                    <p className="text-sm font-medium text-foreground dark:text-primary tabular-nums shrink-0">
-                      +{formatCurrencyIDR(inj.amount)}
-                    </p>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <p className="text-sm font-medium text-foreground dark:text-primary tabular-nums">
+                        +{formatCurrencyIDR(inj.amount)}
+                      </p>
+                      {onDeleteInjection && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="!p-0 !h-8 !w-8 hover:!text-red-500"
+                          aria-label="Delete injection"
+                          onClick={() => onDeleteInjection(inj.id, inj.founderName, inj.amount)}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -317,9 +334,22 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
                         )}
                       </div>
                     </div>
-                    <p className="text-sm font-medium text-red-500 tabular-nums shrink-0">
-                      -{formatCurrencyIDR(pay.amount)}
-                    </p>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <p className="text-sm font-medium text-red-500 tabular-nums">
+                        -{formatCurrencyIDR(pay.amount)}
+                      </p>
+                      {onDeletePayout && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="!p-0 !h-8 !w-8 hover:!text-red-500"
+                          aria-label="Delete payout"
+                          onClick={() => onDeletePayout(pay.id, pay.founderName, pay.amount)}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
