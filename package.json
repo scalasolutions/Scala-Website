@@ -14,5 +14,8 @@
     "db:seed": "npm run db:seed --workspace=apps/web",
     "db:backup": "npm run db:backup --workspace=apps/web",
     "db:restore": "npm run db:restore --workspace=apps/web"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }
