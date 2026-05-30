@@ -7,6 +7,7 @@ import {
   ArrowDownRight,
   Trash2,
   Receipt,
+  X,
 } from 'lucide-react';
 import { formatCurrencyIDR } from './FinanceOverviewCards';
 import Card from '@/components/ui/Card';
@@ -23,6 +24,7 @@ interface ExpenseItem {
   date: string | Date;
   payer: 'company' | 'fredrick' | 'nicholas';
   notes: string | null;
+  receiptUrl?: string | null;
 }
 
 interface InjectionItem {
@@ -60,6 +62,7 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
   const [activeTab, setActiveTab] = useState<TabId>('expenses');
   const [expenseFilter, setExpenseFilter] = useState('all');
   const [founderFilter, setFounderFilter] = useState<FounderFilter>('all');
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
 
   const getFounderNamePretty = (name: string) =>
     name === 'fredrick' ? 'Fredrick Yang' : 'Nicholas Chairnando';
@@ -195,6 +198,16 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
                           ? 'Company'
                           : getFounderNamePretty(exp.payer)}
                       </Badge>
+                      {exp.receiptUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setReceiptPreviewUrl(exp.receiptUrl!)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold bg-primary/15 text-primary border border-primary/25 px-1.5 py-0.5 rounded transition-all hover:bg-primary/25 cursor-pointer select-none active:scale-95"
+                          title="Click to view receipt screenshot"
+                        >
+                          📎 Receipt
+                        </button>
+                      )}
                     </div>
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{new Date(exp.date).toLocaleDateString('id-ID')}</span>
@@ -313,6 +326,46 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
             );
           })()}
       </Card>
+
+      {/* Premium Lightbox Modal for Receipt Screenshot */}
+      {receiptPreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-background/90 backdrop-blur-md cursor-zoom-out"
+            onClick={() => setReceiptPreviewUrl(null)}
+          />
+          <div className="relative max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl animate-fade-in-scale flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Expense Receipt Attachment
+              </span>
+              <button
+                onClick={() => setReceiptPreviewUrl(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-4 bg-muted/5 flex items-center justify-center min-h-[300px]">
+              {receiptPreviewUrl.startsWith('data:application/pdf') || receiptPreviewUrl.includes('.pdf') ? (
+                <iframe
+                  src={receiptPreviewUrl}
+                  className="w-[600px] h-[500px] border-0 rounded-xl"
+                  title="PDF Receipt Viewer"
+                />
+              ) : (
+                <img
+                  src={receiptPreviewUrl}
+                  alt="Expense proof of payment receipt screenshot"
+                  className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-lg border border-border"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -31,6 +31,7 @@ import {
   getInvoicePagePresets,
   MockInvoicePagePreset,
   uploadReceiptAction,
+  createPayout,
 } from '@/lib/db/queries';
 import {
   invalidateCache,
@@ -187,6 +188,8 @@ export default function InvoicesPage() {
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [proofOfPaymentUrl, setProofOfPaymentUrl] = useState<string>('');
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [receivedBy, setReceivedBy] = useState<'company' | 'fredrick' | 'nicholas'>('company');
+  const [paymentReceivedBy, setPaymentReceivedBy] = useState<'company' | 'fredrick' | 'nicholas'>('company');
 
   // Record Payment Modal State
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -239,6 +242,7 @@ export default function InvoicesPage() {
     );
     setAmountPaid(invoice.amountPaid || 0);
     setProofOfPaymentUrl(invoice.proofOfPaymentUrl || '');
+    setReceivedBy(invoice.receivedBy || 'company');
 
     const items = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
     setLineItems(items);
@@ -500,6 +504,7 @@ export default function InvoicesPage() {
     setAmountPaid(0);
     setProofOfPaymentUrl('');
     setReceiptFileName('');
+    setReceivedBy('company');
     setLineItems([
       {
         name: 'Starter Company Profile Package',
@@ -544,6 +549,7 @@ export default function InvoicesPage() {
             discountValue: Number(discountValue),
             amountPaid,
             proofOfPaymentUrl: proofOfPaymentUrl || null,
+            receivedBy,
           });
 
           if (updatedInv) {
@@ -556,6 +562,24 @@ export default function InvoicesPage() {
                   : inv
               )
             );
+
+            // Log smart payout if payment received by a founder personally
+            const finalPayoutAmount = status === 'paid' ? total : amountPaid;
+            const wasAlreadyPaid = editingInvoice.status === 'paid' || editingInvoice.status === 'partially_paid';
+            const amountDiff = finalPayoutAmount - (editingInvoice.amountPaid || 0);
+
+            if ((status === 'paid' || status === 'partially_paid') && (receivedBy === 'fredrick' || receivedBy === 'nicholas')) {
+              const payoutAmount = wasAlreadyPaid ? amountDiff : finalPayoutAmount;
+              if (payoutAmount > 0) {
+                await createPayout({
+                  founderName: receivedBy,
+                  amount: payoutAmount,
+                  date: new Date(),
+                  description: `Direct payment received from client for invoice ${invoiceNumber} (Form Edit)`,
+                });
+              }
+            }
+
             setModalOpen(false);
             resetForm();
           }
@@ -576,12 +600,25 @@ export default function InvoicesPage() {
             discountValue: Number(discountValue),
             amountPaid,
             proofOfPaymentUrl: proofOfPaymentUrl || null,
+            receivedBy,
           });
 
           if (newInv) {
             invalidateCache(CACHE_KEYS.INVOICES);
             const client = clients.find((c) => c.id === selectedClientId);
             setInvoices((prev) => [{ ...newInv, client } as any, ...prev]);
+
+            // Log smart payout if payment received by a founder personally
+            const finalPayoutAmount = status === 'paid' ? total : amountPaid;
+            if ((status === 'paid' || status === 'partially_paid') && (receivedBy === 'fredrick' || receivedBy === 'nicholas') && finalPayoutAmount > 0) {
+              await createPayout({
+                founderName: receivedBy,
+                amount: finalPayoutAmount,
+                date: new Date(),
+                description: `Direct payment received from client for invoice ${invoiceNumber} (Form Create)`,
+              });
+            }
+
             setModalOpen(false);
             resetForm();
             if (typeof window !== 'undefined') {
@@ -602,6 +639,7 @@ export default function InvoicesPage() {
     setPaymentAmount(invoice.status === 'partially_paid' ? (invoice.amountPaid || Math.round(invoice.total * 0.5)) : invoice.total);
     setReceiptFileBase64('');
     setReceiptFileName('');
+    setPaymentReceivedBy(invoice.receivedBy || 'company');
     setPaymentModalOpen(true);
   };
 
@@ -1436,10 +1474,26 @@ export default function InvoicesPage() {
                           )}
 
                           {(status === 'partially_paid' || status === 'paid') && (
-                            <div className="sm:col-span-2 flex flex-col justify-end animate-fade-in-scale">
-                              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
-                                Proof of Payment Attachment
-                              </label>
+                            <>
+                              <div className="sm:col-span-2 animate-fade-in-scale">
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                                  Payment Received By
+                                </label>
+                                <select
+                                  value={receivedBy}
+                                  onChange={(e) => setReceivedBy(e.target.value as any)}
+                                  className="h-10 w-full appearance-none rounded-xl bg-background border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors cursor-pointer"
+                                >
+                                  <option value="company">Company Treasury</option>
+                                  <option value="fredrick">Fredrick Yang (out of pocket / personal)</option>
+                                  <option value="nicholas">Nicholas Chairnando (out of pocket / personal)</option>
+                                </select>
+                              </div>
+
+                              <div className="sm:col-span-2 flex flex-col justify-end animate-fade-in-scale">
+                                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                                  Proof of Payment Attachment
+                                </label>
                               <div className="flex items-center gap-2 border border-border rounded-xl p-2 bg-muted/10 h-[42px] mb-2.5">
                                 <input
                                   type="file"
@@ -1516,6 +1570,7 @@ export default function InvoicesPage() {
                                 </div>
                               )}
                             </div>
+                            </>
                           )}
                         </div>
                       </section>
@@ -2261,6 +2316,22 @@ export default function InvoicesPage() {
                       </span>
                     </div>
                   )}
+
+                  {/* Received By */}
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                      Payment Received By
+                    </label>
+                    <select
+                      value={paymentReceivedBy}
+                      onChange={(e) => setPaymentReceivedBy(e.target.value as any)}
+                      className="h-10 w-full appearance-none rounded-xl bg-background border border-border px-3.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors cursor-pointer"
+                    >
+                      <option value="company">Company Treasury</option>
+                      <option value="fredrick">Fredrick Yang (out of pocket / personal)</option>
+                      <option value="nicholas">Nicholas Chairnando (out of pocket / personal)</option>
+                    </select>
+                  </div>
 
                   {/* File Attachment Upload */}
                   <div>

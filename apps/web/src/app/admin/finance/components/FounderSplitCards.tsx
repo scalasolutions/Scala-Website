@@ -45,6 +45,15 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
   commissionNicholas,
   onActionClick,
 }) => {
+  const positionFredrick = injectionsFredrick + baseProfitShare + commissionFredrick - payoutsFredrick;
+  const positionNicholas = injectionsNicholas + baseProfitShare + commissionNicholas - payoutsNicholas;
+
+  const positionDiff = Math.abs(positionFredrick - positionNicholas);
+  const settlementAmount = Math.round(positionDiff / 2);
+
+  const debtor = positionFredrick > positionNicholas ? 'nicholas' : 'fredrick';
+  const creditor = positionFredrick > positionNicholas ? 'fredrick' : 'nicholas';
+
   const founders: FounderData[] = [
     {
       name: 'Fredrick',
@@ -79,7 +88,44 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
   ];
 
   return (
-    <div className="grid gap-5 md:grid-cols-2">
+    <div className="space-y-6">
+      {/* Smart Settlement Console */}
+      <Card padding="md" className="relative overflow-hidden border-primary/20 bg-primary/5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-[0.08em]">
+              Smart Balance Settlement
+            </span>
+            <h4 className="text-sm font-semibold text-foreground mt-1">
+              {settlementAmount === 0 ? (
+                "🎉 Co-founder accounts are perfectly balanced!"
+              ) : (
+                <>
+                  🤝 <strong>{debtor === 'fredrick' ? 'Fredrick Yang' : 'Nicholas Chairnando'}</strong> owes{" "}
+                  <strong>{creditor === 'fredrick' ? 'Fredrick Yang' : 'Nicholas Chairnando'}</strong> exactly{" "}
+                  <span className="text-primary font-bold">{formatCurrencyIDR(settlementAmount)}</span> to settle the accounts.
+                </>
+              )}
+            </h4>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-2xl">
+              {settlementAmount === 0 ? (
+                "All out-of-pocket expenses and personally received client payments are completely squared away."
+              ) : (
+                `To reconcile the accounts, ${debtor === 'fredrick' ? 'Fredrick' : 'Nicholas'} can transfer ${formatCurrencyIDR(settlementAmount)} personally to ${creditor === 'fredrick' ? 'Fredrick' : 'Nicholas'}. Once transferred, log a Capital Injection for the payer and a matching Payout for the recipient to balance this ledger.`
+              )}
+            </p>
+          </div>
+          {settlementAmount > 0 && (
+            <div className="shrink-0 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-primary/20 text-primary border border-primary/30 animate-pulse">
+                Reconciliation Needed
+              </span>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <div className="grid gap-5 md:grid-cols-2">
       {founders.map((founder) => {
         const drawPercent =
           founder.profitAllocation > 0
@@ -147,6 +193,12 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
                   value={formatCurrencyIDR(founder.payoutsDrawn)}
                 />
 
+                <Row
+                  icon={<Wallet size={14} />}
+                  label="Net Equity Position"
+                  value={formatCurrencyIDR(founder.key === 'fredrick' ? positionFredrick : positionNicholas)}
+                />
+
                 {/* Progress */}
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -198,6 +250,7 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
           </Card>
         );
       })}
+      </div>
     </div>
   );
 };

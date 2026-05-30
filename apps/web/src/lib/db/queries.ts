@@ -62,6 +62,7 @@ export interface MockInvoice {
   paidAt: Date | null;
   discountType: 'percentage' | 'fixed' | null;
   discountValue: number;
+  receivedBy: 'company' | 'fredrick' | 'nicholas';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -295,6 +296,7 @@ export async function createInvoice(data: schema.NewInvoice) {
     paidAt: data.paidAt || null,
     discountType: (data.discountType || null) as 'percentage' | 'fixed' | null,
     discountValue: data.discountValue !== undefined && data.discountValue !== null ? Number(data.discountValue) : 0,
+    receivedBy: data.receivedBy as any || 'company',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -302,7 +304,7 @@ export async function createInvoice(data: schema.NewInvoice) {
   return newInvoice;
 }
 
-export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued' | 'paid' | 'partially_paid' | 'past_due' | 'written_off', amountPaid?: number, proofOfPaymentUrl?: string) {
+export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued' | 'paid' | 'partially_paid' | 'past_due' | 'written_off', amountPaid?: number, proofOfPaymentUrl?: string, receivedBy?: 'company' | 'fredrick' | 'nicholas') {
   if (isDbConfigured()) {
     try {
       const existing = await db.select().from(schema.invoices).where(eq(schema.invoices.id, id));
@@ -324,6 +326,7 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
           status, 
           amountPaid: status === 'paid' ? undefined : amountPaid,
           proofOfPaymentUrl: finalUrl,
+          receivedBy: receivedBy || undefined,
           dpAt: (status === 'partially_paid' || status === 'paid') ? (existing[0]?.dpAt || new Date()) : null,
           paidAt: status === 'paid' ? new Date() : null,
           updatedAt: new Date() 
@@ -358,6 +361,7 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
       status,
       amountPaid: finalAmountPaid,
       proofOfPaymentUrl: finalProofOfPaymentUrl,
+      receivedBy: receivedBy || currentInvoice.receivedBy || 'company',
       dpAt: (status === 'partially_paid' || status === 'paid') ? (currentInvoice.dpAt || new Date()) : null,
       paidAt: status === 'paid' ? new Date() : null,
       updatedAt: new Date()
@@ -591,6 +595,7 @@ export interface MockExpense {
   date: Date;
   payer: 'company' | 'fredrick' | 'nicholas';
   notes: string | null;
+  receiptUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -650,6 +655,7 @@ export async function createExpense(data: schema.NewExpense) {
     date: data.date ? new Date(data.date) : new Date(),
     payer: data.payer as any || 'company',
     notes: data.notes || null,
+    receiptUrl: data.receiptUrl || null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

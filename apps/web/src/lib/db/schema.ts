@@ -60,6 +60,7 @@ export const invoices = pgTable('invoices', {
   paidAt: timestamp('paid_at'),
   discountType: text('discount_type'), // 'percentage' | 'fixed' | null
   discountValue: integer('discount_value').default(0),
+  receivedBy: text('received_by').notNull().default('company'), // 'company' | 'fredrick' | 'nicholas'
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -114,6 +115,7 @@ export const expenses = pgTable('expenses', {
   date: timestamp('date').notNull().defaultNow(),
   payer: text('payer').notNull().default('company'), // 'company' | 'fredrick' | 'nicholas'
   notes: text('notes'),
+  receiptUrl: text('receipt_url'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
