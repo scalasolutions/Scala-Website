@@ -65,8 +65,8 @@ function TypewriterWord({ words }: { words: string[] }) {
   }, [text, phase, wordIndex, words]);
 
   return (
-    <span className="text-primary-ink dark:text-primary text-glow-lime">
-      {text}
+    <span className="text-primary-ink dark:text-primary text-glow-lime inline-block min-h-[1.15em] align-middle">
+      {text || '\u200B'}
       <span
         aria-hidden
         className="inline-block w-[4px] h-[0.85em] bg-primary align-[-0.05em] ml-2 cursor-blink shadow-[0_0_8px_rgba(206,248,78,0.3)]"
@@ -251,8 +251,6 @@ export default function LandingPage() {
                 bg: 'rgba(206, 248, 78, 0.20)',
                 blur: 110,
                 pos: { left: '8%', top: '22%' },
-                drift: { x: [0, 70, -20, 0], y: [0, 30, -10, 0] },
-                driftDur: 18,
                 ignite: 0.3,
               },
               {
@@ -260,8 +258,6 @@ export default function LandingPage() {
                 bg: 'rgba(206, 248, 78, 0.15)',
                 blur: 110,
                 pos: { right: '6%', top: '30%' },
-                drift: { x: [0, -60, 10, 0], y: [0, -40, 0, 0] },
-                driftDur: 22,
                 ignite: 0.4,
               },
               {
@@ -269,8 +265,6 @@ export default function LandingPage() {
                 bg: 'rgba(206, 248, 78, 0.20)',
                 blur: 100,
                 pos: { left: '38%', bottom: '8%' },
-                drift: { x: [0, 50, -10, 0], y: [0, -30, 20, 0] },
-                driftDur: 20,
                 ignite: 0.5,
               },
             ].map((orb, i) => (
@@ -283,19 +277,13 @@ export default function LandingPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 1.1, delay: orb.ignite, ease: [0.16, 1, 0.3, 1] }}
               >
-                <motion.div
-                  className="rounded-full pointer-events-none"
+                <div
+                  className={`rounded-full pointer-events-none animate-orb-${i + 1}`}
                   style={{
                     width: orb.size,
                     height: orb.size,
                     backgroundColor: orb.bg,
                     filter: `blur(${orb.blur}px)`,
-                  }}
-                  animate={orb.drift}
-                  transition={{
-                    duration: orb.driftDur,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
                   }}
                 />
               </motion.div>
@@ -306,7 +294,7 @@ export default function LandingPage() {
         <div className="relative mx-auto max-w-7xl">
           <motion.div
             ref={heroRef}
-            style={reduce ? undefined : { y: heroY, opacity: heroOpacity }}
+            style={reduce ? undefined : { y: heroY, opacity: heroOpacity, willChange: 'transform, opacity' }}
             variants={heroContainer}
             initial="hidden"
             animate="visible"
@@ -314,9 +302,8 @@ export default function LandingPage() {
           >
             <HeroChild>
               <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-[104px] font-semibold tracking-tight leading-[0.95] text-foreground max-w-6xl">
-                Scale your business
-                <span className="block mt-3 md:mt-4">
-                  with{' '}
+                Scale your business with
+                <span className="block mt-3 md:mt-4 min-h-[1.15em] whitespace-nowrap">
                   <TypewriterWord words={['Scala', 'Websites', 'Stores', 'Systems']} />
                 </span>
               </h1>

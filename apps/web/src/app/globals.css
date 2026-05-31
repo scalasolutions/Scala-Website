@@ -317,6 +317,38 @@ html.invoice-preview-active #admin-top-header {
   animation: cursor-blink 1s steps(1, end) infinite;
 }
 
+/* --- High Performance GPU Orbs --- */
+@keyframes orb-drift-1 {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  33% { transform: translate3d(70px, 30px, 0); }
+  66% { transform: translate3d(-20px, -10px, 0); }
+}
+
+@keyframes orb-drift-2 {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  33% { transform: translate3d(-60px, -40px, 0); }
+  66% { transform: translate3d(10px, 0, 0); }
+}
+
+@keyframes orb-drift-3 {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  33% { transform: translate3d(50px, -30px, 0); }
+  66% { transform: translate3d(-10px, 20px, 0); }
+}
+
+.animate-orb-1 {
+  animation: orb-drift-1 18s ease-in-out infinite;
+  will-change: transform;
+}
+.animate-orb-2 {
+  animation: orb-drift-2 22s ease-in-out infinite;
+  will-change: transform;
+}
+.animate-orb-3 {
+  animation: orb-drift-3 20s ease-in-out infinite;
+  will-change: transform;
+}
+
 /* Lime glow for headline accent text — soft halo plus a tighter inner glow.
    Tuned light so the lime reads as a confident accent, not a beacon. */
 .text-glow-lime {
@@ -341,6 +373,7 @@ html.dark .text-glow-lime {
   display: flex;
   width: max-content;
   animation: marquee 38s linear infinite;
+  will-change: transform;
 }
 .marquee-mask {
   -webkit-mask-image: linear-gradient(
