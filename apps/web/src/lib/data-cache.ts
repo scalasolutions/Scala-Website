@@ -68,28 +68,53 @@ export async function getCached<T>(
   ttlMs: number = DEFAULT_TTL_MS
 ): Promise<T> {
   const now = Date.now();
+  const startTime = performance.now();
 
   // Return cached value if still fresh
   const existing = cache.get(key);
   if (existing && existing.expiresAt > now) {
+    console.log(
+      `%c[Cache Hit] 🎯 Key: "${key}" (Fresh; expires in ${Math.round((existing.expiresAt - now) / 1000)}s)`,
+      'color: #10B981; font-weight: bold; background: #ECFDF5; padding: 2px 4px; border-radius: 4px;'
+    );
     return existing.value as T;
   }
 
   // Return in-flight promise if one is already running for this key
   if (inFlight.has(key)) {
+    console.log(
+      `%c[In-Flight Deduplication] 🤝 Key: "${key}" (Reusing active DB request...)`,
+      'color: #3B82F6; font-weight: bold; background: #EFF6FF; padding: 2px 4px; border-radius: 4px;'
+    );
     return inFlight.get(key) as Promise<T>;
   }
+
+  console.log(
+    `%c[Cache Miss/Stale] ⚡ Key: "${key}" - Fetching fresh ledger data from database...`,
+    'color: #F59E0B; font-weight: bold; background: #FFFBEB; padding: 2px 4px; border-radius: 4px;'
+  );
 
   // Launch new fetch and register it as in-flight
   const promise = fetcher()
     .then((value) => {
-      cache.set(key, { value, expiresAt: now + ttlMs });
+      const duration = performance.now() - startTime;
+      console.log(
+        `%c[Fetch Completed] ✅ Key: "${key}" | Duration: ${duration.toFixed(2)}ms (Successfully saved in cache)`,
+        'color: #10B981; font-weight: bold; text-decoration: underline; background: #ECFDF5; padding: 2px 4px; border-radius: 4px;'
+      );
+      cache.set(key, { value, expiresAt: Date.now() + ttlMs });
       inFlight.delete(key);
       // Notify active hooks that fresh data has arrived
       notify(key);
       return value;
     })
     .catch((err) => {
+      const duration = performance.now() - startTime;
+      console.error(
+        `%c[Fetch Failed] ❌ Key: "${key}" | Duration: ${duration.toFixed(2)}ms`,
+        'color: #EF4444; font-weight: bold; background: #FEF2F2; padding: 2px 4px; border-radius: 4px;',
+        err
+      );
       inFlight.delete(key);
       throw err;
     });
@@ -105,6 +130,10 @@ export async function getCached<T>(
  */
 export function invalidateCache(...keys: string[]): void {
   for (const key of keys) {
+    console.log(
+      `%c[Cache Invalidation] 🧹 Invalidated key: "${key}"`,
+      'color: #EC4899; font-weight: bold; background: #FDF2F8; padding: 2px 4px; border-radius: 4px;'
+    );
     cache.delete(key);
     // Notify all active hooks subscribed to this key to automatically re-fetch
     notify(key);
@@ -113,6 +142,10 @@ export function invalidateCache(...keys: string[]): void {
 
 /** Invalidate everything (e.g. after a bulk operation or sign-out). */
 export function clearAllCache(): void {
+  console.log(
+    `%c[Cache Clear] 🧽 Cleared all entries in the corporate ledger cache`,
+    'color: #EC4899; font-weight: bold; background: #FDF2F8; padding: 2px 4px; border-radius: 4px;'
+  );
   cache.clear();
 }
 
@@ -139,19 +172,32 @@ export function useAdminData<T>(
     return !!(existing && existing.expiresAt > Date.now());
   };
 
-  const [loading, setLoading] = useState(() => !isFresh());
+  // Only set loading to true if there is absolutely no existing data in cache
+  const [loading, setLoading] = useState(() => {
+    const existing = cache.get(key);
+    return !existing;
+  });
 
   useEffect(() => {
     let active = true;
 
     async function load(forceRefresh = false) {
       if (!forceRefresh && isFresh()) {
+        console.log(`%c[SWR Hook] 🟢 "${key}" (Cache is fresh, skipping background query)`, 'color: #10B981;');
         if (active) setLoading(false);
         return;
       }
 
       try {
-        if (active) setLoading(true);
+        const existing = cache.get(key);
+        // Only trigger loading visual overlay if we don't have any cached data to show
+        if (active && !existing) {
+          console.log(`%c[SWR Hook] 🔴 "${key}" - Initial Load: No cached data. Rendering loading skeletons...`, 'color: #EF4444; font-weight: bold;');
+          setLoading(true);
+        } else if (active && existing) {
+          console.log(`%c[SWR Hook] 🟣 "${key}" - Stale-While-Revalidate: Instant cache render. Triggering silent background query...`, 'color: #8B5CF6; font-weight: bold;');
+        }
+        
         const val = await getCached(key, fetcher, options?.ttl);
         if (active) {
           setData(val);
@@ -173,7 +219,7 @@ export function useAdminData<T>(
         setData(existing.value as T);
         setLoading(false);
       } else {
-        // Cache was invalidated! Trigger background refetch
+        console.log(`%c[SWR Hook] 🔄 "${key}" Cache Invalidated! Triggering instant re-fetch.`, 'color: #EC4899;');
         load(true);
       }
     });

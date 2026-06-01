@@ -47,6 +47,7 @@ import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import Skeleton from '@/components/ui/Skeleton';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import EmptyState from '@/components/ui/EmptyState';
@@ -416,10 +417,28 @@ export default function ClientsPage() {
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
-              <Loader2 className="animate-spin text-muted-foreground" size={20} />
-              <p className="text-sm text-muted-foreground">Loading clients…</p>
-            </div>
+            <Card padding="sm">
+              <div className="divide-y divide-border">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between gap-4 py-4 px-4 border-b border-border last:border-0">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <Skeleton className="h-10 w-10 shrink-0" rounded="xl" />
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <Skeleton className="h-4 w-24 sm:w-36" />
+                        <Skeleton className="h-3 w-32 sm:w-48" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="text-right space-y-2 hidden sm:block">
+                        <Skeleton className="h-3.5 w-16" />
+                        <Skeleton className="h-3 w-12" />
+                      </div>
+                      <Skeleton className="h-6 w-16" rounded="lg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           ) : filteredClients.length === 0 ? (
             <Card padding="lg">
               <EmptyState

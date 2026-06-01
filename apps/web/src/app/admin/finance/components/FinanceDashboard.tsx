@@ -7,6 +7,10 @@ import {
   deleteExpense,
   deleteCapitalInjection,
   deletePayout,
+  getExpenses,
+  getCapitalInjections,
+  getPayouts,
+  getInvoices,
   MockExpense,
   MockCapitalInjection,
   MockPayout,
@@ -14,12 +18,9 @@ import {
   MockClient,
 } from '@/lib/db/queries';
 import {
-  getCachedExpenses,
-  getCachedInjections,
-  getCachedPayouts,
-  getCachedInvoices,
   invalidateCache,
   CACHE_KEYS,
+  useAdminData,
 } from '@/lib/data-cache';
 import { FinanceOverviewCards } from './FinanceOverviewCards';
 import { FounderSplitCards } from './FounderSplitCards';
@@ -30,13 +31,19 @@ import { ExpenseModal, InjectionModal, PayoutModal } from './TransactionModals';
 import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import SectionHeading from '@/components/ui/SectionHeading';
+import Skeleton from '@/components/ui/Skeleton';
 
 export const FinanceDashboard: React.FC = () => {
-  const [expenses, setExpenses] = useState<MockExpense[]>([]);
-  const [injections, setInjections] = useState<MockCapitalInjection[]>([]);
-  const [payouts, setPayouts] = useState<MockPayout[]>([]);
-  const [invoices, setInvoices] = useState<(MockInvoice & { client?: MockClient })[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: expensesData, loading: loadingExpenses } = useAdminData<MockExpense[]>(CACHE_KEYS.EXPENSES, getExpenses as any);
+  const { data: injectionsData, loading: loadingInjections } = useAdminData<MockCapitalInjection[]>(CACHE_KEYS.INJECTIONS, getCapitalInjections as any);
+  const { data: payoutsData, loading: loadingPayouts } = useAdminData<MockPayout[]>(CACHE_KEYS.PAYOUTS, getPayouts as any);
+  const { data: invoicesData, loading: loadingInvoices } = useAdminData<(MockInvoice & { client?: MockClient })[]>(CACHE_KEYS.INVOICES, getInvoices as any);
+
+  const expenses = expensesData || [];
+  const injections = injectionsData || [];
+  const payouts = payoutsData || [];
+  const invoices = invoicesData || [];
+  const loading = loadingExpenses || loadingInjections || loadingPayouts || loadingInvoices;
   
   // Transitions for deleting/actions
   const [, startTransition] = useTransition();
@@ -56,31 +63,6 @@ export const FinanceDashboard: React.FC = () => {
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [selectedFounder, setSelectedFounder] = useState<'fredrick' | 'nicholas'>('fredrick');
   const [guideOpen, setGuideOpen] = useState(false);
-
-  // Master fetch ledger records
-  const loadFinanceLedger = async () => {
-    try {
-      const [exp, inj, pay, inv] = await Promise.all([
-        getCachedExpenses(),
-        getCachedInjections(),
-        getCachedPayouts(),
-        getCachedInvoices(),
-      ]);
-      // React 18 batches these state updates automatically — no setTimeout needed.
-      setExpenses(exp as MockExpense[]);
-      setInjections(inj as MockCapitalInjection[]);
-      setPayouts(pay as MockPayout[]);
-      setInvoices(inv as (MockInvoice & { client?: MockClient })[]);
-      setLoading(false);
-    } catch (err) {
-      console.error('Failed to load financial records ledger', err);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadFinanceLedger();
-  }, []);
 
   // Quick action modal trigger
   const handleFounderAction = (actionType: 'inject' | 'draw', founderKey: 'fredrick' | 'nicholas') => {
@@ -137,7 +119,6 @@ export const FinanceDashboard: React.FC = () => {
           await deletePayout(id);
           invalidateCache(CACHE_KEYS.PAYOUTS);
         }
-        await loadFinanceLedger();
         setConfirmDeleteOpen(false);
         setDeleteTarget(null);
       } catch (err) {
@@ -284,9 +265,43 @@ export const FinanceDashboard: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-          <Loader2 className="animate-spin text-muted-foreground" size={20} />
-          <p className="text-sm text-muted-foreground">Loading ledger…</p>
+        <div className="space-y-8 animate-pulse">
+          {/* KPI Cards Skeleton */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-7 w-28" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+
+          {/* Split Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-border bg-card p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-4 w-12" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-44" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <div className="pt-2 border-t border-border flex items-center justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Charts Skeleton */}
+          <div className="rounded-2xl border border-border bg-card p-6 h-80 space-y-4">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-full w-full" rounded="xl" />
+          </div>
         </div>
       ) : (
         <>
@@ -351,18 +366,18 @@ export const FinanceDashboard: React.FC = () => {
       <ExpenseModal
         isOpen={expenseModalOpen}
         onClose={() => setExpenseModalOpen(false)}
-        onSuccess={loadFinanceLedger}
+        onSuccess={() => {}}
       />
       <InjectionModal
         isOpen={injectionModalOpen}
         onClose={() => setInjectionModalOpen(false)}
-        onSuccess={loadFinanceLedger}
+        onSuccess={() => {}}
         defaultFounder={selectedFounder}
       />
       <PayoutModal
         isOpen={payoutModalOpen}
         onClose={() => setPayoutModalOpen(false)}
-        onSuccess={loadFinanceLedger}
+        onSuccess={() => {}}
         defaultFounder={selectedFounder}
         maxAllowedDraw={remainingAllowedDraw}
       />
