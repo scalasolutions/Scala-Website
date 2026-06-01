@@ -21,9 +21,7 @@ import {
 } from 'lucide-react';
 import {
   createInvoice,
-  updateInvoiceStatus,
   updateInvoice,
-  deleteInvoice,
   MockInvoice,
   MockClient,
   getInvoiceLinePresets,
@@ -43,6 +41,10 @@ import {
 } from '@/lib/data-cache';
 import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
+import { RecordPaymentModal } from './components/RecordPaymentModal';
+import { RevertPaymentModal } from './components/RevertPaymentModal';
+import { DeleteInvoiceModal } from './components/DeleteInvoiceModal';
+import { performActualOCR, extractAmountFromFilename } from './components/ocr-utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -178,7 +180,6 @@ export default function InvoicesPage() {
   // Delete confirmation modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<MockInvoice | null>(null);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Create invoice form fields
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -196,16 +197,10 @@ export default function InvoicesPage() {
   const [proofOfPaymentUrl, setProofOfPaymentUrl] = useState<string>('');
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [receivedBy, setReceivedBy] = useState<'company' | 'fredrick' | 'nicholas'>('company');
-  const [paymentReceivedBy, setPaymentReceivedBy] = useState<'company' | 'fredrick' | 'nicholas'>('company');
 
   // Record Payment Modal State
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<MockInvoice | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'partially_paid'>('paid');
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [receiptFileBase64, setReceiptFileBase64] = useState<string>('');
-  const [receiptFileName, setReceiptFileName] = useState<string>('');
-  const [isLoggingPayment, setIsLoggingPayment] = useState(false);
 
   // Image/PDF previewer state
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
@@ -218,12 +213,6 @@ export default function InvoicesPage() {
   // Revert status from paid modal state
   const [revertModalOpen, setRevertModalOpen] = useState(false);
   const [invoiceToRevert, setInvoiceToRevert] = useState<MockInvoice | null>(null);
-  const [revertStatusSelection, setRevertStatusSelection] = useState<
-    'draft' | 'issued' | 'partially_paid' | 'past_due' | 'written_off'
-  >('issued');
-  const [revertAmountPaid, setRevertAmountPaid] = useState<number>(0);
-  const [keepReceipt, setKeepReceipt] = useState<boolean>(true);
-  const [isRevertingStatus, setIsRevertingStatus] = useState(false);
 
   // Line items
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
@@ -518,7 +507,6 @@ export default function InvoicesPage() {
     setDiscountValue(0);
     setAmountPaid(0);
     setProofOfPaymentUrl('');
-    setReceiptFileName('');
     setReceivedBy('company');
     setLineItems([
       {
@@ -630,280 +618,18 @@ export default function InvoicesPage() {
   // ── Status helpers ─────────────────────────────────────────
   const handleMarkAsPaid = (invoice: MockInvoice) => {
     setPaymentInvoice(invoice);
-    setPaymentStatus(invoice.status === 'partially_paid' ? 'partially_paid' : 'paid');
-    setPaymentAmount(invoice.status === 'partially_paid' ? (invoice.amountPaid || Math.round(invoice.total * 0.5)) : invoice.total);
-    setReceiptFileBase64('');
-    setReceiptFileName('');
-    setPaymentReceivedBy(invoice.receivedBy || 'company');
     setPaymentModalOpen(true);
   };
 
   const triggerRevertPaidStatus = (invoice: MockInvoice) => {
     setInvoiceToRevert(invoice);
-    setRevertStatusSelection('issued');
-    setRevertAmountPaid(invoice.amountPaid || 0);
-    setKeepReceipt(!!invoice.proofOfPaymentUrl);
     setRevertModalOpen(true);
   };
 
-  const handleRevertStatus = async () => {
-    if (!invoiceToRevert) return;
-    setIsRevertingStatus(true);
-    try {
-      const finalAmountPaid = revertStatusSelection === 'partially_paid' ? revertAmountPaid : 0;
-      const receiptUrl = keepReceipt ? (invoiceToRevert.proofOfPaymentUrl || null) : null;
-      
-      const updated = await updateInvoice(invoiceToRevert.id, {
-        status: revertStatusSelection,
-        amountPaid: finalAmountPaid,
-        proofOfPaymentUrl: receiptUrl,
-        paidAt: null, // clear paid date
-      });
 
-      if (updated) {
-        await syncInvoicePayoutAction(invoiceToRevert.invoiceNumber, invoiceToRevert.receivedBy, finalAmountPaid, new Date());
-        mutateInvoices(
-          invoices.map((inv) =>
-            inv.id === invoiceToRevert.id
-              ? ({
-                  ...inv,
-                  status: revertStatusSelection,
-                  amountPaid: finalAmountPaid,
-                  proofOfPaymentUrl: receiptUrl,
-                  paidAt: null,
-                  updatedAt: new Date(),
-                } as any)
-              : inv
-          )
-        );
-        invalidateCache(CACHE_KEYS.PAYOUTS);
-        setRevertModalOpen(false);
-        setInvoiceToRevert(null);
-      }
-    } catch (err) {
-      console.error('Failed to revert invoice status', err);
-    } finally {
-      setIsRevertingStatus(false);
-    }
-  };
-
-  // ── Secure Local Tesseract OCR Engine (Client-side, 100% private, zero API keys) ──
-  const loadTesseract = (): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      if ((window as any).Tesseract) {
-        resolve((window as any).Tesseract);
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/tesseract.js@5.0.5/dist/tesseract.min.js';
-      script.onload = () => resolve((window as any).Tesseract);
-      script.onerror = (err) => reject(err);
-      document.head.appendChild(script);
-    });
-  };
-
-  const parseIDRAmountString = (str: string): number | null => {
-    // Remove trailing dot/comma or spaces
-    let cleanStr = str.replace(/[.,]$/, '').trim();
-    
-    // Split by dots and commas to analyze the decimal / thousands structure
-    const parts = cleanStr.split(/[.,]/);
-    
-    // If it ends with .00 or ,00 (cents), remove it
-    if (parts.length > 1 && parts[parts.length - 1] === '00') {
-      cleanStr = parts.slice(0, -1).join('');
-    } else if (parts.length > 1 && parts[parts.length - 1].length === 2) {
-      // If the last part has length 2 (e.g. .50 or ,00 cents), strip it as cents
-      cleanStr = parts.slice(0, -1).join('');
-    } else {
-      // Otherwise, it's just thousands separators, strip all non-digits
-      cleanStr = cleanStr.replace(/[^0-9]/g, '');
-    }
-    
-    const val = parseInt(cleanStr.replace(/[^0-9]/g, ''), 10);
-    return isNaN(val) ? null : val;
-  };
-
-  const performActualOCR = async (dataUrl: string): Promise<number | null> => {
-    try {
-      const Tesseract = await loadTesseract();
-      const result = await Tesseract.recognize(dataUrl, 'eng');
-      const text = result?.data?.text || '';
-      console.log("OCR Local Extracted Text:\n", text);
-
-      // 1. Split text into lines to look for contextual keywords
-      const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean);
-      const amountKeywords = [
-        'transfer amount',
-        'amount paid',
-        'jumlah transfer',
-        'nominal',
-        'total',
-        'jumlah',
-        'idr',
-        'rp'
-      ];
-
-      for (const line of lines) {
-        const lowerLine = line.toLowerCase();
-        // If this line contains an amount indicator keyword
-        if (amountKeywords.some(keyword => lowerLine.includes(keyword))) {
-          // Look for any number groups in the line (e.g. 2,750,000.00 or 161.107)
-          const numbers = line.match(/\d[\d.,]*/g);
-          if (numbers) {
-            for (const numStr of numbers) {
-              const val = parseIDRAmountString(numStr);
-              if (val && val >= 10000 && val <= 1000000000) {
-                console.log(`OCR: Found matching amount '${numStr}' (parsed: ${val}) via line keyword context.`);
-                return val;
-              }
-            }
-          }
-        }
-      }
-
-      // 2. Look for strong IDR pattern matches (e.g. 2,750,000 or 161.107) anywhere in the text
-      const idrPattern = /\b\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?\b/g;
-      const idrMatches = text.match(idrPattern);
-      if (idrMatches) {
-        for (const match of idrMatches) {
-          const val = parseIDRAmountString(match);
-          if (val && val >= 10000 && val <= 1000000000) {
-            console.log(`OCR: Found matching amount '${match}' (parsed: ${val}) via IDR pattern matching.`);
-            return val;
-          }
-        }
-      }
-
-      // 3. Fallback to scanning all numeric groups for the first plausible amount (between 10k and 1B IDR)
-      const digitGroups = text.match(/\d+[\d.,]*/g);
-      if (digitGroups) {
-        let bestCandidate = null;
-        for (const group of digitGroups) {
-          const val = parseIDRAmountString(group);
-          if (val && val >= 10000 && val <= 1000000000) {
-            const strippedLength = val.toString().length;
-            // Plausible amount length check
-            if (strippedLength >= 5 && strippedLength <= 9) {
-              if (!bestCandidate || val > bestCandidate) {
-                bestCandidate = val;
-              }
-            }
-          }
-        }
-        if (bestCandidate !== null) {
-          console.log(`OCR: Found fallback amount (parsed: ${bestCandidate}).`);
-          return bestCandidate;
-        }
-      }
-      return null;
-    } catch (e) {
-      console.error("Local client-side OCR failed: ", e);
-      return null;
-    }
-  };
-
-  // ── AI OCR Amount Extractor Fallback Helper ────────────────────────
-  const extractAmountFromFilename = (filename: string, fallbackTotal: number): number => {
-    // If the filename contains typical macOS/Windows screenshot markers, ignore numbers inside
-    const isScreenshot = /screen\s*shot|screenshot/i.test(filename) || 
-                         /\d{2}\.\d{2}\.\d{2}/.test(filename) || 
-                         /\d{4}-\d{2}-\d{2}/.test(filename);
-                         
-    if (!isScreenshot) {
-      // 1. Check for 'k' notation, e.g. 150k -> 150000
-      const kMatch = filename.toLowerCase().match(/(\d+(?:\.\d+)?)\s*k/);
-      if (kMatch) {
-        const val = parseFloat(kMatch[1]);
-        if (!isNaN(val)) return val * 1000;
-      }
-      
-      // 2. Extract any sequence of digits, filtering out invoice ref and date patterns
-      const cleanName = filename.replace(/INV-\d+-\d+/gi, '').replace(/\d{4}-\d{2}-\d{2}/g, '');
-      const digitGroups = cleanName.match(/\d+[\d.,]*/g);
-      if (digitGroups) {
-        for (const group of digitGroups) {
-          const cleaned = group.replace(/[^0-9]/g, '');
-          const val = parseInt(cleaned, 10);
-          // Plausible IDR amount checks
-          if (!isNaN(val) && val >= 10000) {
-            return val;
-          }
-        }
-      }
-    }
-    
-    // 3. Milestone standard fallback (50% Down Payment or 5M default)
-    return fallbackTotal ? Math.round(fallbackTotal / 2) : 5000000;
-  };
-
-  // ── Client-side image compressor & drawer uploader ───────────
-  const handleCompressAndSetFile = (file: File) => {
-    if (!file) return;
-    setReceiptFileName(file.name);
-    setUploadingReceipt(true);
-    setOcrScanning(true);
-    setOcrSuccessMsg(null);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-          setReceiptFileBase64(dataUrl);
-
-          // Run Real Client-side local OCR scanning on receipt canvas
-          setTimeout(async () => {
-            let extractedAmount = await performActualOCR(dataUrl);
-            if (!extractedAmount) {
-              // Fallback to safe filename extraction
-              extractedAmount = extractAmountFromFilename(file.name, paymentInvoice ? paymentInvoice.total : 0);
-            }
-            
-            setPaymentAmount(extractedAmount);
-            setOcrScanning(false);
-            setOcrSuccessMsg(`Secure OCR: Extracted Rp ${formatInputNumberIDR(extractedAmount)} successfully from receipt!`);
-
-            setTimeout(() => {
-              setOcrSuccessMsg(null);
-            }, 6000);
-          }, 500);
-        } else {
-          setOcrScanning(false);
-        }
-        setUploadingReceipt(false);
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleCompressAndUploadForDrawer = (file: File) => {
     if (!file) return;
-    setReceiptFileName(file.name);
     setUploadingReceipt(true);
     setOcrScanning(true);
     setOcrSuccessMsg(null);
@@ -971,32 +697,7 @@ export default function InvoicesPage() {
 
   const triggerDeleteConfirmation = (invoice: MockInvoice) => {
     setInvoiceToDelete(invoice);
-    setDeleteConfirmText('');
     setDeleteModalOpen(true);
-  };
-
-  const handleDeleteInvoice = async () => {
-    if (!invoiceToDelete) return;
-
-    if (invoiceToDelete.status === 'paid' && deleteConfirmText !== 'CONFIRM') {
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const deleted = await deleteInvoice(invoiceToDelete.id);
-        if (deleted) {
-          await syncInvoicePayoutAction(invoiceToDelete.invoiceNumber, 'company', 0);
-          mutateInvoices(invoices.filter((inv) => inv.id !== invoiceToDelete.id));
-          invalidateCache(CACHE_KEYS.PAYOUTS);
-          setDeleteModalOpen(false);
-          setInvoiceToDelete(null);
-          setDeleteConfirmText('');
-        }
-      } catch (err) {
-        console.error('Failed to delete invoice', err);
-      }
-    });
   };
 
   // Auto-derives 'past_due' from due date — issued invoices past their due date are shown as past_due
@@ -2133,339 +1834,35 @@ export default function InvoicesPage() {
             )}
 
           {/* ── Delete invoice confirmation modal ── */}
-          {mounted && deleteModalOpen && invoiceToDelete &&
-            createPortal(
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div
-                  className="fixed inset-0 bg-background/85 backdrop-blur-md"
-                  onClick={() => {
-                    setDeleteModalOpen(false);
-                    setInvoiceToDelete(null);
-                    setDeleteConfirmText('');
-                  }}
-                />
-
-                <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-                  <div className="p-6">
-                    <div className="flex items-start gap-3 pb-4 mb-4 border-b border-border">
-                      <div className="shrink-0 w-9 h-9 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center">
-                        <AlertTriangle size={16} />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-base font-semibold tracking-tight text-foreground">
-                          Delete invoice
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          This action cannot be undone.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Are you sure you want to delete{' '}
-                        <span className="font-mono text-foreground">
-                          {invoiceToDelete.invoiceNumber}
-                        </span>
-                        ? All line items and billing history will be permanently removed.
-                      </p>
-
-                      {invoiceToDelete.status === 'paid' && (
-                        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-3 animate-fade-in-scale">
-                          <p className="text-xs text-red-500 leading-relaxed">
-                            This invoice is marked as{' '}
-                            <span className="font-medium">paid</span>. Deleting a paid
-                            invoice impacts income auditing and client statement history.
-                          </p>
-                          <div>
-                            <label className="text-[10px] font-medium uppercase tracking-[0.06em] text-red-500 mb-1.5 block">
-                              Type 'CONFIRM' to authorize deletion
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="CONFIRM"
-                              value={deleteConfirmText}
-                              onChange={(e) => setDeleteConfirmText(e.target.value)}
-                              className="w-full h-9 rounded-lg bg-background border border-red-500/20 px-3 text-sm font-mono uppercase focus:border-red-500/40 focus:outline-none transition-colors text-red-500 placeholder:text-red-500/30"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="md"
-                        onClick={() => {
-                          setDeleteModalOpen(false);
-                          setInvoiceToDelete(null);
-                          setDeleteConfirmText('');
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="danger"
-                        size="md"
-                        leftIcon={<Trash2 size={14} />}
-                        onClick={handleDeleteInvoice}
-                        disabled={
-                          isPending ||
-                          (invoiceToDelete.status === 'paid' &&
-                            deleteConfirmText !== 'CONFIRM')
-                        }
-                      >
-                        {isPending ? 'Deleting…' : 'Delete invoice'}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>,
-              document.body
-            )}
+          {deleteModalOpen && invoiceToDelete && (
+            <DeleteInvoiceModal
+              isOpen={deleteModalOpen}
+              onClose={() => {
+                setDeleteModalOpen(false);
+                setInvoiceToDelete(null);
+              }}
+              invoice={invoiceToDelete}
+              onDeleteCompleted={(deletedId) => {
+                mutateInvoices(invoices.filter((inv) => inv.id !== deletedId));
+                invalidateCache(CACHE_KEYS.PAYOUTS);
+              }}
+            />
+          )}
 
           {/* ── Record Payment Modal ── */}
-          {mounted && paymentModalOpen && paymentInvoice && createPortal(
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div
-                className="fixed inset-0 bg-background/80 backdrop-blur-md"
-                onClick={() => {
-                  if (!isLoggingPayment) {
-                    setPaymentModalOpen(false);
-                    setPaymentInvoice(null);
-                  }
-                }}
-              />
-
-              <div className="relative w-full max-w-md rounded-2xl bg-card border border-border p-6 shadow-2xl animate-fade-in-scale">
-                <div className="flex items-center gap-3 pb-3 border-b border-border mb-4">
-                  <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
-                    <CreditCard size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-foreground">
-                      Record Client Payment
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                      {paymentInvoice.invoiceNumber} • Total: {formatCurrencyIDR(paymentInvoice.total)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Payment Type selection */}
-                  <div>
-                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                      Payment Type
-                    </label>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentStatus('paid');
-                          setPaymentAmount(paymentInvoice.total);
-                        }}
-                        className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${paymentStatus === 'paid'
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'
-                          }`}
-                      >
-                        Full Payment (100%)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentStatus('partially_paid');
-                          setPaymentAmount(Math.round(paymentInvoice.total * 0.5)); // Default to 50% Down Payment
-                        }}
-                        className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${paymentStatus === 'partially_paid'
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'
-                          }`}
-                      >
-                        Partial Payment (Milestone)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Amount input for partial payment */}
-                  {paymentStatus === 'partially_paid' && (
-                    <div className="animate-fade-in-scale space-y-2">
-                      <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                        Amount Collected (IDR) *
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        required
-                        value={formatInputNumberIDR(paymentAmount)}
-                        onChange={(e) => {
-                          const rawVal = e.target.value.replace(/[^0-9]/g, '');
-                          setPaymentAmount(rawVal ? Number(rawVal) : 0);
-                        }}
-                        className="w-full h-9 rounded-lg bg-background border border-border px-3 text-xs text-foreground font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors"
-                      />
-                      <span className="text-[10px] text-muted-foreground mt-1 block">
-                        Remaining unpaid balance: <strong>{formatCurrencyIDR(Math.max(0, paymentInvoice.total - paymentAmount))}</strong>
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Received By */}
-                  <div>
-                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                      Payment Received By
-                    </label>
-                    <select
-                      value={paymentReceivedBy}
-                      onChange={(e) => setPaymentReceivedBy(e.target.value as any)}
-                      className="h-10 w-full appearance-none rounded-xl bg-background border border-border px-3.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors cursor-pointer"
-                    >
-                      <option value="company">Company Treasury</option>
-                      <option value="fredrick">Fredrick Yang (out of pocket / personal)</option>
-                      <option value="nicholas">Nicholas Chairnando (out of pocket / personal)</option>
-                    </select>
-                  </div>
-
-                  {/* File Attachment Upload */}
-                  <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
-                      Attach Proof of Payment (Screenshot / Image)
-                    </label>
-                    <div className="p-3.5 rounded-xl border border-dashed border-border bg-muted/10 text-center space-y-2">
-                      <input
-                        type="file"
-                        id="receipt-upload"
-                        accept="image/*,application/pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleCompressAndSetFile(file);
-                        }}
-                      />
-                      <label
-                        htmlFor="receipt-upload"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-muted active-press transition-all cursor-pointer text-xs font-bold text-foreground shadow-xs"
-                      >
-                        Select Receipt Image
-                      </label>
-                      {uploadingReceipt && (
-                        <p className="text-[10px] text-primary font-semibold animate-pulse">
-                          ⌛ Compressing &amp; preparing screenshot...
-                        </p>
-                      )}
-                      {receiptFileName && !uploadingReceipt && (
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-emerald-400 font-bold truncate max-w-[280px] mx-auto">
-                            ✓ {receiptFileName} (Compressed!)
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReceiptFileBase64('');
-                              setReceiptFileName('');
-                            }}
-                            className="text-[9px] text-red-400 hover:underline cursor-pointer font-bold"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      )}
-
-                      {ocrScanning && (
-                        <div className="flex items-center gap-2 p-2.5 bg-primary/10 border border-primary/20 rounded-xl text-primary text-[10px] font-bold animate-pulse mt-2.5">
-                          <Loader2 className="animate-spin text-primary shrink-0" size={12} />
-                          <span>Extracting payment total from screenshot...</span>
-                        </div>
-                      )}
-                      {ocrSuccessMsg && (
-                        <div className="flex items-center gap-2 p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-[10px] font-bold animate-fade-in-scale mt-2.5">
-                          <span className="shrink-0 text-emerald-400">✨</span>
-                          <span>{ocrSuccessMsg}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-border">
-                  <button
-                    type="button"
-                    disabled={isLoggingPayment}
-                    onClick={() => {
-                      setPaymentModalOpen(false);
-                      setPaymentInvoice(null);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoggingPayment || uploadingReceipt}
-                    onClick={async () => {
-                      setIsLoggingPayment(true);
-                      try {
-                        let receiptUrl = '';
-                        if (receiptFileBase64) {
-                          receiptUrl = await uploadReceiptAction(receiptFileName || 'receipt.jpg', receiptFileBase64);
-                        }
-
-                        const finalAmountPaid = paymentStatus === 'paid' ? paymentInvoice.total : paymentAmount;
-
-                        const updated = await updateInvoiceStatus(
-                          paymentInvoice.id,
-                          paymentStatus,
-                          finalAmountPaid,
-                          receiptUrl || undefined,
-                          paymentReceivedBy
-                        );
-
-                        if (updated) {
-                          // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
-                          await syncInvoicePayoutAction(paymentInvoice.invoiceNumber, paymentReceivedBy, finalAmountPaid, new Date());
-                          mutateInvoices(
-                            invoices.map(inv =>
-                              inv.id === paymentInvoice.id
-                                ? ({
-                                  ...inv,
-                                  status: paymentStatus,
-                                  amountPaid: finalAmountPaid,
-                                  proofOfPaymentUrl: receiptUrl || inv.proofOfPaymentUrl,
-                                  receivedBy: paymentReceivedBy,
-                                  paidAt: paymentStatus === 'paid' ? new Date() : null,
-                                  updatedAt: new Date()
-                                } as any)
-                                : inv
-                            )
-                          );
-                          invalidateCache(CACHE_KEYS.PAYOUTS);
-                          setPaymentModalOpen(false);
-                          setPaymentInvoice(null);
-                        }
-                      } catch (err) {
-                        console.error("Failed to log client payment", err);
-                      } finally {
-                        setIsLoggingPayment(false);
-                      }
-                    }}
-                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 active-press transition-all cursor-pointer flex items-center gap-1.5"
-                    style={{ boxShadow: '0 0 10px rgba(206, 248, 78, 0.15)' }}
-                  >
-                    {isLoggingPayment ? (
-                      <div className="w-3.5 h-3.5 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin" />
-                    ) : (
-                      <Check size={13} />
-                    )}
-                    Save Receipt &amp; Log Payment
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body
+          {paymentModalOpen && paymentInvoice && (
+            <RecordPaymentModal
+              isOpen={paymentModalOpen}
+              onClose={() => {
+                setPaymentModalOpen(false);
+                setPaymentInvoice(null);
+              }}
+              invoice={paymentInvoice}
+              onPaymentRecorded={(updated) => {
+                mutateInvoices(invoices.map((inv) => inv.id === updated.id ? updated : inv));
+                invalidateCache(CACHE_KEYS.PAYOUTS);
+              }}
+            />
           )}
 
           {/* ── Receipt Image Secure Popup Viewer Modal ── */}
@@ -2548,149 +1945,20 @@ export default function InvoicesPage() {
           )}
 
           {/* ── Revert paid status confirmation modal ── */}
-          {mounted && revertModalOpen && invoiceToRevert &&
-            createPortal(
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div
-                  className="fixed inset-0 bg-background/85 backdrop-blur-md"
-                  onClick={() => {
-                    if (!isRevertingStatus) {
-                      setRevertModalOpen(false);
-                      setInvoiceToRevert(null);
-                    }
-                  }}
-                />
-
-                <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-                  <div className="p-6">
-                    <div className="flex items-start gap-3 pb-4 mb-4 border-b border-border">
-                      <div className="shrink-0 w-9 h-9 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
-                        <RotateCcw size={16} />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-base font-semibold tracking-tight text-foreground">
-                          Revert Paid Status
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Switch invoice {invoiceToRevert.invoiceNumber} back to unpaid.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Audit Warning */}
-                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3.5 flex gap-2">
-                        <span className="text-amber-500 shrink-0 text-xs">⚠️</span>
-                        <div className="text-[11px] leading-relaxed text-amber-500">
-                          <p className="font-bold">FINANCIAL AUDIT CAUTION</p>
-                          <p className="mt-0.5 text-amber-500/90">
-                            Reverting a paid invoice will adjust monthly income charts, ledger totals, and mark the invoice as unpaid in client statements.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Status Selection */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-                          Select New Status *
-                        </label>
-                        <Select
-                          value={revertStatusSelection}
-                          onChange={(e) => {
-                            const newStatus = e.target.value as any;
-                            setRevertStatusSelection(newStatus);
-                            if (newStatus === 'partially_paid' && revertAmountPaid === 0) {
-                              setRevertAmountPaid(Math.round(invoiceToRevert.total * 0.5));
-                            }
-                          }}
-                        >
-                          <option value="issued">Issued (Unpaid)</option>
-                          <option value="draft">Draft</option>
-                          <option value="partially_paid">Partially Paid</option>
-                          <option value="past_due">Past Due</option>
-                          <option value="written_off">Written Off</option>
-                        </Select>
-                      </div>
-
-                      {/* Partially Paid Details */}
-                      {revertStatusSelection === 'partially_paid' && (
-                        <div className="space-y-1.5 animate-fade-up">
-                          <label className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-                            Amount Paid (Rp)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
-                              Rp
-                            </span>
-                            <Input
-                              type="text"
-                              className="pl-9"
-                              value={formatInputNumberIDR(revertAmountPaid)}
-                              onChange={(e) => {
-                                const val = Number(e.target.value.replace(/[^0-9]/g, ''));
-                                setRevertAmountPaid(val);
-                              }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground leading-normal block">
-                            Milestone split total: {formatCurrencyIDR(invoiceToRevert.total - revertAmountPaid)} outstanding
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Keep Receipts (if invoice has one) */}
-                      {invoiceToRevert.proofOfPaymentUrl && (
-                        <div className="flex items-center gap-2 py-1 select-none animate-fade-in-scale">
-                          <input
-                            type="checkbox"
-                            id="keepReceipt"
-                            checked={keepReceipt}
-                            onChange={(e) => setKeepReceipt(e.target.checked)}
-                            className="rounded border-border bg-muted/40 text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
-                          />
-                          <label
-                            htmlFor="keepReceipt"
-                            className="text-xs font-semibold text-foreground/80 cursor-pointer"
-                          >
-                            Keep uploaded proof of payment receipts
-                          </label>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-border">
-                      <button
-                        type="button"
-                        disabled={isRevertingStatus}
-                        onClick={() => {
-                          setRevertModalOpen(false);
-                          setInvoiceToRevert(null);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-all cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isRevertingStatus}
-                        onClick={handleRevertStatus}
-                        className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 active-press transition-all cursor-pointer flex items-center gap-1.5"
-                        style={{ boxShadow: '0 0 10px rgba(206, 248, 78, 0.15)' }}
-                      >
-                        {isRevertingStatus ? (
-                          <div className="w-3.5 h-3.5 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin" />
-                        ) : (
-                          <Check size={13} />
-                        )}
-                        Confirm Revert
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>,
-              document.body
-            )}
+          {revertModalOpen && invoiceToRevert && (
+            <RevertPaymentModal
+              isOpen={revertModalOpen}
+              onClose={() => {
+                setRevertModalOpen(false);
+                setInvoiceToRevert(null);
+              }}
+              invoice={invoiceToRevert}
+              onRevertCompleted={(updated) => {
+                mutateInvoices(invoices.map((inv) => inv.id === updated.id ? updated : inv));
+                invalidateCache(CACHE_KEYS.PAYOUTS);
+              }}
+            />
+          )}
         </>
       )}
     </div>
