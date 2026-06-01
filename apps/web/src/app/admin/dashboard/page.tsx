@@ -23,11 +23,10 @@ const ticketCategoryLabels: Record<string, string> = {
   feature_request: 'Feature request',
 };
 import Link from 'next/link';
-import { MockClient, MockInvoice, MockTicket } from '@/lib/db/queries';
+import { MockClient, MockInvoice, MockTicket, getClients, getInvoices, getTickets } from '@/lib/db/queries';
 import {
-  getCachedClients,
-  getCachedInvoices,
-  getCachedTickets,
+  useAdminData,
+  CACHE_KEYS,
 } from '@/lib/data-cache';
 import { getSubscriptionRemainingMonths } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
@@ -40,33 +39,14 @@ import EmptyState from '@/components/ui/EmptyState';
 import Skeleton from '@/components/ui/Skeleton';
 
 export default function DashboardHome() {
-  const [clients, setClients] = useState<MockClient[]>([]);
-  const [invoices, setInvoices] = useState<MockInvoice[]>([]);
-  const [tickets, setTickets] = useState<MockTicket[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: clientsData, loading: loadingClients } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
+  const { data: invoicesData, loading: loadingInvoices } = useAdminData<MockInvoice[]>(CACHE_KEYS.INVOICES, getInvoices as any);
+  const { data: ticketsData, loading: loadingTickets } = useAdminData<MockTicket[]>(CACHE_KEYS.TICKETS, getTickets);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        // Parallel fetch — all three requests fire simultaneously.
-        // The shared cache also deduplicates any concurrent requests
-        // from the notification bell in the layout.
-        const [c, inv, t] = await Promise.all([
-          getCachedClients(),
-          getCachedInvoices(),
-          getCachedTickets(),
-        ]);
-        setClients(c);
-        setInvoices(inv as MockInvoice[]);
-        setTickets(t);
-      } catch (err) {
-        console.error("Failed to load dashboard data", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, []);
+  const clients = clientsData || [];
+  const invoices = invoicesData || [];
+  const tickets = ticketsData || [];
+  const loading = loadingClients || loadingInvoices || loadingTickets;
 
   if (loading) {
     return (

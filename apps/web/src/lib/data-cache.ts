@@ -1,7 +1,8 @@
 /**
  * data-cache.ts
  * ---------------------------------------------------------------------------
- * A lightweight, client-side, TTL-based in-memory cache for admin data fetches.
+ * A lightweight, client-side, TTL-based in-memory cache for admin data fetches
+ * upgraded with Stale-While-Revalidate (SWR) and Pub/Sub mechanics for React.
  *
  * Goals:
  *  • Prevent duplicate network requests when multiple components on the same
@@ -11,10 +12,13 @@
  *    same Promise.
  *  • Allow mutations (create/update/delete) to invalidate specific keys so the
  *    next read always gets fresh data.
- *
- * This is intentionally simple — no persistence, no React context — just a
- * module-level singleton that lives for the duration of the browser session.
+ *  • Provide a custom hook useAdminData() that offers instant rendering via
+ *    synchronous cache lookup, background updates (SWR), and cross-component syncing.
  */
+
+import { useState, useEffect } from 'react';
+import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout } from './db/queries';
+import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts } from './db/queries';
 
 interface CacheEntry<T> {
   value: T;
@@ -27,6 +31,32 @@ const cache = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
 
 const DEFAULT_TTL_MS = 30_000; // 30 seconds
+
+// ---------------------------------------------------------------------------
+// Pub/Sub Subscription Manager
+// ---------------------------------------------------------------------------
+const listeners = new Map<string, Set<() => void>>();
+
+export function subscribe(key: string, callback: () => void): () => void {
+  if (!listeners.has(key)) {
+    listeners.set(key, new Set());
+  }
+  listeners.get(key)!.add(callback);
+  return () => {
+    listeners.get(key)?.delete(callback);
+    if (listeners.get(key)?.size === 0) {
+      listeners.delete(key);
+    }
+  };
+}
+
+export function notify(key: string): void {
+  listeners.get(key)?.forEach((cb) => cb());
+}
+
+// ---------------------------------------------------------------------------
+// Core Cache Methods
+// ---------------------------------------------------------------------------
 
 /**
  * Get a value from the cache, or fetch it if missing/expired.
@@ -51,14 +81,18 @@ export async function getCached<T>(
   }
 
   // Launch new fetch and register it as in-flight
-  const promise = fetcher().then((value) => {
-    cache.set(key, { value, expiresAt: now + ttlMs });
-    inFlight.delete(key);
-    return value;
-  }).catch((err) => {
-    inFlight.delete(key);
-    throw err;
-  });
+  const promise = fetcher()
+    .then((value) => {
+      cache.set(key, { value, expiresAt: now + ttlMs });
+      inFlight.delete(key);
+      // Notify active hooks that fresh data has arrived
+      notify(key);
+      return value;
+    })
+    .catch((err) => {
+      inFlight.delete(key);
+      throw err;
+    });
 
   inFlight.set(key, promise);
   return promise;
@@ -67,13 +101,13 @@ export async function getCached<T>(
 /**
  * Immediately invalidate one or more cache keys.
  * Call this after any mutation (create/update/delete) so the next read
- * always fetches fresh data.
+ * always fetches fresh data and notifies active subscribers to sync.
  */
 export function invalidateCache(...keys: string[]): void {
   for (const key of keys) {
     cache.delete(key);
-    // Note: we intentionally leave in-flight requests running — they will
-    // update the cache when they resolve, which is fine.
+    // Notify all active hooks subscribed to this key to automatically re-fetch
+    notify(key);
   }
 }
 
@@ -83,13 +117,96 @@ export function clearAllCache(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Typed cache-aware wrappers for the four hot admin query functions.
+// Custom React Hook for SWR & Pub/Sub
+// ---------------------------------------------------------------------------
+export function useAdminData<T>(
+  key: string,
+  fetcher: FetcherFn<T>,
+  options?: { ttl?: number }
+) {
+  // Synchronous cache lookup on init prevents loading state flash if data is available
+  const [data, setData] = useState<T | null>(() => {
+    const existing = cache.get(key);
+    if (existing) {
+      return existing.value as T;
+    }
+    return null;
+  });
+
+  // Check if current cache entry is fresh
+  const isFresh = () => {
+    const existing = cache.get(key);
+    return !!(existing && existing.expiresAt > Date.now());
+  };
+
+  const [loading, setLoading] = useState(() => !isFresh());
+
+  useEffect(() => {
+    let active = true;
+
+    async function load(forceRefresh = false) {
+      if (!forceRefresh && isFresh()) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      try {
+        if (active) setLoading(true);
+        const val = await getCached(key, fetcher, options?.ttl);
+        if (active) {
+          setData(val);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error(`useAdminData loading error for key ${key}:`, err);
+        if (active) setLoading(false);
+      }
+    }
+
+    load();
+
+    // Subscribe to cache changes/invalidations
+    const unsubscribe = subscribe(key, () => {
+      if (!active) return;
+      const existing = cache.get(key);
+      if (existing) {
+        setData(existing.value as T);
+        setLoading(false);
+      } else {
+        // Cache was invalidated! Trigger background refetch
+        load(true);
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [key, fetcher, options?.ttl]);
+
+  // Trigger cache invalidation or optimistic manual updates
+  const mutate = async (optimisticData?: T) => {
+    if (optimisticData !== undefined) {
+      cache.set(key, {
+        value: optimisticData,
+        expiresAt: Date.now() + (options?.ttl ?? DEFAULT_TTL_MS),
+      });
+      setData(optimisticData);
+      setLoading(false);
+      notify(key);
+    } else {
+      invalidateCache(key);
+    }
+  };
+
+  return { data, loading, mutate };
+}
+
+// ---------------------------------------------------------------------------
+// Typed cache-aware wrappers for the hot admin query functions.
 // Import these instead of calling the raw query functions directly when
 // you want cross-component caching.
 // ---------------------------------------------------------------------------
-
-import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout } from './db/queries';
-import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts } from './db/queries';
 
 export const CACHE_KEYS = {
   CLIENTS: 'admin:clients',

@@ -33,12 +33,13 @@ import {
   uploadReceiptAction,
   createPayout,
   syncInvoicePayoutAction,
+  getClients,
+  getInvoices,
 } from '@/lib/db/queries';
 import {
   invalidateCache,
   CACHE_KEYS,
-  getCachedClients,
-  getCachedInvoices,
+  useAdminData,
 } from '@/lib/data-cache';
 import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
@@ -150,12 +151,17 @@ export default function InvoicesPage() {
     return key;
   };
 
-  const [invoices, setInvoices] = useState<MockInvoice[]>([]);
-  const [clients, setClients] = useState<MockClient[]>([]);
+  const { data: invoicesData, loading: loadingInvoices, mutate: mutateInvoices } = useAdminData<MockInvoice[]>(CACHE_KEYS.INVOICES, getInvoices as any);
+  const { data: clientsData, loading: loadingClients } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
+
+  const invoices = invoicesData || [];
+  const clients = clientsData || [];
+
   const [linePresets, setLinePresets] = useState<MockInvoiceLinePreset[]>([]);
   const [allPagePresets, setAllPagePresets] = useState<MockInvoicePagePreset[]>([]);
   const [includedPages, setIncludedPages] = useState<string[]>(['cover', 'tc1', 'tc2']);
-  const [loading, setLoading] = useState(true);
+  const [presetsLoading, setPresetsLoading] = useState(true);
+  const loading = loadingInvoices || loadingClients || presetsLoading;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatusFilter>('all');
@@ -366,33 +372,41 @@ export default function InvoicesPage() {
       }
     }
 
-    async function loadData() {
-      const [inv, c, presets, pages] = await Promise.all([
-        getCachedInvoices(),
-        getCachedClients(),
-        getInvoiceLinePresets(),
-        getInvoicePagePresets(),
-      ]);
-      setInvoices(inv as MockInvoice[]);
-      setClients(c);
-      setLinePresets(presets as MockInvoiceLinePreset[]);
-      setAllPagePresets(pages as MockInvoicePagePreset[]);
+    async function loadPresets() {
+      try {
+        const [presets, pages] = await Promise.all([
+          getInvoiceLinePresets(),
+          getInvoicePagePresets(),
+        ]);
+        setLinePresets(presets as MockInvoiceLinePreset[]);
+        setAllPagePresets(pages as MockInvoicePagePreset[]);
 
-      const activeKeys = pages
-        .filter((p) => p.sectionKey === 'full_page_html')
-        .map((p) => p.pageKey);
-      setIncludedPages(['cover', ...activeKeys]);
+        const activeKeys = pages
+          .filter((p) => p.sectionKey === 'full_page_html')
+          .map((p) => p.pageKey);
+        setIncludedPages(['cover', ...activeKeys]);
+      } catch (err) {
+        console.error("Failed to load invoice presets", err);
+      } finally {
+        setPresetsLoading(false);
+      }
+    }
+    loadPresets();
+  }, []);
 
-      setInvoiceNumber(`INV-2026-${String(inv.length + 1).padStart(3, '0')}`);
+  useEffect(() => {
+    if (invoicesData && !invoiceNumber) {
+      setInvoiceNumber(`INV-2026-${String(invoicesData.length + 1).padStart(3, '0')}`);
+    }
+  }, [invoicesData, invoiceNumber]);
 
+  useEffect(() => {
+    if (!dueDate) {
       const defaultDue = new Date();
       defaultDue.setDate(defaultDue.getDate() + 14);
       setDueDate(defaultDue.toISOString().slice(0, 10));
-
-      setLoading(false);
     }
-    loadData();
-  }, []);
+  }, [dueDate]);
 
   // Prevent background scrolling when the create/edit modal is open
   useEffect(() => {
@@ -554,15 +568,15 @@ export default function InvoicesPage() {
           });
 
           if (updatedInv) {
-            invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
             const client = clients.find((c) => c.id === selectedClientId);
-            setInvoices((prev) =>
-              prev.map((inv) =>
+            mutateInvoices(
+              invoices.map((inv) =>
                 inv.id === editingInvoice.id
                   ? ({ ...updatedInv, client } as any)
                   : inv
               )
             );
+            invalidateCache(CACHE_KEYS.PAYOUTS);
 
             // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
             const finalPayoutAmount = (status === 'paid' || status === 'partially_paid') ? (status === 'paid' ? total : amountPaid) : 0;
@@ -592,9 +606,9 @@ export default function InvoicesPage() {
           });
 
           if (newInv) {
-            invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
             const client = clients.find((c) => c.id === selectedClientId);
-            setInvoices((prev) => [{ ...newInv, client } as any, ...prev]);
+            mutateInvoices([{ ...newInv, client } as any, ...invoices]);
+            invalidateCache(CACHE_KEYS.PAYOUTS);
 
             // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
             const finalPayoutAmount = (status === 'paid' || status === 'partially_paid') ? (status === 'paid' ? total : amountPaid) : 0;
@@ -648,9 +662,8 @@ export default function InvoicesPage() {
 
       if (updated) {
         await syncInvoicePayoutAction(invoiceToRevert.invoiceNumber, invoiceToRevert.receivedBy, finalAmountPaid, new Date());
-        invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
-        setInvoices((prev) =>
-          prev.map((inv) =>
+        mutateInvoices(
+          invoices.map((inv) =>
             inv.id === invoiceToRevert.id
               ? ({
                   ...inv,
@@ -663,6 +676,7 @@ export default function InvoicesPage() {
               : inv
           )
         );
+        invalidateCache(CACHE_KEYS.PAYOUTS);
         setRevertModalOpen(false);
         setInvoiceToRevert(null);
       }
@@ -973,8 +987,8 @@ export default function InvoicesPage() {
         const deleted = await deleteInvoice(invoiceToDelete.id);
         if (deleted) {
           await syncInvoicePayoutAction(invoiceToDelete.invoiceNumber, 'company', 0);
-          invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
-          setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceToDelete.id));
+          mutateInvoices(invoices.filter((inv) => inv.id !== invoiceToDelete.id));
+          invalidateCache(CACHE_KEYS.PAYOUTS);
           setDeleteModalOpen(false);
           setInvoiceToDelete(null);
           setDeleteConfirmText('');
@@ -2413,9 +2427,8 @@ export default function InvoicesPage() {
                         if (updated) {
                           // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
                           await syncInvoicePayoutAction(paymentInvoice.invoiceNumber, paymentReceivedBy, finalAmountPaid, new Date());
-                          invalidateCache(CACHE_KEYS.INVOICES, CACHE_KEYS.PAYOUTS);
-                          setInvoices(prev =>
-                            prev.map(inv =>
+                          mutateInvoices(
+                            invoices.map(inv =>
                               inv.id === paymentInvoice.id
                                 ? ({
                                   ...inv,
@@ -2429,6 +2442,7 @@ export default function InvoicesPage() {
                                 : inv
                             )
                           );
+                          invalidateCache(CACHE_KEYS.PAYOUTS);
                           setPaymentModalOpen(false);
                           setPaymentInvoice(null);
                         }

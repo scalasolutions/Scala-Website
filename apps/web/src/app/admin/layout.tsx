@@ -24,10 +24,10 @@ import {
   Coins
 } from 'lucide-react';
 import {
-  getCachedClients,
-  getCachedInvoices,
-  getCachedTickets,
+  useAdminData,
+  CACHE_KEYS,
 } from '@/lib/data-cache';
+import { getClients, getInvoices, getTickets, MockClient, MockInvoice } from '@/lib/db/queries';
 import { getSubscriptionRemainingMonths, cn } from '@/lib/utils';
 import ScalaLogo from '@/components/ui/ScalaLogo';
 import Badge from '@/components/ui/Badge';
@@ -95,10 +95,64 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
 
-  // Notifications State
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  // Notifications & Cache State
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: clientsData } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
+  const { data: invoicesData } = useAdminData<(MockInvoice & { client?: MockClient })[]>(CACHE_KEYS.INVOICES, getInvoices as any);
+  const { data: ticketsData } = useAdminData<any[]>(CACHE_KEYS.TICKETS, getTickets);
+
+  const notifications = React.useMemo(() => {
+    if (!clientsData || !invoicesData || !ticketsData) return [];
+
+    const list: NotificationItem[] = [];
+
+    // 1. Subscription Expiry alerts (< 3 months)
+    clientsData.forEach(client => {
+      if (client.status === 'active' && client.subscriptionType) {
+        const rem = getSubscriptionRemainingMonths(client);
+        if (rem !== null && rem < 3) {
+          list.push({
+            id: `expiry-${client.id}`,
+            type: 'expiry',
+            title: `${client.name} Subscription Quota`,
+            description: rem === 0 ? 'Hosting subscription has fully expired!' : `Only ${rem} month${rem > 1 ? 's' : ''} left on static/dynamic hosting SLA.`,
+            link: `/admin/clients/${client.id}`
+          });
+        }
+      }
+    });
+
+    // 2. Urgent or High priority support tickets
+    ticketsData.forEach(ticket => {
+      if (ticket.status !== 'resolved' && ticket.status !== 'closed' && (ticket.priority === 'urgent' || ticket.priority === 'high')) {
+        list.push({
+          id: `ticket-${ticket.id}`,
+          type: 'ticket',
+          title: `Urgent Ticket: ${ticket.title}`,
+          description: `Client support request requires prompt attention.`,
+          link: `/admin/tickets`
+        });
+      }
+    });
+
+    // 3. Past due invoices
+    invoicesData.forEach(invoice => {
+      if (invoice.status === 'past_due') {
+        const clientName = invoice.client?.name || 'Partner Account';
+        list.push({
+          id: `invoice-${invoice.id}`,
+          type: 'invoice',
+          title: `Invoice Past Due`,
+          description: `Billing past due for ${clientName} (${invoice.invoiceNumber}).`,
+          link: `/admin/invoices`
+        });
+      }
+    });
+
+    return list;
+  }, [clientsData, invoicesData, ticketsData]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
@@ -126,77 +180,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return next;
     });
   };
-
-  // Fetch alerts for notifications dropdown
-  useEffect(() => {
-    async function loadNotifications() {
-      try {
-        // Use the shared cache — avoids duplicate DB hits when the dashboard
-        // page already fetched the same data within the last 30 seconds.
-        const [c, inv, t] = await Promise.all([
-          getCachedClients(),
-          getCachedInvoices(),
-          getCachedTickets(),
-        ]);
-
-        const list: NotificationItem[] = [];
-
-        // 1. Subscription Expiry alerts (< 3 months)
-        c.forEach(client => {
-          if (client.status === 'active' && client.subscriptionType) {
-            const rem = getSubscriptionRemainingMonths(client);
-            if (rem !== null && rem < 3) {
-              list.push({
-                id: `expiry-${client.id}`,
-                type: 'expiry',
-                title: `${client.name} Subscription Quota`,
-                description: rem === 0 ? 'Hosting subscription has fully expired!' : `Only ${rem} month${rem > 1 ? 's' : ''} left on static/dynamic hosting SLA.`,
-                link: `/admin/clients/${client.id}`
-              });
-            }
-          }
-        });
-
-        // 2. Urgent or High priority support tickets
-        t.forEach(ticket => {
-          if (ticket.status !== 'resolved' && ticket.status !== 'closed' && (ticket.priority === 'urgent' || ticket.priority === 'high')) {
-            list.push({
-              id: `ticket-${ticket.id}`,
-              type: 'ticket',
-              title: `Urgent Ticket: ${ticket.title}`,
-              description: `Client support request requires prompt attention.`,
-              link: `/admin/tickets`
-            });
-          }
-        });
-
-        // 3. Past due invoices
-        inv.forEach(invoice => {
-          if (invoice.status === 'past_due') {
-            const clientName = invoice.client?.name || 'Partner Account';
-            list.push({
-              id: `invoice-${invoice.id}`,
-              type: 'invoice',
-              title: `Invoice Past Due`,
-              description: `Billing past due for ${clientName} (${invoice.invoiceNumber}).`,
-              link: `/admin/invoices`
-            });
-          }
-        });
-
-        setNotifications(list);
-      } catch (err) {
-        console.error("Failed to load notifications panel", err);
-      }
-    }
-
-    loadNotifications();
-    // Refresh every 60 s — the shared cache means only one real DB call fires
-    // per 30 s window, so this is effectively a very cheap periodic check.
-    const interval = setInterval(loadNotifications, 60_000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   // Click outside to close notification dropdown
   useEffect(() => {

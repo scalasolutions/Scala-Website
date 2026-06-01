@@ -31,13 +31,14 @@ import {
   deletePartner,
   MockPartner,
   MockInvoice,
+  getClients,
+  getPartners,
+  getInvoices,
 } from '@/lib/db/queries';
 import {
   invalidateCache,
   CACHE_KEYS,
-  getCachedClients,
-  getCachedPartners,
-  getCachedInvoices,
+  useAdminData,
 } from '@/lib/data-cache';
 import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER } from '@/lib/utils';
 import { formatCurrencyIDR } from '@/app/admin/invoices/components/invoice-types';
@@ -66,19 +67,21 @@ export default function ClientsPage() {
   // Tab State
   const [activeTab, setActiveTab] = useState<TabValue>('clients');
 
-  // Clients Directory State
-  const [clients, setClients] = useState<MockClient[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Clients Directory State & Queries
+  const { data: clientsData, loading: loadingClients, mutate: mutateClients } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
+  const { data: partnersData, loading: loadingPartners, mutate: mutatePartners } = useAdminData<MockPartner[]>(CACHE_KEYS.PARTNERS, getPartners as any);
+  const { data: invoicesData } = useAdminData<MockInvoice[]>(CACHE_KEYS.INVOICES, getInvoices as any);
+
+  const clients = clientsData || [];
+  const partners = partnersData || [];
+  const invoices = invoicesData || [];
+
+  const loading = loadingClients;
+  const partnersLoading = loadingPartners;
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-
-  // Partners Directory State
-  const [partners, setPartners] = useState<MockPartner[]>([]);
-  const [partnersLoading, setPartnersLoading] = useState(true);
   const [partnersSearch, setPartnersSearch] = useState('');
-
-  // Invoices State
-  const [invoices, setInvoices] = useState<MockInvoice[]>([]);
 
   // Create/Edit Client Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -125,25 +128,6 @@ export default function ClientsPage() {
         setModalOpen(true);
       }
     }
-
-    async function loadAllData() {
-      try {
-        const [c, p, inv] = await Promise.all([
-          getCachedClients(),
-          getCachedPartners(),
-          getCachedInvoices(),
-        ]);
-        setClients(c);
-        setPartners(p as MockPartner[]);
-        setInvoices(inv as MockInvoice[]);
-      } catch (err) {
-        console.error('Failed to load directory data', err);
-      } finally {
-        setLoading(false);
-        setPartnersLoading(false);
-      }
-    }
-    loadAllData();
   }, []);
 
   // Prevent background scrolling when Add Client or Partner modal is open
@@ -191,8 +175,7 @@ export default function ClientsPage() {
         });
 
         if (newClient) {
-          invalidateCache(CACHE_KEYS.CLIENTS);
-          setClients((prev) => [newClient as MockClient, ...prev]);
+          mutateClients([newClient as MockClient, ...clients]);
           // Reset form fields
           setName('');
           setEmail('');
@@ -237,8 +220,8 @@ export default function ClientsPage() {
             bankDetails: partnerBankDetails || null,
           });
           if (updated) {
-            setPartners((prev) =>
-              prev.map((p) => (p.id === updated.id ? (updated as MockPartner) : p))
+            mutatePartners(
+              partners.map((p) => (p.id === updated.id ? (updated as MockPartner) : p))
             );
           }
         } else {
@@ -251,11 +234,9 @@ export default function ClientsPage() {
             bankDetails: partnerBankDetails || null,
           });
           if (created) {
-            setPartners((prev) => [created as MockPartner, ...prev]);
+            mutatePartners([created as MockPartner, ...partners]);
           }
         }
-
-        invalidateCache(CACHE_KEYS.PARTNERS);
 
         // Reset fields & close
         setPartnerName('');
@@ -294,11 +275,9 @@ export default function ClientsPage() {
     startTransition(async () => {
       try {
         await deletePartner(partnerId);
-        setPartners((prev) => prev.filter((p) => p.id !== partnerId));
-        // Refresh clients — some may now show 'organic' sourcing.
-        invalidateCache(CACHE_KEYS.PARTNERS, CACHE_KEYS.CLIENTS);
-        const c = await getCachedClients();
-        setClients(c);
+        mutatePartners(partners.filter((p) => p.id !== partnerId));
+        // Refresh clients — some may now show 'organic' sourcing in the background
+        invalidateCache(CACHE_KEYS.CLIENTS);
       } catch (err) {
         console.error('Failed to delete partner', err);
       }
