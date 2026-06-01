@@ -302,9 +302,9 @@ export default function LandingPage() {
           >
             <HeroChild>
               <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-[104px] font-semibold tracking-tight leading-[0.95] text-foreground max-w-6xl">
-                Scale your business with
+                Scale your business
                 <span className="block mt-3 md:mt-4 min-h-[1.15em] whitespace-nowrap">
-                  <TypewriterWord words={['Scala', 'Websites', 'Stores', 'Systems']} />
+                  with <TypewriterWord words={['Scala', 'Websites', 'Stores', 'Systems']} />
                 </span>
               </h1>
             </HeroChild>
@@ -325,7 +325,7 @@ export default function LandingPage() {
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 <a
-                  href="https://wa.me/"
+                  href="https://wa.me/61481949464"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-border bg-card/60 text-foreground font-medium text-sm transition-colors hover:bg-muted/40 active-press"

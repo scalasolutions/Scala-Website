@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Lock, Mail, Eye, EyeOff, Loader2, Sun, Moon } from 'lucide-react';
 import ScalaLogo from '@/components/ui/ScalaLogo';
-import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 
@@ -83,33 +83,70 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden p-6 bg-background">
+    <div className="relative min-h-screen w-full md:grid md:grid-cols-2">
       {/* Theme toggle — calm hairline button, top right */}
       <button
         onClick={toggleTheme}
-        className="absolute top-6 right-6 p-2 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer z-20"
+        className="absolute top-6 right-6 p-2 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer z-30"
         title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
       >
         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
       </button>
 
-      {/* One subtle lime ambient blur in the corner — punctuation only. */}
-      <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-primary/4 blur-[120px] pointer-events-none" />
+      {/* ── Left: dark brand panel with the big wordmark ──────────────────
+          Always dark so the white-on-transparent wordmark reads correctly,
+          independent of the form-side theme toggle. */}
+      <div className="relative hidden md:flex flex-col items-center justify-center overflow-hidden bg-zinc-950 p-12 lg:p-16">
+        {/* Lime ambient glows — editorial punctuation, not decoration. */}
+        <div className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-primary/10 blur-[140px]" />
+        <div className="pointer-events-none absolute -bottom-20 -right-16 h-80 w-80 rounded-full bg-primary/5 blur-[120px]" />
 
-      {/* Centered stack — logo above, then the card. */}
-      <div className="relative w-full max-w-md z-10 animate-fade-in-scale">
-        {/* Brand */}
-        <div className="flex flex-col items-center mb-10">
-          <ScalaLogo variant="full" className="h-16 w-auto" />
-        </div>
+        <Image
+          src="/scala-navbar-logo.svg"
+          alt="Scala"
+          width={560}
+          height={127}
+          priority
+          className="relative w-64 lg:w-[22rem] h-auto"
+        />
 
-        {/* Form card */}
-        <Card padding="lg">
-          <div className="mb-7">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Sign in to Scala
+        <p className="absolute bottom-12 lg:bottom-16 text-xs text-zinc-600">
+          © {new Date().getFullYear()} Scala Solutions · Secure workspace portal
+        </p>
+      </div>
+
+      {/* ── Right: sign-in fields ───────────────────────────────────────────
+          On mobile the left panel is hidden, so this becomes the whole screen:
+          min-h-screen + center so the form sits in the vertical middle, with
+          the wordmark floated above it — simplified, editorial. */}
+      <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background p-6 sm:p-12 md:min-h-0">
+        {/* Single faint lime blur, mobile-only ambience behind the form. */}
+        <div className="pointer-events-none absolute -top-20 -right-20 h-80 w-80 rounded-full bg-primary/4 blur-[120px] md:hidden" />
+
+        <div className="relative z-10 w-full max-w-sm animate-fade-in-scale">
+          {/* Mobile brand — left panel is hidden under md. The navbar wordmark
+              is white-on-transparent, so it only reads on the dark canvas; fall
+              back to the theme-adaptive mark in light mode. */}
+          <div className="mb-14 flex justify-center md:hidden">
+            {theme === 'dark' ? (
+              <Image
+                src="/scala-navbar-logo.svg"
+                alt="Scala"
+                width={420}
+                height={95}
+                priority
+                className="h-8 w-auto"
+              />
+            ) : (
+              <ScalaLogo variant="full" className="h-11 w-auto" />
+            )}
+          </div>
+
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Sign in
             </h1>
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Access your invoices, hosting SLAs, dynamic metrics, and open support tickets.
             </p>
           </div>
@@ -166,12 +203,11 @@ export default function LoginPage() {
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
-        </Card>
 
-        {/* Subtle legal footer */}
-        <p className="text-xs text-muted-foreground text-center mt-6">
-          Scala Solutions · Secure workspace portal
-        </p>
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Scala Solutions · Secure workspace portal
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -40,7 +40,7 @@ export default function LetsTalkBand({
           <Reveal delay={0.15} className="shrink-0">
             <div className="flex flex-col sm:flex-row gap-3">
               <a
-                href="https://wa.me/"
+                href="https://wa.me/61481949464"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-zinc-900 font-medium text-sm transition-colors hover:bg-primary/90 active-press"

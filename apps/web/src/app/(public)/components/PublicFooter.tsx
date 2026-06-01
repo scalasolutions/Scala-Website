@@ -26,6 +26,9 @@ export default function PublicFooter() {
           <Link href="/services" className="hover:text-foreground transition-colors">
             Services
           </Link>
+          <Link href="/about" className="hover:text-foreground transition-colors">
+            About
+          </Link>
           <Link href="/services#pricing" className="hover:text-foreground transition-colors">
             Pricing
           </Link>

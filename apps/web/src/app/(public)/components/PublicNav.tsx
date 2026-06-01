@@ -44,7 +44,7 @@ interface PublicNavProps {
 export default function PublicNav({
   links = [
     { href: '/services', label: 'Services' },
-    { href: '/#faq', label: 'FAQ' },
+    { href: '/about', label: 'About' },
     { href: '/#contact', label: 'Contact' },
   ],
 }: PublicNavProps) {
@@ -97,45 +97,40 @@ export default function PublicNav({
         style={{ opacity: borderOpacity }}
       />
 
-      <div className="mx-auto max-w-7xl px-6 h-full flex items-center justify-between">
+      <div className="w-full px-6 lg:px-10 h-full flex items-center justify-between">
+        <div className="flex items-end gap-8">
         <Link href="/" className="flex items-center gap-2.5" aria-label="Scala — home">
           <motion.span
             className="inline-flex"
             style={{ scale: logoScale, transformOrigin: 'left center' }}
           >
-            {/* New wordmark assets. Two files rather than one re-tinted SVG so
-                the lime mark in the icon stays the brand hex on both themes
-                without needing CSS filters. */}
+            {/* Full Scala wordmark — lime mark + white text on transparent.
+                Marketing routes are force-dark (see app/(public)/layout.tsx),
+                so the white wordmark is correct everywhere it renders.
+                Native aspect ratio 1401:317 ≈ 4.42:1. */}
             <Image
-              src="/scala-logo-dark.svg"
+              src="/scala-navbar-logo.svg"
               alt="Scala"
-              width={138}
+              width={177}
               height={40}
               priority
-              className="h-9 w-auto block dark:hidden"
-            />
-            <Image
-              src="/scala-logo-white.svg"
-              alt="Scala"
-              width={138}
-              height={40}
-              priority
-              className="h-9 w-auto hidden dark:block"
+              className="h-5 w-auto"
             />
           </motion.span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="hover:text-foreground transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="hover:text-foreground transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
 
         <div className="flex items-center gap-3">
           <Link

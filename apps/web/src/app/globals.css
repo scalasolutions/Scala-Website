@@ -67,7 +67,7 @@
      `--primary-soft` is a very pale lime tint for chip/badge backgrounds in
      light mode (paired with `text-primary-ink` for the label).
      In dark mode, all three resolve to the neon — dark mode is unchanged. */
-  --primary: #93BE0C;
+  --primary: #CEF84E;
   --primary-foreground: #0f172a;
   --primary-ink: #5A7A07;
   --primary-soft: #f2fadc;
@@ -78,22 +78,22 @@
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
 
-  --accent: #93BE0C;
+  --accent: #CEF84E;
   --accent-foreground: #0f172a;
 
   --destructive: #ef4444;
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #93BE0C;
+  --ring: #CEF84E;
 
   --sidebar: #f8fafc;
   --sidebar-foreground: #0f172a;
-  --sidebar-primary: #93BE0C;
+  --sidebar-primary: #CEF84E;
   --sidebar-primary-foreground: #0f172a;
   --sidebar-accent: #f1f5f9;
   --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #e2e8f0;
-  --sidebar-ring: #93BE0C;
+  --sidebar-ring: #CEF84E;
 }
 
 html.dark {
@@ -148,6 +148,20 @@ html.dark {
   }
   body {
     @apply bg-background text-foreground antialiased;
+  }
+  /* Browser autofill paints inputs with a blue (Chrome) / yellow background and
+     swaps the text color. Repaint to match our tokens so autofilled fields stay
+     on-brand instead of flashing blue. The 9999s transition is the standard hack
+     to keep the inset box-shadow override from being repainted away. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--foreground);
+    caret-color: var(--foreground);
+    -webkit-box-shadow: 0 0 0 1000px var(--muted) inset;
+    box-shadow: 0 0 0 1000px var(--muted) inset;
+    transition: background-color 9999s ease-in-out 0s;
   }
 }
 

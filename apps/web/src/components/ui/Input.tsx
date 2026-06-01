@@ -52,7 +52,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           ref={ref}
           id={inputId}
           className={cn(
-            'h-10 w-full rounded-xl bg-background border px-3.5 text-sm text-foreground',
+            'h-10 w-full rounded-xl bg-muted border px-3.5 text-sm text-foreground',
             'placeholder:text-muted-foreground/70',
             'focus-visible:outline-none focus-visible:ring-2 transition-colors',
             hasError
