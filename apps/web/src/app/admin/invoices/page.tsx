@@ -1393,9 +1393,9 @@ export default function InvoicesPage() {
                               key={index}
                               className="rounded-xl border border-border bg-muted/10 p-4 animate-fade-in-scale"
                             >
-                              <div className="flex gap-3 items-end w-full">
+                              <div className="flex flex-col sm:flex-row gap-3 sm:items-end w-full">
                                 {/* Item name */}
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 w-full">
                                   <div className="flex items-center justify-between mb-1">
                                     <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em]">
                                       Item title *
@@ -1458,61 +1458,64 @@ export default function InvoicesPage() {
                                   />
                                 </div>
 
-                                {/* Quantity */}
-                                <div className="w-20 shrink-0">
-                                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em] mb-1 block">
-                                    Qty
-                                  </label>
-                                  <input
-                                    type="number"
-                                    required
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) =>
-                                      handleLineItemChange(
-                                        index,
-                                        'quantity',
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-full h-9 rounded-lg bg-background border border-border px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors"
-                                  />
-                                </div>
+                                {/* Secondary container for Qty, Rate, and Remove on mobile viewports */}
+                                <div className="flex gap-3 items-end w-full sm:w-auto shrink-0">
+                                  {/* Quantity */}
+                                  <div className="w-20 shrink-0">
+                                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em] mb-1 block">
+                                      Qty
+                                    </label>
+                                    <input
+                                      type="number"
+                                      required
+                                      min="1"
+                                      value={item.quantity}
+                                      onChange={(e) =>
+                                        handleLineItemChange(
+                                          index,
+                                          'quantity',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-full h-9 rounded-lg bg-background border border-border px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors"
+                                    />
+                                  </div>
 
-                                {/* Rate */}
-                                <div className="w-32 shrink-0">
-                                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em] mb-1 block">
-                                    Rate (IDR)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    required
-                                    inputMode="numeric"
-                                    value={formatInputNumberIDR(item.price)}
-                                    onChange={(e) => {
-                                      const rawVal = e.target.value.replace(/[^0-9]/g, '');
-                                      handleLineItemChange(
-                                        index,
-                                        'price',
-                                        rawVal ? Number(rawVal) : 0
-                                      );
-                                    }}
-                                    className="w-full h-9 rounded-lg bg-background border border-border px-3 text-sm text-foreground tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors"
-                                  />
-                                </div>
+                                  {/* Rate (fills remaining space next to Qty on mobile, locks to w-32 on desktop) */}
+                                  <div className="flex-1 sm:w-32 sm:flex-none">
+                                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.06em] mb-1 block">
+                                      Rate (IDR)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      required
+                                      inputMode="numeric"
+                                      value={formatInputNumberIDR(item.price)}
+                                      onChange={(e) => {
+                                        const rawVal = e.target.value.replace(/[^0-9]/g, '');
+                                        handleLineItemChange(
+                                          index,
+                                          'price',
+                                          rawVal ? Number(rawVal) : 0
+                                        );
+                                      }}
+                                      className="w-full h-9 rounded-lg bg-background border border-border px-3 text-sm text-foreground tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors"
+                                    />
+                                  </div>
 
-                                {/* Remove */}
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="!p-0 !h-9 !w-9 hover:!text-red-500"
-                                  aria-label="Remove line item"
-                                  onClick={() => handleRemoveLineItem(index)}
-                                  disabled={lineItems.length === 1}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
+                                  {/* Remove */}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="!p-0 !h-9 !w-9 hover:!text-red-500"
+                                    aria-label="Remove line item"
+                                    onClick={() => handleRemoveLineItem(index)}
+                                    disabled={lineItems.length === 1}
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </div>
                               </div>
 
                               {/* Description textarea */}

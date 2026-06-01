@@ -38,8 +38,9 @@ export default function FilterBar<T extends string = string>({
   return (
     <div
       role="tablist"
+      style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
       className={cn(
-        'inline-flex items-center gap-1 rounded-xl border border-border bg-card p-1',
+        'inline-flex items-center gap-1 rounded-xl border border-border bg-card p-1 max-w-full overflow-x-auto shrink-0 scrollbar-none',
         className
       )}
     >

@@ -6,6 +6,7 @@ import {
   Plus,
   Search,
   X,
+  ArrowLeft,
   Ticket,
   Clock,
   MessageSquare,
@@ -433,7 +434,7 @@ export default function TicketsPage() {
                       className="lg:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer shrink-0"
                       aria-label="Back to list"
                     >
-                      <X size={16} />
+                      <ArrowLeft size={16} />
                     </button>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">

@@ -342,7 +342,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Header / Brand */}
             <div className="flex items-center justify-between px-6 py-6 border-b border-sidebar-border">
               <ScalaLogo variant="full" className="h-10 w-auto" />
-              <button onClick={() => setMobileSidebarOpen(false)} className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer">
+              <button onClick={() => setMobileSidebarOpen(false)} className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer" aria-label="Close sidebar menu">
                 <X size={20} />
               </button>
             </div>
@@ -399,6 +399,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <button
               onClick={() => setMobileSidebarOpen(true)}
               className="lg:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
+              aria-label="Open sidebar menu"
             >
               <Menu size={20} />
             </button>
