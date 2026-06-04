@@ -301,7 +301,7 @@ export default function LandingPage() {
             className="flex flex-col items-center text-center"
           >
             <HeroChild>
-              <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-[104px] font-semibold tracking-tight leading-[0.95] text-foreground max-w-6xl">
+              <h1 className="text-4xl min-[390px]:text-5xl min-[510px]:text-6xl sm:text-7xl md:text-8xl lg:text-[104px] font-semibold tracking-tight leading-[0.95] text-foreground max-w-6xl">
                 Scale your business
                 <span className="block mt-3 md:mt-4 min-h-[1.15em] whitespace-nowrap">
                   with <TypewriterWord words={['Scala', 'Websites', 'Stores', 'Systems']} />
