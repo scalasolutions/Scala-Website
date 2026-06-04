@@ -1,7 +1,20 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, ZoomIn, ZoomOut, Printer, X, FileText, CheckCircle, Clock } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { 
+  ArrowLeft, 
+  ZoomIn, 
+  ZoomOut, 
+  Printer, 
+  X, 
+  FileText, 
+  CheckCircle, 
+  Clock, 
+  ChevronLeft, 
+  ChevronRight, 
+  Download 
+} from 'lucide-react';
 import { MockClient } from '@/lib/db/queries';
 import ScalaLogo from '@/components/ui/ScalaLogo';
 
@@ -146,17 +159,23 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
   client,
   onClose,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [preparedBy, setPreparedBy] = useState<'nicholas' | 'fredrick' | 'both'>('nicholas');
   const [currentPage, setCurrentPage] = useState(0);
   const outerPagesRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScroll = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const effectiveScale = zoomPercent / 100;
   const numPages = 2;
   const totalUnscaledHeight = PAGE_H * numPages + PAGE_GAP * (numPages - 1);
 
-  // Auto-fit scale on mount / resize
+  // Auto-fit scale on mount / resize & lock body scroll
   useEffect(() => {
+    setMounted(true);
     const computeScale = () => {
       const availH = window.innerHeight - 200;
       const availW = window.innerWidth - 80;
@@ -166,8 +185,71 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
     };
     computeScale();
     window.addEventListener('resize', computeScale);
-    return () => window.removeEventListener('resize', computeScale);
+
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('resize', computeScale);
+      document.body.style.overflow = originalStyle;
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, []);
+
+  const scrollToPage = (pageIndex: number) => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      isProgrammaticScroll.current = true;
+      setCurrentPage(pageIndex);
+      
+      const paddingTop = 32; // pt-8 top padding of #agreement-canvas-container
+      const pageOffset = pageIndex * (PAGE_H + PAGE_GAP);
+      const targetScrollTop = paddingTop + pageOffset * effectiveScale;
+      
+      container.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      });
+
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScroll.current = false;
+      }, 800); // 800ms duration covers standard smooth scrolls
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isProgrammaticScroll.current) return;
+    
+    const container = e.currentTarget;
+    const containerRect = container.getBoundingClientRect();
+    const toolbarHeight = 80;
+
+    let activePage = 0;
+    let maxVisibleHeight = 0;
+
+    pageRefs.current.forEach((page, index) => {
+      if (!page) return;
+      const rect = page.getBoundingClientRect();
+      
+      const visibleTop = Math.max(rect.top, containerRect.top + toolbarHeight);
+      const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+
+      if (visibleHeight > maxVisibleHeight) {
+        maxVisibleHeight = visibleHeight;
+        activePage = index;
+      }
+    });
+
+    if (activePage !== currentPage) {
+      setCurrentPage(activePage);
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -189,24 +271,34 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
       })
     : null;
 
-  return (
-    <div id="agreement-preview-overlay" className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col select-none overflow-y-auto">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div 
+      id="agreement-preview-overlay" 
+      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col select-none"
+    >
       <style>{PRINT_CSS}</style>
 
       {/* ── Sticky Toolbar ── */}
-      <div className="sticky top-0 z-30 flex items-center justify-between p-4 bg-background/90 backdrop-blur border-b border-border print:hidden w-full">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between p-4 bg-background/90 backdrop-blur border-b border-border print:hidden w-full gap-4 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onClose}
-            className="flex items-center justify-center h-10 w-10 rounded-xl bg-card border border-border hover:bg-muted text-foreground cursor-pointer transition-all"
+            className="flex items-center justify-center h-10 w-10 rounded-xl bg-card border border-border hover:bg-muted text-foreground cursor-pointer transition-all shrink-0"
             title="Back to Clients"
           >
             <ArrowLeft size={16} />
           </button>
-          <div>
-            <h2 className="text-base font-extrabold flex items-center gap-2">
-              T&C & SLA Agreement Preview
-              <span className={`text-[10px] uppercase font-black tracking-widest shrink-0 px-2 py-0.5 rounded flex items-center gap-1 ${
+          <div className="min-w-0">
+            <h2 className="text-sm md:text-base font-extrabold text-foreground truncate">
+              <span className="hidden sm:inline">T&C & SLA </span>Agreement Preview
+            </h2>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px] sm:max-w-none">
+                Ref: SLA • {client.companyName || client.name}
+              </p>
+              <span className={`text-[9px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0 ${
                 client.tcStatus === 'signed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
               }`}>
                 {client.tcStatus === 'signed' ? (
@@ -221,17 +313,37 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   </>
                 )}
               </span>
-            </h2>
-            <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-              Ref: SLA • {client.companyName || client.name}
-            </p>
+            </div>
           </div>
         </div>
 
         {/* Toolbar Center Controls */}
-        <div className="flex items-center gap-2">
-          {/* Zoom controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Page navigation */}
           <div className="flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
+            <button
+              onClick={() => scrollToPage(Math.max(0, currentPage - 1))}
+              disabled={currentPage === 0}
+              className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+              title="Previous Page"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="text-[10px] font-black text-foreground w-16 sm:w-20 text-center select-none tabular-nums">
+              Page {currentPage + 1} of {numPages}
+            </span>
+            <button
+              onClick={() => scrollToPage(Math.min(numPages - 1, currentPage + 1))}
+              disabled={currentPage === numPages - 1}
+              className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+              title="Next Page"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Zoom controls */}
+          <div className="hidden md:flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
             <button
               onClick={() => setZoomPercent(prev => Math.max(40, prev - 10))}
               className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground cursor-pointer"
@@ -251,29 +363,47 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
             </button>
           </div>
 
+          {/* Action Download button */}
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md"
+            title="Download PDF"
+          >
+            <Download size={13} />
+            <span className="hidden lg:inline">Download</span>
+          </button>
+
           {/* Action Print button */}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all cursor-pointer"
-            style={{ boxShadow: '0 0 12px rgba(206, 248, 78, 0.2)' }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-foreground font-semibold text-xs hover:bg-muted transition-all cursor-pointer"
+            title="Print SLA Document"
           >
             <Printer size={13} />
-            Print / Save PDF
+            <span className="hidden lg:inline">Print</span>
           </button>
+
+          <div className="h-6 w-[1px] bg-border/60 mx-1 hidden sm:block" />
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-muted-foreground hover:bg-muted cursor-pointer"
-            title="Close"
+            className="p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+            title="Close Preview"
           >
             <X size={18} />
           </button>
         </div>
       </div>
 
-      {/* Pages Canvas */}
-      <div id="agreement-canvas-container" className="flex-1 flex justify-center py-8">
+      {/* ── Scrollable content container ── */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto print:overflow-visible"
+        onScroll={handleScroll}
+      >
+        {/* Pages Canvas */}
+        <div id="agreement-canvas-container" className="flex justify-center pt-8 pb-[80vh]">
         <div
           ref={outerPagesRef}
           id="agreement-canvas-unscale"
@@ -300,7 +430,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
             {/* ────────────────────────────────────────────────────────── */}
             {/* PAGE 1: TERMS & CONDITIONS                                 */}
             {/* ────────────────────────────────────────────────────────── */}
-            <div className="agreement-print-page" style={PAGE_STYLE}>
+            <div ref={el => { pageRefs.current[0] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
               {/* Cover Header */}
               <div className="flex justify-between items-start border-b-2 border-zinc-900 pb-6 mb-8">
                 <div>
@@ -395,7 +525,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
             {/* ────────────────────────────────────────────────────────── */}
             {/* PAGE 2: SLA AGREEMENT & SIGNATURES                        */}
             {/* ────────────────────────────────────────────────────────── */}
-            <div className="agreement-print-page" style={PAGE_STYLE}>
+            <div ref={el => { pageRefs.current[1] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
               {/* Mini Header */}
               <div className="flex justify-between items-center border-b border-zinc-200 pb-3 mb-6 text-[10px] font-bold text-zinc-400">
                 <span>SCALA SOLUTIONS &bull; SLA SCHEDULE</span>
@@ -551,9 +681,12 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
         </div>
       </div>
 
-      {/* ── Sticky right controls panel (Prepared By Signature Selector) ── */}
+      {/* Close scrollable content container */}
+      </div>
+
+      {/* ── Floating right controls panel (Prepared By Signature Selector) ── */}
       <div
-        className="sticky bottom-6 self-end mr-6 z-20 print:hidden flex flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
+        className="absolute bottom-6 right-6 z-20 print:hidden flex flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
       >
         <div 
           className="group bg-card border border-border rounded-2xl p-3 shadow-xl flex flex-col gap-2 transition-all duration-300 animate-fade-in"
@@ -583,6 +716,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
