@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 import * as dotenv from 'dotenv';
+import { checkDatabaseSafety } from './security';
 
 dotenv.config({ path: '.env.local' });
 
@@ -11,6 +12,9 @@ if (!connectionString) {
   console.error("DATABASE_URL is not defined in the environment.");
   process.exit(1);
 }
+
+// Apply database connection safety guard
+checkDatabaseSafety(connectionString);
 
 const client = postgres(connectionString, { max: 1 });
 const db = drizzle(client, { schema });

@@ -4,6 +4,7 @@ import * as schema from './schema';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { checkDatabaseSafety } from './security';
 
 dotenv.config({ path: '.env.local' });
 
@@ -13,6 +14,9 @@ if (!connectionString) {
   console.error("❌ DATABASE_URL is not defined in your .env.local file.");
   process.exit(1);
 }
+
+// Apply database connection safety guard
+checkDatabaseSafety(connectionString);
 
 // 1. Identify which backup file to restore
 const backupFilename = process.argv[2];

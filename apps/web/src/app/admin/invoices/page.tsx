@@ -986,7 +986,7 @@ export default function InvoicesPage() {
                               <span className="text-xs line-through text-muted-foreground tabular-nums">
                                 {formatCurrencyIDR(invoice.total)}
                               </span>
-                              <span className="text-sm font-bold text-primary tabular-nums">
+                              <span className="text-sm font-bold text-primary-ink tabular-nums">
                                 {formatCurrencyIDR(invoice.total - (invoice.amountPaid || 0))} left
                               </span>
                             </div>

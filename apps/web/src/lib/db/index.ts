@@ -1,8 +1,12 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
+import { checkDatabaseSafety } from './security';
 
 const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/scala_dashboard';
+
+// Apply database connection safety guard
+checkDatabaseSafety(connectionString);
 
 // For serverless environments like Vercel, use connection pool or single-connection
 // depending on context. Under postgres-js, we define the client:

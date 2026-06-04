@@ -95,9 +95,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
 
-  // Notifications & Cache State
+  // Notifications, Profile, & Cache State
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  
+  const notificationsDropdownRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: clientsData } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
   const { data: invoicesData } = useAdminData<(MockInvoice & { client?: MockClient })[]>(CACHE_KEYS.INVOICES, getInvoices as any);
@@ -181,11 +184,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
   };
 
-  // Click outside to close notification dropdown
+  // Click outside to close dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (notificationsDropdownRef.current && !notificationsDropdownRef.current.contains(event.target as Node)) {
         setNotificationsOpen(false);
+      }
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -225,7 +231,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside
         className={cn(
           'hidden lg:flex flex-col bg-sidebar border-r border-sidebar-border shrink-0 transition-[width] duration-300 ease-out',
-          sidebarCollapsed ? 'w-[64px]' : 'w-56'
+          sidebarCollapsed ? 'w-[64px]' : 'w-60'
         )}
       >
 
@@ -304,16 +310,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div
               className={cn(
                 'min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-out',
-                sidebarCollapsed ? 'max-w-0 opacity-0' : 'flex-1 max-w-[160px] opacity-100'
+                sidebarCollapsed ? 'max-w-0 opacity-0' : 'flex-1 max-w-[170px] opacity-100'
               )}
             >
-              <div className="flex items-center gap-1.5">
-                <p className="text-sm font-medium text-foreground truncate">Scala Solutions</p>
-                <Badge variant="brand" className="text-[9px] tracking-[0.14em] uppercase px-1.5 py-0 shrink-0">
+              <p className="text-sm font-medium text-foreground truncate" title="Scala Solutions">Scala Solutions</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Badge variant="brand" className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0 shrink-0">
                   Admin
                 </Badge>
+                <span className="text-[10px] text-muted-foreground select-none">•</span>
+                <p className="text-xs text-muted-foreground truncate">Scala</p>
               </div>
-              <p className="text-xs text-muted-foreground truncate">Scala</p>
             </div>
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
@@ -423,7 +430,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
 
             {/* Notifications Bell Dropdown */}
-            <div ref={dropdownRef} className="relative">
+            <div ref={notificationsDropdownRef} className="relative">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className={cn(
@@ -524,11 +531,80 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <div className="h-6 w-px bg-sidebar-border hidden sm:block mx-1"></div>
 
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-muted/60 text-foreground flex items-center justify-center text-xs font-medium border border-border">
-                S
-              </div>
-              <span className="text-xs font-medium text-foreground hidden sm:block">Scala Solutions</span>
+            {/* Profile Dropdown */}
+            <div ref={profileDropdownRef} className="relative">
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className={cn(
+                  "flex items-center gap-2.5 p-1 rounded-xl hover:bg-muted/40 transition-colors cursor-pointer text-left focus:outline-none",
+                  profileOpen && "bg-muted/40"
+                )}
+                title="Admin Account"
+              >
+                <div className="w-8 h-8 rounded-full bg-muted/60 text-foreground flex items-center justify-center text-xs font-medium border border-border shrink-0">
+                  S
+                </div>
+                <div className="hidden sm:flex flex-col">
+                  <span className="text-xs font-semibold text-foreground leading-none">Scala Solutions</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5 leading-none">Admin</span>
+                </div>
+              </button>
+              
+              {profileOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-56 rounded-2xl bg-card border border-border shadow-md z-50 overflow-hidden animate-fade-in-scale py-1"
+                  style={{ transformOrigin: 'top right' }}
+                >
+                  {/* User details */}
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-xs text-muted-foreground">Signed in as</p>
+                    <p className="text-sm font-semibold text-foreground truncate mt-0.5">scalasolutions.dev@gmail.com</p>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="p-1">
+                    <Link
+                      href="/admin/dashboard"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <LayoutDashboard size={14} />
+                      Dashboard
+                    </Link>
+                    <Link
+                      href="/admin/tickets"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <Ticket size={14} />
+                      Support Desk
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        toggleTheme();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-left cursor-pointer"
+                    >
+                      {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                      {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                    </button>
+                  </div>
+                  
+                  <div className="border-t border-border my-1" />
+                  
+                  {/* Sign out */}
+                  <div className="p-1">
+                    <button
+                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors text-left cursor-pointer"
+                    >
+                      <LogOut size={14} />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
