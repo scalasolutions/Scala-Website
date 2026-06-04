@@ -67,10 +67,10 @@
      `--primary-soft` is a very pale lime tint for chip/badge backgrounds in
      light mode (paired with `text-primary-ink` for the label).
      In dark mode, all three resolve to the neon — dark mode is unchanged. */
-  --primary: #CEF84E;
+  --primary: #b8f11a;
   --primary-foreground: #0f172a;
-  --primary-ink: #5A7A07;
-  --primary-soft: #f2fadc;
+  --primary-ink: #76a305;
+  --primary-soft: #edfacc;
 
   --secondary: #e2e8f0;
   --secondary-foreground: #0f172a;

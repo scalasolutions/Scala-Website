@@ -1,8 +1,20 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { ArrowLeft, ZoomIn, ZoomOut, Printer, X } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  ZoomIn, 
+  ZoomOut, 
+  Printer, 
+  X, 
+  ChevronLeft, 
+  ChevronRight, 
+  Download,
+  Settings,
+  Plus
+} from 'lucide-react';
 import { MockInvoice, MockClient, getInvoicePagePresets, MockInvoicePagePreset } from '@/lib/db/queries';
 import { InvoiceLineItem, getClientRefCode, formatDateClean } from './invoice-types';
 import { InvoiceCoverPage } from './InvoiceCoverPage';
@@ -150,8 +162,8 @@ interface BillingPageChunk {
 // Splits the billing items into chunks that fit on A4 pages without overlapping the footer
 const splitBillingItems = (lineItems: InvoiceLineItem[], hasPayments: boolean): BillingPageChunk[] => {
   const chunks: BillingPageChunk[] = [];
-  const USABLE_HEIGHT = 710; // safe A4 content vertical space
-  const TOTALS_HEIGHT = hasPayments ? 360 : 120; // safe totals & payments card space allocation
+  const USABLE_HEIGHT = 750; // safe A4 content vertical space (increased to fit more on a single page)
+  const TOTALS_HEIGHT = hasPayments ? 260 : 60; // realistic space allocation for totals card
 
   let currentPageItems: InvoiceLineItem[] = [];
   let currentHeight = 0;
@@ -214,13 +226,21 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   onClose,
   onModify,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [currentPage, setCurrentPage] = useState(0);
   const [preparedBy, setPreparedBy] = useState<'nicholas' | 'fredrick' | 'both'>('nicholas');
   const [pagePresets, setPagePresets] = useState<MockInvoicePagePreset[]>([]);
   const [titlePresets, setTitlePresets] = useState<MockInvoicePagePreset[]>([]);
+  const [modifyMenuOpen, setModifyMenuOpen] = useState(false);
 
   const outerPagesRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const modifyMenuRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScroll = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const effectiveScale = zoomPercent / 100;
 
   // Bootstrap page presets
@@ -255,20 +275,60 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     loadPagePresets();
   }, [invoice]);
 
-  // Auto-fit scale on mount / resize
+  // Auto-fit scale on mount / resize & lock body scroll
   useEffect(() => {
+    setMounted(true);
     const computeScale = () => {
       const availH = window.innerHeight - (window.innerWidth < 640 ? 160 : 200);
       const availW = window.innerWidth - (window.innerWidth < 640 ? 48 : 120);
       const rawScale = Math.max(0.2, Math.min(availH / PAGE_H, availW / PAGE_W, 1.2));
-      // Set initial zoom percent as a rounded 10% multiple (e.g. rawScale * 2 * 100 rounded to nearest 10)
       const roundedPercent = Math.round((rawScale * 2) * 10) * 10;
       setZoomPercent(roundedPercent);
     };
     computeScale();
     window.addEventListener('resize', computeScale);
-    return () => window.removeEventListener('resize', computeScale);
+
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('resize', computeScale);
+      document.body.style.overflow = originalStyle;
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, []);
+
+  // Click outside listener for modify presets dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (modifyMenuRef.current && !modifyMenuRef.current.contains(event.target as Node)) {
+        setModifyMenuOpen(false);
+      }
+    }
+    if (modifyMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [modifyMenuOpen]);
+
+  // Reset zoom and scroll to top when invoice changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const availH = window.innerHeight - (window.innerWidth < 640 ? 160 : 200);
+      const availW = window.innerWidth - (window.innerWidth < 640 ? 48 : 120);
+      const rawScale = Math.max(0.2, Math.min(availH / PAGE_H, availW / PAGE_W, 1.2));
+      const roundedPercent = Math.round((rawScale * 2) * 10) * 10;
+      setZoomPercent(roundedPercent);
+      setCurrentPage(0);
+    }, 0);
+    const container = scrollContainerRef.current;
+    if (container) container.scrollTop = 0;
+    return () => clearTimeout(timer);
+  }, [invoice]);
 
   // Parse included page keys from invoice
   const getIncludedPageKeys = (): string[] => {
@@ -342,55 +402,56 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const totalUnscaledHeight = PAGE_H * numPages + PAGE_GAP * (numPages - 1);
   const pageLabels = activePages.map(p => p.label);
 
-  // Reset zoom and scroll to top when invoice changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const availH = window.innerHeight - (window.innerWidth < 640 ? 160 : 200);
-      const availW = window.innerWidth - (window.innerWidth < 640 ? 48 : 120);
-      const rawScale = Math.max(0.2, Math.min(availH / PAGE_H, availW / PAGE_W, 1.2));
-      const roundedPercent = Math.round((rawScale * 2) * 10) * 10;
-      setZoomPercent(roundedPercent);
-      setCurrentPage(0);
-    }, 0);
-    const mainEl = document.querySelector('main');
-    if (mainEl) mainEl.scrollTop = 0;
-    return () => clearTimeout(timer);
-  }, [invoice]);
-
-  // Track current page from scroll position
-  useEffect(() => {
-    const mainEl = document.querySelector('main');
-    if (!mainEl) return;
-
-    const handleScroll = () => {
-      const outer = outerPagesRef.current;
-      if (!outer) return;
-      const mainRect = mainEl.getBoundingClientRect();
-      const outerRect = outer.getBoundingClientRect();
-      const scrolledPast = mainRect.top - outerRect.top;
-      const scaledPageSize = (PAGE_H + PAGE_GAP) * effectiveScale;
-      const page = Math.max(0, Math.min(numPages - 1, Math.floor(scrolledPast / scaledPageSize)));
-      setCurrentPage(page);
-    };
-
-    mainEl.addEventListener('scroll', handleScroll, { passive: true });
-    return () => mainEl.removeEventListener('scroll', handleScroll);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoomPercent, numPages]);
-
-  // Scroll main to a specific page index
   const scrollToPage = (pageIndex: number) => {
-    const outer = outerPagesRef.current;
-    const mainEl = document.querySelector('main');
-    if (!outer || !mainEl) return;
+    const container = scrollContainerRef.current;
+    if (container) {
+      isProgrammaticScroll.current = true;
+      setCurrentPage(pageIndex);
+      
+      const paddingTop = 32; // pt-8 top padding of #invoice-canvas-container
+      const pageOffset = pageIndex * (PAGE_H + PAGE_GAP);
+      const targetScrollTop = paddingTop + pageOffset * effectiveScale;
+      
+      container.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      });
 
-    const mainRect = mainEl.getBoundingClientRect();
-    const outerRect = outer.getBoundingClientRect();
-    const outerTopInMain = outerRect.top - mainRect.top + mainEl.scrollTop;
-    const scaledPageSize = (PAGE_H + PAGE_GAP) * effectiveScale;
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScroll.current = false;
+      }, 800);
+    }
+  };
 
-    mainEl.scrollTo({ top: outerTopInMain + pageIndex * scaledPageSize, behavior: 'smooth' });
-    setCurrentPage(pageIndex);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isProgrammaticScroll.current) return;
+    
+    const container = e.currentTarget;
+    const containerRect = container.getBoundingClientRect();
+
+    let activePage = 0;
+    let maxVisibleHeight = 0;
+
+    pageRefs.current.forEach((page, index) => {
+      if (!page) return;
+      const rect = page.getBoundingClientRect();
+      
+      const visibleTop = Math.max(rect.top, containerRect.top);
+      const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+
+      if (visibleHeight > maxVisibleHeight) {
+        maxVisibleHeight = visibleHeight;
+        activePage = index;
+      }
+    });
+
+    if (activePage !== currentPage) {
+      setCurrentPage(activePage);
+    }
   };
 
 
@@ -399,40 +460,68 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     window.print();
   };
 
-  return (
-    <div className="relative w-full flex flex-col gap-6 select-none animate-fade-up">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div 
+      id="invoice-preview-overlay" 
+      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col select-none"
+    >
       {/* Dynamic Print styles block */}
       <style>{PRINT_CSS}</style>
 
       {/* ── Sticky Toolbar ── */}
-      <div
-        className="sticky top-0 z-30 flex items-center justify-between p-4 bg-background/90 backdrop-blur border-b border-border print:hidden"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between p-4 bg-background/90 backdrop-blur border-b border-border print:hidden w-full gap-4 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onClose}
-            className="flex items-center justify-center h-10 w-10 rounded-xl bg-card border border-border hover:bg-muted text-foreground cursor-pointer transition-all"
+            className="flex items-center justify-center h-10 w-10 rounded-xl bg-card border border-border hover:bg-muted text-foreground cursor-pointer transition-all shrink-0"
             title="Back to Invoices"
           >
             <ArrowLeft size={16} />
           </button>
-          <div>
-            <h2 className="text-base font-extrabold flex items-center gap-2">
+          <div className="min-w-0">
+            <h2 className="text-sm md:text-base font-extrabold text-foreground truncate">
               Preview Invoice
-              <span className="text-[10px] uppercase font-black tracking-widest text-primary shrink-0 bg-primary/10 px-2 py-0.5 rounded">
+            </h2>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px] sm:max-w-none">
+                Ref: <span className="font-mono">{invoice.invoiceNumber}</span> • {clientName}
+              </p>
+              <span className="text-[10px] uppercase font-black tracking-widest text-primary-ink dark:text-primary shrink-0 bg-primary-soft dark:bg-primary/10 px-2.5 py-0.5 rounded border border-primary-ink/10 dark:border-transparent font-bold">
                 Rp {invoice.total.toLocaleString('id-ID')}
               </span>
-            </h2>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              Ref: <span className="font-mono">{invoice.invoiceNumber}</span> • {clientName}
-            </p>
+            </div>
           </div>
         </div>
 
         {/* Toolbar Center Controls */}
-        <div className="flex items-center gap-2">
-          {/* Zoom controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Page navigation */}
           <div className="flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
+            <button
+              onClick={() => scrollToPage(Math.max(0, currentPage - 1))}
+              disabled={currentPage === 0}
+              className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+              title="Previous Page"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="text-[10px] font-black text-foreground w-16 sm:w-20 text-center select-none tabular-nums">
+              Page {currentPage + 1} of {numPages}
+            </span>
+            <button
+              onClick={() => scrollToPage(Math.min(numPages - 1, currentPage + 1))}
+              disabled={currentPage === numPages - 1}
+              className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+              title="Next Page"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Zoom controls */}
+          <div className="hidden md:flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
             <button
               onClick={() => setZoomPercent(prev => Math.max(40, prev - 10))}
               className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground text-muted-foreground cursor-pointer"
@@ -452,50 +541,70 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             </button>
           </div>
 
+          {/* Action Download button */}
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md"
+            title="Download PDF"
+          >
+            <Download size={13} />
+            <span className="hidden lg:inline">Download</span>
+          </button>
+
           {/* Action Print button */}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all cursor-pointer"
-            style={{ boxShadow: '0 0 12px rgba(206, 248, 78, 0.2)' }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-foreground font-semibold text-xs hover:bg-muted transition-all cursor-pointer"
+            title="Print SLA Document"
           >
             <Printer size={13} />
-            Print / PDF
+            <span className="hidden lg:inline">Print</span>
           </button>
+
+          <div className="h-6 w-[1px] bg-border/60 mx-1 hidden sm:block" />
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-muted-foreground hover:bg-muted cursor-pointer"
-            title="Close"
+            className="p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+            title="Close Preview"
           >
             <X size={18} />
           </button>
         </div>
       </div>
 
-      {/*
-        Outer div: provides the exact visual (scaled) height so the
-        scroll container can scroll correctly.
-        Inner wrapper: position:absolute + CSS scale.
-      */}
-      <div
-        ref={outerPagesRef}
-        className="relative w-full flex justify-center"
-        style={{ height: totalUnscaledHeight * effectiveScale }}
+      {/* ── Scrollable content container ── */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto print:overflow-visible"
+        onScroll={handleScroll}
       >
-        <div
-          id="invoice-pages-wrapper"
-          style={{
-            position: 'absolute',
-            top: 0,
-            transform: `scale(${effectiveScale})`,
-            transformOrigin: 'top center',
-            width: `${PAGE_W}px`,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: `${PAGE_GAP}px`,
-          }}
-        >
+        {/* Pages Canvas */}
+        <div id="invoice-canvas-container" className="flex justify-center pt-8 pb-[80vh]">
+          <div
+            ref={outerPagesRef}
+            id="invoice-canvas-unscale"
+            className="relative"
+            style={{
+              height: `${totalUnscaledHeight * effectiveScale}px`,
+              width: `${PAGE_W * effectiveScale}px`,
+            }}
+          >
+            <div
+              id="invoice-pages-wrapper"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '50%',
+                transform: `translate(-50%, 0) scale(${effectiveScale})`,
+                transformOrigin: 'top center',
+                width: `${PAGE_W}px`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: `${PAGE_GAP}px`,
+              }}
+            >
           {activePages.map((page, index) => {
             const pageNo = index + 1;
             const sharedProps = {
@@ -508,11 +617,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               websiteAddress: client?.websiteAddress,
             };
 
+            let pageComponent = null;
             if (page.key.startsWith('billing')) {
               const chunk = page.chunk!;
-              return (
+              pageComponent = (
                 <InvoiceBillingPage
-                  key={page.key}
                   {...sharedProps}
                   lineItems={chunk.items}
                   total={invoice.total}
@@ -525,50 +634,56 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   showTotals={chunk.showTotals}
                 />
               );
-            }
-            if (page.key === 'cover') {
-              return (
+            } else if (page.key === 'cover') {
+              pageComponent = (
                 <InvoiceCoverPage
-                  key="cover"
                   {...sharedProps}
                   preparedBy={preparedBy}
                 />
               );
-            }
-            if (page.key === 'tc1') {
-              return (
+            } else if (page.key === 'tc1') {
+              pageComponent = (
                 <InvoiceTCPage1
-                  key="tc1"
                   {...sharedProps}
                   htmlContent={page.content}
                 />
               );
-            }
-            if (page.key === 'tc2') {
-              return (
+            } else if (page.key === 'tc2') {
+              pageComponent = (
                 <InvoiceTCPage2
-                  key="tc2"
+                  {...sharedProps}
+                  htmlContent={page.content}
+                />
+              );
+            } else {
+              pageComponent = (
+                <InvoiceTCPage1
                   {...sharedProps}
                   htmlContent={page.content}
                 />
               );
             }
 
-            // Custom dynamic HTML pages use the responsive TCPage1 renderer
             return (
-              <InvoiceTCPage1
-                key={page.key}
-                {...sharedProps}
-                htmlContent={page.content}
-              />
+              <div 
+                key={page.key} 
+                ref={el => { pageRefs.current[index] = el; }}
+              >
+                {pageComponent}
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* ── Sticky right controls panel (Signature Selector & Page Navigator) ── */}
+      </div>
+
+      {/* Close scrollable content container */}
+      </div>
+
+      {/* ── Floating right controls panel (Prepared By Signature & Pages Navigator) ── */}
       <div
-        className="sticky bottom-6 self-end mr-[15px] z-20 print:hidden flex flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
+        className="absolute bottom-6 right-[15px] z-20 print:hidden flex flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
       >
         {/* Prepared By Selector */}
         {includedPageKeys.includes('cover') && (
@@ -588,7 +703,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 <button
                   key={opt.id}
                   onClick={() => setPreparedBy(opt.id as any)}
-                  className={`w-full px-2.5 rounded-lg text-left text-[10px] font-black transition-all duration-300 origin-top flex items-center ${
+                  className={`w-full px-2.5 rounded-lg text-left text-[10px] font-black transition-all duration-300 origin-top flex items-center cursor-pointer ${
                     preparedBy === opt.id
                       ? 'bg-primary text-primary-foreground py-1.5 h-7 min-h-[28px]'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-7 group-hover:min-h-[28px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-1.5 group-hover:pointer-events-auto'
@@ -601,80 +716,81 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
           </div>
         )}
 
-        {/* Dynamic Page Navigator */}
+        {/* Dynamic Page Block Navigator */}
         <div
-          className="group bg-card border border-border rounded-2xl p-1.5 shadow-xl flex flex-col gap-0 group-hover:gap-1.5 transition-all duration-300"
+          className="bg-card border border-border rounded-2xl p-3 shadow-xl flex flex-col gap-2.5 w-full animate-fade-in"
           style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
         >
-          {pageLabels.map((label, i) => (
-            <button
-              key={i}
-              onClick={() => scrollToPage(i)}
-              title={`Go to ${label}`}
-              className={`flex items-center gap-2 px-2.5 rounded-xl text-left transition-all duration-300 group/nav ${
-                currentPage === i
-                  ? 'bg-primary text-primary-foreground py-2 h-9 min-h-[36px]'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-9 group-hover:min-h-[36px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-2 group-hover:pointer-events-auto'
-              }`}
-            >
-              {/* Page number badge */}
-              <span
-                className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 transition-all ${
+          <div className="flex flex-col gap-1 mx-0.5 border-b border-border/60 pb-1.5">
+            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+              Pages {activePages[currentPage] ? `(${activePages[currentPage].label})` : ''}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 justify-items-center">
+            {pageLabels.map((label, i) => (
+              <button
+                key={i}
+                onClick={() => scrollToPage(i)}
+                title={`Go to ${label}`}
+                className={`w-9 h-9 aspect-square rounded-full flex flex-col items-center justify-center text-xs font-black transition-all cursor-pointer border ${
                   currentPage === i
-                    ? 'bg-white/20 text-primary-foreground'
-                    : 'bg-muted text-muted-foreground group-hover/nav:text-foreground'
+                    ? 'bg-primary border-primary text-primary-foreground font-black shadow-sm'
+                    : 'bg-muted/40 border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground hover:border-border'
                 }`}
               >
                 {i + 1}
-              </span>
-              {/* Label */}
-              <span className="hidden lg:block text-[11px] font-bold pr-0.5 truncate">{label}</span>
-            </button>
-          ))}
+              </button>
+            ))}
 
-          {/* Divider line, only visible when hovered */}
-          <div className="h-px bg-border/60 mx-1.5 hidden group-hover:block transition-all duration-300" />
-
-          {/* (+/-) Modify Button and Hover Flyout */}
-          <div className="relative group/modify">
-            <Link
-              href="/admin/invoices/presets"
-              title="Modify page inclusions or presets"
-              className="w-full flex items-center gap-2 px-2.5 rounded-xl text-left transition-all duration-300 text-primary hover:bg-primary/10 h-0 min-h-0 max-h-0 py-0 overflow-hidden pointer-events-none group-hover:h-9 group-hover:min-h-[36px] group-hover:max-h-12 group-hover:opacity-100 group-hover:py-2 group-hover:pointer-events-auto border border-dashed border-primary/30 cursor-pointer font-extrabold text-xs"
-            >
-              <span className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 bg-primary/15 text-primary">
-                ±
-              </span>
-              <span className="hidden lg:block">Modify</span>
-            </Link>
-
-            {/* Modify Flyout Options Menu */}
-            <div 
-              className="absolute bottom-11 right-0 bg-card border border-border backdrop-blur-md rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 min-w-[160px] z-30 transition-all duration-200 opacity-0 pointer-events-none scale-95 origin-bottom-right group-hover/modify:opacity-100 group-hover/modify:pointer-events-auto group-hover/modify:scale-100 text-foreground text-[11px] font-semibold"
-              style={{ boxShadow: '0 10px 40px -6px rgba(0,0,0,0.3)' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {onModify && (
-                <button
-                  onClick={() => {
-                    onModify();
-                  }}
-                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
-                >
-                  ⚙️ Include / Exclude
-                </button>
-              )}
-
-              <Link
-                href="/admin/invoices/presets"
-                className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
+            {/* Dash block button for modify / add preset */}
+            <div ref={modifyMenuRef} className="relative">
+              <button
+                onClick={() => setModifyMenuOpen(!modifyMenuOpen)}
+                title="Modify page inclusions or presets"
+                className={`w-9 h-9 aspect-square rounded-full flex items-center justify-center text-sm font-semibold transition-all cursor-pointer border border-dashed ${
+                  modifyMenuOpen
+                    ? 'bg-primary-soft border-primary text-primary-ink'
+                    : 'bg-card border-border hover:bg-muted/40 text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
               >
-                ➕ Add New Preset
-              </Link>
+                <Plus size={14} />
+              </button>
+
+              {/* Flyout Menu (aligned left because navigator is on the right of screen) */}
+              {modifyMenuOpen && (
+                <div 
+                  className="absolute bottom-0 right-11 bg-card border border-border backdrop-blur-md rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 min-w-[160px] z-30 animate-fade-in text-foreground text-[11px] font-semibold"
+                  style={{ boxShadow: '0 10px 40px -6px rgba(0,0,0,0.3)' }}
+                >
+                  {onModify && (
+                    <button
+                      onClick={() => {
+                        onModify();
+                        setModifyMenuOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
+                    >
+                      <Settings size={13} className="text-muted-foreground shrink-0" />
+                      Include / Exclude
+                    </button>
+                  )}
+
+                  <Link
+                    href="/admin/invoices/presets"
+                    onClick={() => setModifyMenuOpen(false)}
+                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-muted text-foreground flex items-center gap-2 cursor-pointer transition-colors font-bold"
+                  >
+                    <Plus size={13} className="text-muted-foreground shrink-0" />
+                    Add New Preset
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
