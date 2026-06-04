@@ -153,30 +153,42 @@ export default function TicketsPage() {
     loadData();
   }, []);
 
-  // Fetch ticket details whenever a ticket is selected
+  // Fetch ticket details whenever a ticket is selected (with background polling)
   useEffect(() => {
     if (!selectedTicketId) {
       setActiveTicket(null);
       return;
     }
 
-    async function loadThread() {
+    async function loadThread(isPoll = false) {
       if (!selectedTicketId) return;
-      setThreadLoading(true);
+      if (!isPoll) setThreadLoading(true);
       try {
         const details = await getTicketDetails(selectedTicketId);
-        setActiveTicket(details);
-        // Scroll to bottom
-        setTimeout(() => {
-          threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
+        setActiveTicket((prev: any) => {
+          // Scroll to bottom if new messages have arrived
+          const prevMsgCount = prev?.messages?.length || 0;
+          const newMsgCount = details?.messages?.length || 0;
+          if (newMsgCount > prevMsgCount) {
+            setTimeout(() => {
+              threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }
+          return details;
+        });
       } catch (err) {
         console.error('Failed to load ticket details', err);
       } finally {
-        setThreadLoading(false);
+        if (!isPoll) setThreadLoading(false);
       }
     }
+
     loadThread();
+
+    // Automatically check for new messages every 5 seconds
+    const interval = setInterval(() => loadThread(true), 5000);
+    
+    return () => clearInterval(interval);
   }, [selectedTicketId]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {

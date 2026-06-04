@@ -27,6 +27,9 @@ import {
   RotateCcw,
   Settings,
   Printer,
+  Copy,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { ClientAgreementPreview } from '../components/ClientAgreementPreview';
 import {
@@ -45,7 +48,7 @@ import {
   getCachedTickets,
   getCachedPartners,
 } from '@/lib/data-cache';
-import { getSubscriptionRemainingMonths } from '@/lib/utils';
+import { getSubscriptionRemainingMonths, generateStrongPassword } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -86,6 +89,13 @@ export default function ClientDetailPage() {
   const [portalPassword, setPortalPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [sourcedBy, setSourcedBy] = useState('organic');
+
+  // Password Management States
+  const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [newPasswordValue, setNewPasswordValue] = useState('');
+  const [copiedState, setCopiedState] = useState(false);
+  const [regeneratedState, setRegeneratedState] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // SLA & T&C States
   const [agreementModalOpen, setAgreementModalOpen] = useState(false);
@@ -286,6 +296,61 @@ export default function ClientDetailPage() {
       setIsDeleting(false);
     }
   };
+
+  const handleCopyPassword = (pw: string) => {
+    if (!pw || pw === 'No password assigned') return;
+    navigator.clipboard.writeText(pw);
+    setCopiedState(true);
+    setTimeout(() => setCopiedState(false), 2000);
+  };
+
+  const handleRegeneratePassword = async () => {
+    const newPw = generateStrongPassword();
+    setIsUpdatingPassword(true);
+    try {
+      const updated = await updateClient(client.id, {
+        portalPassword: newPw,
+        portalPasswordIsPrivate: false,
+      });
+      if (updated) {
+        invalidateCache(CACHE_KEYS.CLIENTS);
+        setClient(updated as MockClient);
+        setPortalPassword(newPw);
+        navigator.clipboard.writeText(newPw);
+        setCopiedState(true);
+        setRegeneratedState(true);
+        setTimeout(() => {
+          setCopiedState(false);
+          setRegeneratedState(false);
+        }, 3000);
+      }
+    } catch (err) {
+      console.error('Failed to regenerate password', err);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
+  const handleSavePassword = async () => {
+    setIsUpdatingPassword(true);
+    try {
+      const updated = await updateClient(client.id, {
+        portalPassword: newPasswordValue || null,
+        portalPasswordIsPrivate: false,
+      });
+      if (updated) {
+        invalidateCache(CACHE_KEYS.CLIENTS);
+        setClient(updated as MockClient);
+        setPortalPassword(newPasswordValue);
+        setIsEditingPassword(false);
+      }
+    } catch (err) {
+      console.error('Failed to save password', err);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
 
   const getSourcedByLabel = (sourcedByVal: string | null) => {
     if (
@@ -589,30 +654,130 @@ export default function ClientDetailPage() {
 
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Password</p>
-                <div className="flex items-center gap-2">
+                <div className="relative flex items-center">
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    readOnly
-                    value={client.portalPassword || 'No password assigned'}
-                    className="bg-background border border-border px-3 py-1.5 rounded-lg text-xs font-mono flex-1 focus:outline-none select-all text-foreground"
+                    type={client.portalPasswordIsPrivate ? 'password' : (showPassword ? 'text' : (client.portalPassword ? 'password' : 'text'))}
+                    readOnly={!isEditingPassword}
+                    value={isEditingPassword ? newPasswordValue : (client.portalPasswordIsPrivate ? '••••••••••••' : (client.portalPassword || 'No password assigned'))}
+                    onChange={(e) => setNewPasswordValue(e.target.value)}
+                    placeholder="Enter custom password"
+                    className={`w-full bg-background border pl-3 pr-28 py-2 rounded-xl text-xs font-mono focus:outline-none select-all text-foreground ${
+                      isEditingPassword ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'
+                    }`}
                   />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? 'Hide' : 'Show'}
-                  </Button>
+                  
+                  {/* Inline Icon Actions wrapper */}
+                  <div className="absolute right-2 flex items-center gap-1.5 bg-background/80 backdrop-blur-sm pl-1 py-0.5 rounded-lg">
+                    {isEditingPassword ? (
+                      <>
+                        {/* Eye toggle in edit mode */}
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          title={showPassword ? 'Hide password' : 'Show password'}
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50"
+                        >
+                          {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                        {/* Generate button inside input */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const generated = generateStrongPassword();
+                            setNewPasswordValue(generated);
+                          }}
+                          title="Generate strong password"
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50"
+                        >
+                          <RotateCcw size={13} />
+                        </button>
+                        {/* Save button inside input */}
+                        <button
+                          type="button"
+                          onClick={handleSavePassword}
+                          disabled={isUpdatingPassword}
+                          title="Save password"
+                          className="p-1 text-primary hover:text-primary-ink transition-colors cursor-pointer rounded-lg hover:bg-primary/10 disabled:opacity-50"
+                        >
+                          {isUpdatingPassword ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                        </button>
+                        {/* Cancel button inside input */}
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingPassword(false)}
+                          title="Cancel"
+                          className="p-1 text-muted-foreground hover:text-red-400 transition-colors cursor-pointer rounded-lg hover:bg-red-500/10"
+                        >
+                          <X size={13} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {/* Show/Hide visibility toggle */}
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={client.portalPasswordIsPrivate || !client.portalPassword}
+                          title={client.portalPasswordIsPrivate ? 'Private password' : (showPassword ? 'Hide password' : 'Show password')}
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                        {/* Copy button */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPassword(client.portalPassword || '')}
+                          disabled={!client.portalPassword || client.portalPasswordIsPrivate}
+                          title={copiedState && !regeneratedState ? 'Copied!' : 'Copy to clipboard'}
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          {copiedState && !regeneratedState ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                        </button>
+                        {/* Regenerate button */}
+                        <button
+                          type="button"
+                          onClick={handleRegeneratePassword}
+                          disabled={isUpdatingPassword}
+                          title="Regenerate secure password"
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 disabled:opacity-50"
+                        >
+                          {isUpdatingPassword ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                        </button>
+                        {/* Change mode trigger */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingPassword(true);
+                            setNewPasswordValue(client.portalPasswordIsPrivate ? '' : (client.portalPassword || ''));
+                            setShowPassword(true); // Auto reveal when editing
+                          }}
+                          title="Enter custom password"
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50"
+                        >
+                          <Edit size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status Notice labels under the field */}
+                <div className="flex items-center justify-between mt-1 text-[11px]">
+                  {regeneratedState && (
+                    <span className="text-emerald-500 animate-fade-in font-medium flex items-center gap-1">
+                      <CheckCircle size={12} />
+                      Regenerated & copied!
+                    </span>
+                  )}
+                  {client.portalPasswordIsPrivate && !regeneratedState && (
+                    <span className="text-amber-500 font-medium flex items-center gap-1">
+                      🔒 Changed by client (Private)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Coming-soon overlay (subtler, less aggressive) */}
-            <div className="absolute inset-0 bg-card/85 backdrop-blur-[2px] flex items-center justify-center z-10 select-none">
-              <Badge variant="warning" className="!px-3 !py-1 text-[11px]">
-                Client portal coming soon
-              </Badge>
-            </div>
           </Card>
 
           {/* SLA & T&C Agreement Card */}

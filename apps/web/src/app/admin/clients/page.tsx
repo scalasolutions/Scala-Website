@@ -21,6 +21,7 @@ import {
   Trash2,
   Briefcase,
   FileText,
+  RotateCcw,
 } from 'lucide-react';
 import { ClientAgreementPreview } from './components/ClientAgreementPreview';
 import {
@@ -40,7 +41,7 @@ import {
   CACHE_KEYS,
   useAdminData,
 } from '@/lib/data-cache';
-import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER } from '@/lib/utils';
+import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER, generateStrongPassword } from '@/lib/utils';
 import { formatCurrencyIDR } from '@/app/admin/invoices/components/invoice-types';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -131,6 +132,15 @@ export default function ClientsPage() {
     }
   }, []);
 
+  // Pre-populate portal password with a secure generated password when modal opens
+  useEffect(() => {
+    if (modalOpen) {
+      setPortalPassword(generateStrongPassword());
+    } else {
+      setPortalPassword('');
+    }
+  }, [modalOpen]);
+
   // Prevent background scrolling when Add Client or Partner modal is open
   useEffect(() => {
     const mainEl = document.querySelector('main');
@@ -164,7 +174,7 @@ export default function ClientsPage() {
           subscriptionType: subscriptionType || null,
           subscriptionMonths: subscriptionType ? Number(subscriptionMonths) : null,
           subscriptionStartDate: subscriptionType ? new Date(subscriptionStartDate) : null,
-          portalPassword: portalPassword || null,
+          portalPassword: portalPassword || generateStrongPassword(),
           sourcedBy: sourcedBy || 'organic',
           tcStatus: 'pending',
           envRotationInterval: Number(envRotationInterval),
@@ -203,6 +213,32 @@ export default function ClientsPage() {
         console.error('Failed to create client', err);
       }
     });
+  };
+
+  const generateSuggestedEmail = (company: string, clientName: string) => {
+    const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+    
+    const nameParts = clientName.trim().split(/\s+/);
+    const firstName = nameParts[0] ? nameParts[0].toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+    const lastName = nameParts[1] ? nameParts[1].toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+    
+    const cleanCompany = cleanString(company);
+    
+    // 1. If we have both name and business name
+    if (firstName && cleanCompany) {
+      return `${firstName}@${cleanCompany}.com`;
+    }
+    
+    // 2. If we only have name, use surname as domain + random suffix to prevent clashes
+    if (firstName) {
+      const rand = Math.floor(Math.random() * 900) + 100; // 3-digit random number
+      const domain = lastName || 'client';
+      return `${firstName}${rand}@${domain}.com`;
+    }
+    
+    // 3. Fallback: fully random email
+    const randVal = Math.floor(Math.random() * 9000) + 1000;
+    return `client${randVal}@example.com`;
   };
 
   const handleCreatePartner = async (e: React.FormEvent) => {
@@ -903,14 +939,27 @@ export default function ClientsPage() {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                       />
-                      <Input
-                        label="Email *"
-                        type="email"
-                        required
-                        placeholder="e.g. fredrick@anakweb.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground">Email *</label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="email"
+                            required
+                            placeholder="e.g. fredrick@anakweb.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full bg-background border border-border pl-3 pr-10 py-2 rounded-xl text-xs focus:outline-none focus:border-primary/50 text-foreground"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEmail(generateSuggestedEmail(companyName, name))}
+                            title="Generate suggested email"
+                            className="absolute right-2.5 p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        </div>
+                      </div>
                       <Input
                         label="Phone number"
                         placeholder="e.g. +628123456789"
@@ -1080,12 +1129,26 @@ export default function ClientsPage() {
                       </div>
                     </div>
 
-                    <Input
-                      label="Portal password (optional)"
-                      placeholder="Leave blank to auto-generate"
-                      value={portalPassword}
-                      onChange={(e) => setPortalPassword(e.target.value)}
-                    />
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground">Portal password</label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          placeholder="Password"
+                          value={portalPassword}
+                          onChange={(e) => setPortalPassword(e.target.value)}
+                          className="w-full bg-background border border-border pl-3 pr-10 py-2 rounded-xl text-xs font-mono focus:outline-none focus:border-primary/50 text-foreground"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPortalPassword(generateStrongPassword())}
+                          title="Generate strong password"
+                          className="absolute right-2.5 p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
+                        >
+                          <RotateCcw size={13} />
+                        </button>
+                      </div>
+                    </div>
                   </section>
 
                   <div className="flex gap-2 justify-end pt-5 border-t border-border">

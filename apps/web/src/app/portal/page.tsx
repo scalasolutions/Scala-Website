@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Loader2,
   FileText,
-  UserCheck
+  UserCheck,
+  X
 } from 'lucide-react';
 import { 
   getClients, 
@@ -28,7 +29,8 @@ import {
   getTickets, 
   getTicketDetails,
   createTicket, 
-  createTicketMessage 
+  createTicketMessage,
+  updateClient
 } from '@/lib/db/queries';
 import Link from 'next/link';
 
@@ -54,6 +56,10 @@ export default function ClientPortal() {
   const [newTicketCategory, setNewTicketCategory] = useState<'billing' | 'technical' | 'general'>('technical');
   const [newTicketPriority, setNewTicketPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
+  // Password change state
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState<boolean>(false);
+  const [newPortalPassword, setNewPortalPassword] = useState<string>('');
+  const [isSavingPassword, setIsSavingPassword] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -213,6 +219,30 @@ export default function ClientPortal() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPortalPassword.trim() || !client) return;
+
+    setIsSavingPassword(true);
+    try {
+      const updated = await updateClient(client.id, {
+        portalPassword: newPortalPassword.trim(),
+        portalPasswordIsPrivate: true,
+      });
+      if (updated) {
+        setClient(updated);
+        setIsPasswordModalOpen(false);
+        setNewPortalPassword('');
+        alert('Password changed successfully!');
+      }
+    } catch (err) {
+      console.error('Failed to change password:', err);
+      alert('Failed to change password. Please try again.');
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
+
   const formatDate = (dateInput: any) => {
     if (!dateInput) return '—';
     const date = new Date(dateInput);
@@ -285,6 +315,19 @@ export default function ClientPortal() {
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+
+            {/* Change Password button */}
+            <button 
+              onClick={() => setIsPasswordModalOpen(true)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer active-press ${
+                theme === 'dark'
+                  ? 'bg-muted/50 border-white/5 text-slate-300 hover:text-white'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <ShieldCheck size={13} />
+              <span>Change Password</span>
             </button>
 
             {/* Logout button */}
@@ -810,6 +853,85 @@ export default function ClientPortal() {
           </div>
         </div>
       )}
+
+      {/* MODAL: CHANGE PORTAL PASSWORD */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          {/* Backdrop mask */}
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setIsPasswordModalOpen(false)}></div>
+
+          {/* Modal Container */}
+          <div className={`relative w-full max-w-sm border rounded-2xl p-6 shadow-2xl backdrop-blur-xl animate-fade-in-scale text-left z-10 transition-all duration-300 ${
+            theme === 'dark' ? 'bg-[#11131E]/95 border-white/5' : 'bg-white border-slate-200 shadow-slate-200/50'
+          }`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black tracking-tight">Change Portal Password</h3>
+              <button 
+                type="button" 
+                onClick={() => setIsPasswordModalOpen(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted/50"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 transition-colors duration-300 ${
+                  theme === 'dark' ? 'text-muted-foreground' : 'text-slate-500'
+                }`}>
+                  New Password
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter secure new password"
+                  value={newPortalPassword}
+                  onChange={(e) => setNewPortalPassword(e.target.value)}
+                  disabled={isSavingPassword}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono focus:outline-none transition-all ${
+                    theme === 'dark'
+                      ? 'bg-muted/20 border border-white/5 text-white focus:border-primary/45'
+                      : 'bg-slate-100/50 border border-slate-200 text-slate-900 focus:border-primary/60'
+                  }`}
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(false)}
+                  disabled={isSavingPassword}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border cursor-pointer active-press transition-all ${
+                    theme === 'dark'
+                      ? 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
+                      : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPassword || !newPortalPassword.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-black text-xs uppercase tracking-widest hover:opacity-90 active-press transition-all duration-200 cursor-pointer shadow-md flex items-center gap-1.5"
+                >
+                  {isSavingPassword ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Password</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Existing Ticket modal close */}
+      <div className="hidden" />
 
     </div>
   );

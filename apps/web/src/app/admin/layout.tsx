@@ -221,8 +221,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     },
   ];
 
-  // Breadcrumb leaf
-  const breadcrumbLeaf = pathname.split('/').filter(Boolean).slice(1).join(' / ') || 'Dashboard';
+  // Breadcrumb segments
+  const segmentLabels: Record<string, string> = {
+    dashboard: 'Dashboard',
+    clients: 'Clients',
+    invoices: 'Invoices',
+    finance: 'Finance',
+    tickets: 'Support Tickets'
+  };
+  const segments = pathname.split('/').filter(Boolean);
+  const pathSegments = segments.slice(1).length > 0 ? segments.slice(1) : ['dashboard'];
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -231,7 +239,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside
         className={cn(
           'hidden lg:flex flex-col bg-sidebar border-r border-sidebar-border shrink-0 transition-[width] duration-300 ease-out',
-          sidebarCollapsed ? 'w-[64px]' : 'w-60'
+          sidebarCollapsed ? 'w-[64px]' : 'w-64'
         )}
       >
 
@@ -300,7 +308,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div
             className={cn(
               'flex items-center rounded-xl transition-[gap,padding] duration-300 ease-out',
-              sidebarCollapsed ? 'gap-0 p-1 justify-center' : 'gap-3 p-2.5'
+              sidebarCollapsed ? 'gap-0 p-1 justify-center' : 'gap-2 p-1.5'
             )}
           >
             <div className="w-9 h-9 rounded-full bg-muted/60 text-foreground flex items-center justify-center text-sm font-medium border border-border shrink-0">
@@ -310,7 +318,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div
               className={cn(
                 'min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-out',
-                sidebarCollapsed ? 'max-w-0 opacity-0' : 'flex-1 max-w-[170px] opacity-100'
+                sidebarCollapsed ? 'max-w-0 opacity-0' : 'flex-1 max-w-[180px] opacity-100'
               )}
             >
               <p className="text-sm font-medium text-foreground truncate" title="Scala Solutions">Scala Solutions</p>
@@ -413,9 +421,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* Quick Context Path */}
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>Scala solutions</span>
-              <ChevronRight size={12} className="text-muted-foreground/40" />
-              <span className="text-foreground font-medium capitalize">{breadcrumbLeaf}</span>
+              <Link href="/admin/dashboard" className="hover:text-foreground transition-colors">
+                Scala solutions
+              </Link>
+              {pathSegments.map((segment, index) => {
+                const label = segmentLabels[segment] || segment;
+                const href = '/admin/' + pathSegments.slice(0, index + 1).join('/');
+                const isLast = index === pathSegments.length - 1;
+
+                return (
+                  <React.Fragment key={segment}>
+                    <ChevronRight size={12} className="text-muted-foreground/40 shrink-0" />
+                    {isLast ? (
+                      <span className="text-foreground font-medium capitalize truncate max-w-[200px]">
+                        {label}
+                      </span>
+                    ) : (
+                      <Link href={href} className="hover:text-foreground transition-colors capitalize">
+                        {label}
+                      </Link>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
 

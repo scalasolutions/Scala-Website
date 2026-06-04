@@ -29,6 +29,7 @@ export interface MockClient {
   subscriptionMonths: number | null;
   subscriptionStartDate: Date | null;
   portalPassword: string | null;
+  portalPasswordIsPrivate: boolean;
   sourcedBy: string | null;
   tcStatus: string;
   tcSignedAt: Date | null;
@@ -159,6 +160,7 @@ export async function createClient(data: schema.NewClient) {
     subscriptionMonths: data.subscriptionMonths !== undefined && data.subscriptionMonths !== null ? Number(data.subscriptionMonths) : null,
     subscriptionStartDate: data.subscriptionStartDate ? new Date(data.subscriptionStartDate) : null,
     portalPassword: data.portalPassword || `scala-${data.name.split(' ')[0].toLowerCase()}-2026`,
+    portalPasswordIsPrivate: data.portalPasswordIsPrivate || false,
     sourcedBy: data.sourcedBy || 'organic',
     tcStatus: (data.tcStatus as 'pending' | 'signed') || 'pending',
     tcSignedAt: data.tcSignedAt ? new Date(data.tcSignedAt) : null,
@@ -197,6 +199,7 @@ export async function updateClient(id: string, data: Partial<schema.NewClient>) 
       subscriptionStartDate: data.subscriptionStartDate ? new Date(data.subscriptionStartDate) : mockClients[idx].subscriptionStartDate,
       subscriptionMonths: data.subscriptionMonths !== undefined && data.subscriptionMonths !== null ? Number(data.subscriptionMonths) : mockClients[idx].subscriptionMonths,
       portalPassword: data.portalPassword !== undefined ? data.portalPassword : mockClients[idx].portalPassword,
+      portalPasswordIsPrivate: data.portalPasswordIsPrivate !== undefined ? data.portalPasswordIsPrivate : mockClients[idx].portalPasswordIsPrivate,
       sourcedBy: data.sourcedBy !== undefined ? data.sourcedBy : mockClients[idx].sourcedBy,
       tcSignedAt: data.tcSignedAt !== undefined ? (data.tcSignedAt ? new Date(data.tcSignedAt) : null) : mockClients[idx].tcSignedAt,
       envRotationLastAt: data.envRotationLastAt !== undefined ? (data.envRotationLastAt ? new Date(data.envRotationLastAt) : null) : mockClients[idx].envRotationLastAt,

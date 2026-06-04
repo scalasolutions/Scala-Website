@@ -24,6 +24,7 @@ export const clients = pgTable('clients', {
   subscriptionMonths: integer('subscription_months').default(12),
   subscriptionStartDate: timestamp('subscription_start_date'),
   portalPassword: text('portal_password'),
+  portalPasswordIsPrivate: boolean('portal_password_is_private').notNull().default(false),
   sourcedBy: text('sourced_by').notNull().default('organic'),
   // SLA & T&C fields
   tcStatus: text('tc_status').notNull().default('pending'), // 'pending' | 'signed'
