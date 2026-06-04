@@ -150,7 +150,7 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
     : treasury;
 
   const pieData = [
-    { name: 'Retained Earnings (Treasury)', value: retainedEarnings, color: 'var(--primary)' },
+    { name: 'Retained Earnings', value: retainedEarnings, color: 'var(--primary)' },
     { name: 'Fredrick Draws', value: payoutsFredrick, color: '#38bdf8' },
     { name: 'Nicholas Draws', value: payoutsNicholas, color: '#60a5fa' },
   ];
@@ -162,9 +162,9 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
   const totalExpenses = chartData.reduce((s, d) => s + d.Expenses, 0);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* ── Cash flow — 2/3 wide ── */}
-      <div className="relative rounded-3xl bg-card border border-border/70 p-7 overflow-hidden lg:col-span-2 flex flex-col min-h-[400px]">
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      {/* ── Cash flow — 3/5 wide ── */}
+      <div className="relative rounded-3xl bg-card border border-border/70 p-7 overflow-hidden lg:col-span-3 flex flex-col min-h-[400px]">
         {/* Decorative lime glow behind the chart */}
         <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
 
@@ -252,8 +252,8 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
         </div>
       </div>
 
-      {/* ── Treasury allocation — 1/3 wide ── */}
-      <div className="relative rounded-3xl bg-card border border-border/70 p-7 overflow-hidden flex flex-col min-h-[400px]">
+      {/* ── Treasury allocation — 2/5 wide ── */}
+      <div className="relative rounded-3xl bg-card border border-border/70 p-7 overflow-hidden lg:col-span-2 flex flex-col min-h-[400px]">
         <div>
           <h3 className="text-base font-semibold tracking-tight text-foreground">
             Treasury allocation
@@ -320,7 +320,7 @@ export const FinanceCharts: React.FC<FinanceChartsProps> = ({
               <div key={idx} className="flex items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-muted-foreground truncate">{item.name}</span>
+                  <span className="text-muted-foreground">{item.name}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-foreground font-semibold tabular-nums">{pct}%</span>

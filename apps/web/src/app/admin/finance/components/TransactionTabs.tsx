@@ -206,7 +206,7 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
                         <button
                           type="button"
                           onClick={() => setReceiptPreviewUrl(exp.receiptUrl!)}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold bg-primary/15 text-primary border border-primary/25 px-1.5 py-0.5 rounded transition-all hover:bg-primary/25 cursor-pointer select-none active:scale-95"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold bg-primary-soft dark:bg-primary/15 text-primary-ink dark:text-primary border border-primary-ink/20 dark:border-primary/25 px-1.5 py-0.5 rounded transition-all hover:bg-primary/25 dark:hover:bg-primary/25 cursor-pointer select-none active:scale-95"
                           title="Click to view receipt screenshot"
                         >
                           📎 Receipt

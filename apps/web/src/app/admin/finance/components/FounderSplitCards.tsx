@@ -93,7 +93,7 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
       <Card padding="md" className="relative overflow-hidden border-primary/20 bg-primary/5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <span className="text-[10px] font-bold text-primary uppercase tracking-[0.08em]">
+            <span className="text-[10px] font-bold text-primary-ink dark:text-primary uppercase tracking-[0.08em]">
               Smart Balance Settlement
             </span>
             <h4 className="text-sm font-semibold text-foreground mt-1">
@@ -103,7 +103,7 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
                 <>
                   🤝 <strong>{debtor === 'fredrick' ? 'Fredrick Yang' : 'Nicholas Chairnando'}</strong> owes{" "}
                   <strong>{creditor === 'fredrick' ? 'Fredrick Yang' : 'Nicholas Chairnando'}</strong> exactly{" "}
-                  <span className="text-primary font-bold">{formatCurrencyIDR(settlementAmount)}</span> to settle the accounts.
+                  <span className="text-primary-ink dark:text-primary font-bold">{formatCurrencyIDR(settlementAmount)}</span> to settle the accounts.
                 </>
               )}
             </h4>
@@ -117,7 +117,7 @@ export const FounderSplitCards: React.FC<FounderSplitCardsProps> = ({
           </div>
           {settlementAmount > 0 && (
             <div className="shrink-0 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-primary/20 text-primary border border-primary/30 animate-pulse">
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-primary-soft dark:bg-primary/20 text-primary-ink dark:text-primary border border-primary-ink/20 dark:border-primary/30 animate-pulse">
                 Reconciliation Needed
               </span>
             </div>

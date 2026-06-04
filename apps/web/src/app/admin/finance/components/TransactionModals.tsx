@@ -437,13 +437,13 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
               Select Receipt Image
             </label>
             {uploadingReceipt && (
-              <p className="text-[10px] text-primary font-semibold animate-pulse">
+              <p className="text-[10px] text-primary-ink dark:text-primary font-semibold animate-pulse">
                 ⌛ Compressing &amp; preparing image...
               </p>
             )}
             {receiptFileName && !uploadingReceipt && (
               <div className="space-y-1 mt-1">
-                <p className="text-[10px] text-emerald-400 font-bold truncate max-w-[280px] mx-auto">
+                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold truncate max-w-[280px] mx-auto">
                   ✓ {receiptFileName} (Compressed!)
                 </p>
                 <button
@@ -452,7 +452,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
                     setReceiptFileBase64('');
                     setReceiptFileName('');
                   }}
-                  className="text-[9px] text-red-400 hover:underline cursor-pointer font-bold"
+                  className="text-[9px] text-red-500 dark:text-red-400 hover:underline cursor-pointer font-bold"
                 >
                   Remove
                 </button>
@@ -460,8 +460,8 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             )}
 
             {ocrScanning && (
-              <div className="flex items-center justify-center gap-2 p-2 bg-primary/10 border border-primary/20 rounded-xl text-primary text-[10px] font-bold animate-pulse mt-2">
-                <Loader2 className="animate-spin text-primary shrink-0" size={12} />
+              <div className="flex items-center justify-center gap-2 p-2 bg-primary-soft dark:bg-primary/10 border border-primary-ink/20 dark:border-primary/20 rounded-xl text-primary-ink dark:text-primary text-[10px] font-bold animate-pulse mt-2">
+                <Loader2 className="animate-spin text-primary-ink dark:text-primary shrink-0" size={12} />
                 <span>Running Local OCR: Extracting expense total from receipt...</span>
               </div>
             )}
