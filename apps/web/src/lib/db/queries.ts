@@ -350,7 +350,9 @@ export async function updateClientTask(id: string, data: Partial<schema.NewClien
         })
         .where(eq(schema.clientTasks.id, id))
         .returning();
-      return results[0];
+      if (results.length > 0) {
+        return results[0];
+      }
     } catch (e) {
       console.warn("DB Update failed, running mock update: ", e);
     }
@@ -384,7 +386,9 @@ export async function deleteClientTask(id: string) {
       const results = await db.delete(schema.clientTasks)
         .where(eq(schema.clientTasks.id, id))
         .returning();
-      return results[0] || null;
+      if (results.length > 0) {
+        return results[0];
+      }
     } catch (e) {
       console.warn("DB Delete failed, running mock delete: ", e);
     }
