@@ -215,12 +215,26 @@ export default function ClientBoardPage() {
     const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === nextStatus) return;
 
+    // Optimistic Update
+    const updatedTasks = tasks.map(t => 
+      t.id === taskId 
+        ? { 
+            ...t, 
+            status: nextStatus,
+            completedAt: nextStatus === 'achieved' ? new Date() : (t.status === 'achieved' ? null : t.completedAt),
+            updatedAt: new Date()
+          } 
+        : t
+    );
+    mutateTasks(updatedTasks);
+
     try {
       await updateClientTask(taskId, { status: nextStatus });
       invalidateCache(CACHE_KEYS.CLIENTS);
       mutateTasks();
     } catch (err) {
       console.error('Failed to update task status', err);
+      mutateTasks(); // rollback on error
     }
   };
 

@@ -190,8 +190,8 @@ export function useAdminData<T>(
 
       try {
         const existing = cache.get(key);
-        // Only trigger loading visual overlay if we don't have any cached data to show
-        if (active && !existing) {
+        // Only trigger loading visual overlay if we don't have any cached data to show AND no active state data
+        if (active && !existing && !data) {
           console.log(`%c[SWR Hook] 🔴 "${key}" - Initial Load: No cached data. Rendering loading skeletons...`, 'color: #EF4444; font-weight: bold;');
           setLoading(true);
         } else if (active && existing) {
