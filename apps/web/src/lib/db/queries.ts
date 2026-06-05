@@ -282,6 +282,15 @@ export async function getClientTasks() {
       });
     } catch (e) {
       console.warn("DB Query failed, falling back to mock data: ", e);
+      try {
+        const liveClients = await db.select().from(schema.clients);
+        return mockClientTasks.map(t => ({
+          ...t,
+          client: liveClients.find(c => c.id === t.clientId)
+        })).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      } catch (dbErr) {
+        console.warn("Failed to fetch live clients for mock fallback:", dbErr);
+      }
     }
   }
   return mockClientTasks.map(t => ({
