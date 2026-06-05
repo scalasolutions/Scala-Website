@@ -22,11 +22,13 @@ import {
   Briefcase,
   FileText,
   RotateCcw,
+  ClipboardList,
 } from 'lucide-react';
 import { ClientAgreementPreview } from './components/ClientAgreementPreview';
 import {
   createClient,
   MockClient,
+  MockClientTask,
   createPartner,
   updatePartner,
   deletePartner,
@@ -35,6 +37,7 @@ import {
   getClients,
   getPartners,
   getInvoices,
+  getClientTasks,
 } from '@/lib/db/queries';
 import {
   invalidateCache,
@@ -73,10 +76,12 @@ export default function ClientsPage() {
   const { data: clientsData, loading: loadingClients, mutate: mutateClients } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
   const { data: partnersData, loading: loadingPartners, mutate: mutatePartners } = useAdminData<MockPartner[]>(CACHE_KEYS.PARTNERS, getPartners as any);
   const { data: invoicesData } = useAdminData<MockInvoice[]>(CACHE_KEYS.INVOICES, getInvoices as any);
+  const { data: tasksData } = useAdminData<MockClientTask[]>(CACHE_KEYS.CLIENT_TASKS, getClientTasks as any);
 
   const clients = clientsData || [];
   const partners = partnersData || [];
   const invoices = invoicesData || [];
+  const allTasks = tasksData || [];
 
   const loading = loadingClients;
   const partnersLoading = loadingPartners;
@@ -665,6 +670,25 @@ export default function ClientsPage() {
                                 ? `Pending | ${Math.floor((Date.now() - new Date(client.createdAt).getTime()) / (1000 * 60 * 60 * 24))}D`
                                 : client.status}
                             </Badge>
+                            {(() => {
+                              const taskCount = allTasks.filter(
+                                t => t.clientId === client.id && t.status !== 'achieved'
+                              ).length;
+                              if (taskCount === 0) return null;
+                              return (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/admin/clients/${client.id}?tab=board`);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold cursor-pointer hover:bg-primary/20 active:scale-95 transition-all select-none shrink-0"
+                                  title={`${taskCount} active task${taskCount !== 1 ? 's' : ''}`}
+                                >
+                                  <ClipboardList size={9} />
+                                  {taskCount}
+                                </span>
+                              );
+                            })()}
                             {!isOrganic && (
                               <Badge variant="neutral">via {sourcedLabel}</Badge>
                             )}

@@ -97,6 +97,28 @@ export default function ClientBoardPage() {
   // Drag and Drop active states
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    task: any;
+  } | null>(null);
+
+  // Close context menu on scroll or escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClose = () => setContextMenu(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    window.addEventListener('scroll', handleClose, true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('scroll', handleClose, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
+
   // Prevent background scrolling when modal is open
   useEffect(() => {
     const mainEl = document.querySelector('main');
@@ -164,6 +186,25 @@ export default function ClientBoardPage() {
     return 'border-t-2 border-t-emerald-500 bg-emerald-500/5 dark:bg-emerald-400/5';
   };
 
+  // Handle Right-click Context Menu
+  const handleContextMenu = (e: React.MouseEvent, task: any) => {
+    e.preventDefault();
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // Quick boundary adjustment if close to right/bottom of screen
+    const menuWidth = 160;
+    const menuHeight = 90;
+    if (x + menuWidth > window.innerWidth) {
+      x -= menuWidth;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y -= menuHeight;
+    }
+    
+    setContextMenu({ x, y, task });
+  };
+
   // Handle Drag Start
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     const target = e.target as HTMLElement;
@@ -176,6 +217,10 @@ export default function ClientBoardPage() {
       target.closest('[role="menu"]') ||
       target.closest('[role="menuitem"]')
     ) {
+      e.preventDefault();
+      return;
+    }
+    if (contextMenu || modalOpen) {
       e.preventDefault();
       return;
     }
@@ -611,14 +656,18 @@ export default function ClientBoardPage() {
                         }
                       }
 
+                      const isContextMenuOpen = contextMenu?.task.id === task.id;
+
                       return (
                         <div
                           key={task.id}
-                          draggable
+                          draggable={!contextMenu && !modalOpen}
                           onDragStart={(e) => handleDragStart(e, task.id)}
+                          onContextMenu={(e) => handleContextMenu(e, task)}
                           className={cn(
-                            'group relative bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98] cursor-grab active:cursor-grabbing',
-                            urgent && 'border-red-500/20 dark:border-red-500/30 ring-1 ring-red-500/10 dark:ring-red-500/20 bg-red-500/[0.01]'
+                            'group relative bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98] cursor-grab active:cursor-grabbing select-none',
+                            urgent && 'border-red-500/20 dark:border-red-500/30 ring-1 ring-red-500/10 dark:ring-red-500/20 bg-red-500/[0.01]',
+                            isContextMenuOpen && 'border-primary ring-1 ring-primary/20 bg-primary/[0.02]'
                           )}
                         >
                           {/* Card header: client details */}
@@ -971,6 +1020,52 @@ export default function ClientBoardPage() {
           </div>,
           document.body
         )}
+
+      {/* --- TASK CARD CONTEXT MENU --- */}
+      {mounted && contextMenu && createPortal(
+        <div
+          className="fixed inset-0 z-[90] cursor-default"
+          onClick={() => setContextMenu(null)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu(null);
+          }}
+        >
+          <div
+            className="absolute z-[100] min-w-[160px] py-1.5 rounded-xl border border-border bg-card shadow-2xl animate-fade-in-scale"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+              boxShadow: '0 8px 30px -4px rgba(0,0,0,0.25)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                handleEditClick(contextMenu.task);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors"
+            >
+              <Pencil size={13} className="text-muted-foreground" />
+              Edit details
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleDeleteClick(contextMenu.task.id);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+            >
+              <Trash2 size={13} className="text-red-500" />
+              Delete task
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }

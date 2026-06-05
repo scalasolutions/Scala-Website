@@ -155,6 +155,51 @@ export default function ClientDetailPage() {
   const [taskStatus, setTaskStatus] = useState<'to_prepare' | 'in_progress' | 'achieved'>('to_prepare');
   const [taskTargetDate, setTaskTargetDate] = useState('');
   const [dragOverColumn, setDragOverColumn] = useState<'to_prepare' | 'in_progress' | 'achieved' | null>(null);
+  const [activeTaskTab, setActiveTaskTab] = useState<'board' | 'timeline'>('board');
+
+  // Main Navigation Tab State
+  const [activeMainTab, setActiveMainTab] = useState<'board' | 'maintenance' | 'hosting' | 'billing' | 'tickets'>('board');
+
+  // Context Menu State for Kanban Tasks
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    task: any;
+  } | null>(null);
+
+  // Close context menu on scroll or escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClose = () => setContextMenu(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    window.addEventListener('scroll', handleClose, true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('scroll', handleClose, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
+
+  // Handle Right-click Context Menu
+  const handleContextMenu = (e: React.MouseEvent, task: any) => {
+    e.preventDefault();
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // Quick boundary adjustment if close to right/bottom of screen
+    const menuWidth = 160;
+    const menuHeight = 90;
+    if (x + menuWidth > window.innerWidth) {
+      x -= menuWidth;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y -= menuHeight;
+    }
+    
+    setContextMenu({ x, y, task });
+  };
 
   // Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
@@ -168,6 +213,10 @@ export default function ClientDetailPage() {
       target.closest('[role="menu"]') ||
       target.closest('[role="menuitem"]')
     ) {
+      e.preventDefault();
+      return;
+    }
+    if (contextMenu || taskModalOpen) {
       e.preventDefault();
       return;
     }
@@ -1194,476 +1243,577 @@ export default function ClientDetailPage() {
 
         {/* Right Columns: Subscription Details & Linked records */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Operations & Client Tasks Kanban Card */}
-          <Card padding="md">
-            <SectionHeading
-              title="Client Board & Updates Tracker"
-              icon={<ClipboardList size={16} />}
-              action={
-                <Button
-                  variant="primary"
-                  size="sm"
-                  leftIcon={<Plus size={12} />}
-                  onClick={() => {
-                    setEditingTask(null);
-                    setTaskTitle('');
-                    setTaskDescription('');
-                    setTaskStatus('to_prepare');
-                    setTaskTargetDate('');
-                    setTaskModalOpen(true);
-                  }}
-                  className="!h-8 text-xs flex justify-center items-center animate-fade-in-scale"
+          {/* Main Navigation Tabs */}
+          <div className="flex flex-wrap gap-1 bg-muted/30 border border-border/60 p-1 rounded-2xl select-none">
+            {(
+              [
+                { key: 'board', label: 'Tasks & Board', icon: <ClipboardList size={14} />, badge: clientTasks.filter(t => t.status !== 'achieved' || (t.completedAt && new Date(t.completedAt).toDateString() === new Date().toDateString())).length, alert: false },
+                { key: 'maintenance', label: 'Maintenance', icon: <RotateCcw size={14} />, badge: undefined as number | undefined, alert: isEnvOverdue || isStabOverdue || isExpOverdue },
+                { key: 'hosting', label: 'Hosting Plan', icon: <Layers size={14} />, badge: undefined as number | undefined, alert: false },
+                { key: 'billing', label: 'Invoices', icon: <Receipt size={14} />, badge: invoices.length, alert: false },
+                { key: 'tickets', label: 'Tickets', icon: <Ticket size={14} />, badge: tickets.length, alert: false }
+              ]
+            ).map((tab) => {
+              const isActive = activeMainTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveMainTab(tab.key as any)}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer focus:outline-none",
+                    isActive
+                      ? "bg-card text-foreground border border-border/80 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                  )}
                 >
-                  Add Task
-                </Button>
-              }
-            />
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  {tab.badge !== undefined && tab.badge > 0 && (
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums",
+                      isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    )}>
+                      {tab.badge}
+                    </span>
+                  )}
+                  {tab.alert && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-            <div className="grid gap-4 md:grid-cols-3 mt-5">
-              {(['to_prepare', 'in_progress', 'achieved'] as const).map((colStatus) => {
-                const colTasks = clientTasks.filter(t => {
-                  if (t.status !== colStatus) return false;
-                  if (colStatus === 'achieved') {
-                    if (!t.completedAt) return false;
-                    const completedDate = new Date(t.completedAt);
-                    const today = new Date();
-                    return completedDate.toDateString() === today.toDateString();
-                  }
-                  return true;
-                });
-                const colLabel = colStatus === 'to_prepare' ? 'To Prepare' : colStatus === 'in_progress' ? 'In Progress' : 'Achieved Today';
-                const colColor = colStatus === 'to_prepare' ? 'border-t-zinc-400 bg-zinc-500/[0.02]' : colStatus === 'in_progress' ? 'border-t-blue-500 bg-blue-500/[0.02]' : 'border-t-emerald-500 bg-emerald-500/[0.02]';
-                const isOver = dragOverColumn === colStatus;
+          {/* Operations & Client Tasks Kanban Card with Tabbed Navigation */}
+          {activeMainTab === 'board' && (
+            <Card padding="md">
+              <SectionHeading
+                title="Client Board & Updates Tracker"
+                icon={<ClipboardList size={16} />}
+                action={
+                  activeTaskTab === 'board' && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      leftIcon={<Plus size={12} />}
+                      onClick={() => {
+                        setEditingTask(null);
+                        setTaskTitle('');
+                        setTaskDescription('');
+                        setTaskStatus('to_prepare');
+                        setTaskTargetDate('');
+                        setTaskModalOpen(true);
+                      }}
+                      className="!h-8 text-xs flex justify-center items-center animate-fade-in-scale"
+                    >
+                      Add Task
+                    </Button>
+                  )
+                }
+              />
 
-                return (
-                  <div
-                    key={colStatus}
-                    onDragOver={(e) => handleDragOver(e, colStatus)}
-                    onDrop={(e) => handleDrop(e, colStatus)}
-                    onDragLeave={() => setDragOverColumn(null)}
-                    className={cn(
-                      'rounded-xl border border-border p-3 transition-all duration-300 min-h-[220px] flex flex-col',
-                      isOver && 'border-primary ring-2 ring-primary/10 bg-primary/5',
-                      colColor
-                    )}
-                  >
-                    <div className="flex justify-between items-center pb-2 border-b border-border/60 mb-2 shrink-0">
-                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                        {colLabel}
-                        <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.2 rounded-full font-bold tabular-nums">
-                          {colTasks.length}
-                        </span>
-                      </span>
-                    </div>
+              {/* Pill Tabs Switcher */}
+              <div className="flex border-b border-border/60 mt-4 mb-5 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveTaskTab('board')}
+                  className={cn(
+                    "pb-2.5 px-4 text-xs font-bold transition-all relative cursor-pointer focus:outline-none",
+                    activeTaskTab === 'board'
+                      ? "text-primary font-bold"
+                      : "text-muted-foreground hover:text-foreground font-semibold"
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <ClipboardList size={14} />
+                    Kanban Board
+                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold tabular-nums">
+                      {clientTasks.filter(t => t.status !== 'achieved' || (t.completedAt && new Date(t.completedAt).toDateString() === new Date().toDateString())).length}
+                    </span>
+                  </span>
+                  {activeTaskTab === 'board' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-fade-in" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTaskTab('timeline')}
+                  className={cn(
+                    "pb-2.5 px-4 text-xs font-bold transition-all relative cursor-pointer focus:outline-none",
+                    activeTaskTab === 'timeline'
+                      ? "text-primary font-bold"
+                      : "text-muted-foreground hover:text-foreground font-semibold"
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <CheckCircle size={14} className={activeTaskTab === 'timeline' ? "text-primary" : "text-muted-foreground"} />
+                    Achievement Timeline
+                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-bold tabular-nums">
+                      {Object.values(groupedClientAchievements).reduce((acc, curr) => acc + curr.length, 0)}
+                    </span>
+                  </span>
+                  {activeTaskTab === 'timeline' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-fade-in" />
+                  )}
+                </button>
+              </div>
 
-                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[280px]">
-                      {colTasks.length === 0 ? (
-                        <div className="h-full flex items-center justify-center py-6 border border-dashed border-border/40 rounded-lg bg-muted/5">
-                          <p className="text-[10px] text-muted-foreground italic">Empty</p>
+              {activeTaskTab === 'board' ? (
+                <div className="grid gap-4 md:grid-cols-3">
+                  {(['to_prepare', 'in_progress', 'achieved'] as const).map((colStatus) => {
+                    const colTasks = clientTasks.filter(t => {
+                      if (t.status !== colStatus) return false;
+                      if (colStatus === 'achieved') {
+                        if (!t.completedAt) return false;
+                        const completedDate = new Date(t.completedAt);
+                        const today = new Date();
+                        return completedDate.toDateString() === today.toDateString();
+                      }
+                      return true;
+                    });
+                    const colLabel = colStatus === 'to_prepare' ? 'To Prepare' : colStatus === 'in_progress' ? 'In Progress' : 'Achieved Today';
+                    const colColor = colStatus === 'to_prepare' ? 'border-t-zinc-400 bg-zinc-500/[0.02]' : colStatus === 'in_progress' ? 'border-t-blue-500 bg-blue-500/[0.02]' : 'border-t-emerald-500 bg-emerald-500/[0.02]';
+                    const isOver = dragOverColumn === colStatus;
+
+                    return (
+                      <div
+                        key={colStatus}
+                        onDragOver={(e) => handleDragOver(e, colStatus)}
+                        onDrop={(e) => handleDrop(e, colStatus)}
+                        onDragLeave={() => setDragOverColumn(null)}
+                        className={cn(
+                          'rounded-xl border border-border p-3 transition-all duration-300 min-h-[220px] flex flex-col',
+                          isOver && 'border-primary ring-2 ring-primary/10 bg-primary/5',
+                          colColor
+                        )}
+                      >
+                        <div className="flex justify-between items-center pb-2 border-b border-border/60 mb-2 shrink-0">
+                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            {colLabel}
+                            <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.2 rounded-full font-bold tabular-nums">
+                              {colTasks.length}
+                            </span>
+                          </span>
                         </div>
-                      ) : (
-                        colTasks.map(task => {
-                          const urgent = isTaskUrgent(task);
-                          let dateLabel = '';
-                          if (task.targetDate) {
-                            const now = new Date();
-                            const due = new Date(task.targetDate);
-                            const days = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                            dateLabel = days < 0 ? `Overdue by ${Math.abs(days)}d` : days === 0 ? 'Due Today' : `Due in ${days}d`;
-                          }
 
-                          return (
-                            <div
-                              key={task.id}
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, task.id)}
-                              className={cn(
-                                'relative bg-card border border-border rounded-lg p-2.5 shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing hover:border-foreground/15',
-                                urgent && 'border-red-500/20 dark:border-red-500/30 ring-1 ring-red-500/10 dark:ring-red-500/20 bg-red-500/[0.01]'
-                              )}
-                            >
-                              <div className="flex justify-between items-start gap-1">
-                                <h5 className="text-[11px] font-semibold text-foreground leading-snug truncate flex-1" title={task.title}>
-                                  {task.title}
-                                </h5>
-                                {urgent && (
-                                  <span className="text-[8px] font-black text-red-500 uppercase shrink-0 animate-pulse-subtle">
-                                    ⚠️ Urgent
-                                  </span>
-                                )}
-                              </div>
-                              {task.description && (
-                                <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1 leading-normal">
-                                  {task.description}
-                                </p>
-                              )}
-                              
-                              <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-border/40 text-[9px] text-muted-foreground">
-                                <span className={cn(
-                                  task.targetDate && (new Date(task.targetDate) < new Date() ? 'text-red-500 font-medium' : '')
-                                )}>
-                                  {dateLabel || 'No due date'}
-                                </span>
-                                
-                                <div className="flex items-center gap-1">
-                                  {colStatus !== 'achieved' && (
-                                    <button
-                                      onClick={() => handleStatusChange(task.id, 'achieved')}
-                                      className="p-0.5 rounded text-muted-foreground hover:text-emerald-500 transition-colors"
-                                      title="Mark Achieved"
-                                    >
-                                      <Check size={9} />
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => handleEditTaskClick(task)}
-                                    className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
-                                    title="Edit"
-                                  >
-                                    <Edit size={9} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTaskClick(task.id)}
-                                    className="p-0.5 rounded text-muted-foreground hover:text-red-500 transition-colors"
-                                    title="Delete"
-                                  >
-                                    <Trash2 size={9} />
-                                  </button>
-                                </div>
-                              </div>
+                        <div className="flex-1 space-y-2 overflow-y-auto max-h-[280px]">
+                          {colTasks.length === 0 ? (
+                            <div className="h-full flex items-center justify-center py-6 border border-dashed border-border/40 rounded-lg bg-muted/5">
+                              <p className="text-[10px] text-muted-foreground italic">Empty</p>
                             </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+                          ) : (
+                            colTasks.map(task => {
+                              const urgent = isTaskUrgent(task);
+                              let dateLabel = '';
+                              if (task.targetDate) {
+                                const now = new Date();
+                                const due = new Date(task.targetDate);
+                                const days = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                dateLabel = days < 0 ? `Overdue by ${Math.abs(days)}d` : days === 0 ? 'Due Today' : `Due in ${days}d`;
+                              }
 
-          {/* Client Achievements Timeline Log */}
-          <Card padding="md">
-            <SectionHeading
-              icon={<CheckCircle className="text-emerald-500" size={16} />}
-              title="Daily Achievement Timeline"
-              description="Timeline log of completed tasks and updates for this client."
-            />
+                              const isContextMenuOpen = contextMenu?.task.id === task.id;
 
-            <div className="mt-4 space-y-4">
-              {Object.keys(groupedClientAchievements).length === 0 ? (
-                <div className="py-6 text-center text-xs text-muted-foreground italic flex flex-col items-center gap-1">
-                  <Clock size={14} className="text-muted-foreground/60" />
-                  <span>No updates achieved yet. Start moving items to 'Achieved Today'!</span>
+                              return (
+                                <div
+                                  key={task.id}
+                                  draggable={!contextMenu && !taskModalOpen}
+                                  onDragStart={(e) => handleDragStart(e, task.id)}
+                                  onContextMenu={(e) => handleContextMenu(e, task)}
+                                  className={cn(
+                                    'relative bg-card border border-border rounded-lg p-2.5 shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing hover:border-foreground/15 select-none',
+                                    urgent && 'border-red-500/20 dark:border-red-500/30 ring-1 ring-red-500/10 dark:ring-red-500/20 bg-red-500/[0.01]',
+                                    isContextMenuOpen && 'border-primary ring-1 ring-primary/20 bg-primary/[0.02]'
+                                  )}
+                                >
+                                  <div className="flex justify-between items-start gap-1">
+                                    <h5 className="text-[11px] font-semibold text-foreground leading-snug truncate flex-1" title={task.title}>
+                                      {task.title}
+                                    </h5>
+                                    {urgent && (
+                                      <span className="text-[8px] font-black text-red-500 uppercase shrink-0 animate-pulse-subtle">
+                                        ⚠️ Urgent
+                                      </span>
+                                    )}
+                                  </div>
+                                  {task.description && (
+                                    <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1 leading-normal">
+                                      {task.description}
+                                    </p>
+                                  )}
+                                  
+                                  <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-border/40 text-[9px] text-muted-foreground">
+                                    <span className={cn(
+                                      task.targetDate && (new Date(task.targetDate) < new Date() ? 'text-red-500 font-medium' : '')
+                                    )}>
+                                      {dateLabel || 'No due date'}
+                                    </span>
+                                    
+                                    <div className="flex items-center gap-1">
+                                      {colStatus !== 'achieved' && (
+                                        <button
+                                          onClick={() => handleStatusChange(task.id, 'achieved')}
+                                          className="p-0.5 rounded text-muted-foreground hover:text-emerald-500 transition-colors"
+                                          title="Mark Achieved"
+                                        >
+                                          <Check size={9} />
+                                        </button>
+                                      )}
+                                      {/* ⋮ More button — opens same popup as right-click */}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                          const menuWidth = 160;
+                                          const menuHeight = 90;
+                                          let x = rect.right + 4;
+                                          let y = rect.top;
+                                          if (x + menuWidth > window.innerWidth) x = rect.left - menuWidth - 4;
+                                          if (y + menuHeight > window.innerHeight) y = rect.bottom - menuHeight;
+                                          setContextMenu({ x, y, task });
+                                        }}
+                                        className={cn(
+                                          'p-0.5 rounded transition-colors',
+                                          isContextMenuOpen
+                                            ? 'text-primary bg-primary/10'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                        )}
+                                        title="More options"
+                                      >
+                                        <MoreHorizontal size={10} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                Object.keys(groupedClientAchievements).map((dateKey) => (
-                  <div key={dateKey} className="relative pl-4 border-l border-border/80 space-y-2">
-                    {/* Timeline dot */}
-                    <span className="absolute -left-[5px] top-1.5 w-[9px] h-[9px] rounded-full bg-emerald-500 border border-background ring-4 ring-emerald-500/10" />
-
-                    {/* Group header */}
-                    <h4 className="text-[10px] font-bold text-foreground uppercase tracking-wider">
-                      {dateKey}
-                    </h4>
-
-                    {/* Tasks in group */}
-                    <div className="grid gap-2">
-                      {groupedClientAchievements[dateKey].map((task) => (
-                        <div
-                          key={task.id}
-                          className="p-2.5 bg-muted/20 border border-border/60 hover:border-border rounded-lg text-xs flex items-start justify-between gap-3 transition-colors"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-semibold text-foreground truncate">{task.title}</p>
-                            {task.description && (
-                              <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
-                                {task.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <Badge variant="success" className="text-[8px] uppercase tracking-wider px-1">
-                              Achieved
-                            </Badge>
-                            {task.completedAt && (
-                              <p className="text-[9px] text-muted-foreground font-mono mt-0.5">
-                                {new Date(task.completedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                <div className="space-y-4">
+                  {Object.keys(groupedClientAchievements).length === 0 ? (
+                    <div className="py-6 text-center text-xs text-muted-foreground italic flex flex-col items-center gap-1">
+                      <Clock size={14} className="text-muted-foreground/60" />
+                      <span>No updates achieved yet. Start moving items to 'Achieved Today'!</span>
                     </div>
-                  </div>
-                ))
+                  ) : (
+                    Object.keys(groupedClientAchievements).map((dateKey) => (
+                      <div key={dateKey} className="relative pl-4 border-l border-border/80 space-y-2">
+                        {/* Timeline dot */}
+                        <span className="absolute -left-[5px] top-1.5 w-[9px] h-[9px] rounded-full bg-emerald-500 border border-background ring-4 ring-emerald-500/10" />
+
+                        {/* Group header */}
+                        <h4 className="text-[10px] font-bold text-foreground uppercase tracking-wider">
+                          {dateKey}
+                        </h4>
+
+                        {/* Tasks in group */}
+                        <div className="grid gap-2">
+                          {groupedClientAchievements[dateKey].map((task) => (
+                            <div
+                              key={task.id}
+                              className="p-2.5 bg-muted/20 border border-border/60 hover:border-border rounded-lg text-xs flex items-start justify-between gap-3 transition-colors"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground truncate">{task.title}</p>
+                                {task.description && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                                    {task.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <Badge variant="success" className="text-[8px] uppercase tracking-wider px-1">
+                                  Achieved
+                                </Badge>
+                                {task.completedAt && (
+                                  <p className="text-[9px] text-muted-foreground font-mono mt-0.5">
+                                    {new Date(task.completedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               )}
-            </div>
-          </Card>
+            </Card>
+          )}
 
           {/* Operations & Maintenance Checklist Card */}
-          <Card padding="md">
-            <SectionHeading
-              title="Operations & Maintenance Checklist"
-              icon={<RotateCcw size={16} />}
-              action={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<Settings size={13} />}
-                  onClick={() => {
-                    setEnvRotationInterval(client.envRotationInterval || 6);
-                    setStabilityCheckInterval(client.stabilityCheckInterval || 1);
-                    setExpectationsCheckInterval(client.expectationsCheckInterval || 3);
-                    setMaintenanceModalOpen(true);
-                  }}
-                  className="!h-8 !px-2 text-xs flex justify-center items-center"
-                >
-                  Configure Intervals
-                </Button>
-              }
-            />
+          {activeMainTab === 'maintenance' && (
+            <Card padding="md">
+              <SectionHeading
+                title="Operations & Maintenance Checklist"
+                icon={<RotateCcw size={16} />}
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<Settings size={13} />}
+                    onClick={() => {
+                      setEnvRotationInterval(client.envRotationInterval || 6);
+                      setStabilityCheckInterval(client.stabilityCheckInterval || 1);
+                      setExpectationsCheckInterval(client.expectationsCheckInterval || 3);
+                      setMaintenanceModalOpen(true);
+                    }}
+                    className="!h-8 !px-2 text-xs flex justify-center items-center"
+                  >
+                    Configure Intervals
+                  </Button>
+                }
+              />
 
-            <div className="space-y-0 mt-5">
-              {/* Row 1: Env Rotation */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 pb-6 mb-6 border-b border-border/40">
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isEnvOverdue ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-                    <h4 className="text-sm font-semibold text-foreground">Environment Variables Rotation</h4>
-                    <Badge variant="neutral">Every {client.envRotationInterval || 6} mo</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed pl-4">
-                    Rotate sensitive client keys, database passwords, and API credentials to maintain peak security.
-                  </p>
-                  <div className="flex items-center gap-2 pl-4 flex-wrap">
-                    <div className="text-[11px] font-mono text-muted-foreground flex gap-2">
-                      <span>Last Rotated: {client.envRotationLastAt ? new Date(client.envRotationLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
-                      <span>•</span>
-                      <span>Next Due: {envDue.toLocaleDateString('id-ID')}</span>
+              <div className="space-y-0 mt-5">
+                {/* Row 1: Env Rotation */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 pb-6 mb-6 border-b border-border/40">
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isEnvOverdue ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                      <h4 className="text-sm font-semibold text-foreground">Environment Variables Rotation</h4>
+                      <Badge variant="neutral">Every {client.envRotationInterval || 6} mo</Badge>
                     </div>
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${envRemainingInfo.bgClass} ${envRemainingInfo.colorClass}`}>
-                      <Clock size={9} />
-                      {envRemainingInfo.label}
-                    </span>
+                    <p className="text-xs text-muted-foreground leading-relaxed pl-4">
+                      Rotate sensitive client keys, database passwords, and API credentials to maintain peak security.
+                    </p>
+                    <div className="flex items-center gap-2 pl-4 flex-wrap">
+                      <div className="text-[11px] font-mono text-muted-foreground flex gap-2">
+                        <span>Last Rotated: {client.envRotationLastAt ? new Date(client.envRotationLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
+                        <span>•</span>
+                        <span>Next Due: {envDue.toLocaleDateString('id-ID')}</span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${envRemainingInfo.bgClass} ${envRemainingInfo.colorClass}`}>
+                        <Clock size={9} />
+                        {envRemainingInfo.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2 self-start">
+                    <Button
+                      variant={isEnvOverdue ? 'primary' : 'secondary'}
+                      size="sm"
+                      leftIcon={<Check size={12} />}
+                      onClick={() => handleMarkTaskComplete('env')}
+                      className="h-8 text-xs shrink-0 flex items-center justify-center"
+                    >
+                      Mark Done
+                    </Button>
                   </div>
                 </div>
-                <div className="shrink-0 flex items-center gap-2 self-start">
-                  <Button
-                    variant={isEnvOverdue ? 'primary' : 'secondary'}
-                    size="sm"
-                    leftIcon={<Check size={12} />}
-                    onClick={() => handleMarkTaskComplete('env')}
-                    className="h-8 text-xs shrink-0 flex items-center justify-center"
-                  >
-                    Mark Done
-                  </Button>
+
+                {/* Row 2: Stability Checks */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 pb-6 mb-6 border-b border-border/40">
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isStabOverdue ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                      <h4 className="text-sm font-semibold text-foreground">Stability &amp; Dependency Checkup</h4>
+                      <Badge variant="neutral">Every {client.stabilityCheckInterval || 1} mo</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed pl-4">
+                      Verify server logs, check NPM dependency vulnerabilities, run speed/Lighthouse tests, and verify backups.
+                    </p>
+                    <div className="flex items-center gap-2 pl-4 flex-wrap">
+                      <div className="text-[11px] font-mono text-muted-foreground flex gap-2">
+                        <span>Last Checked: {client.stabilityCheckLastAt ? new Date(client.stabilityCheckLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
+                        <span>•</span>
+                        <span>Next Due: {stabDue.toLocaleDateString('id-ID')}</span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${stabRemainingInfo.bgClass} ${stabRemainingInfo.colorClass}`}>
+                        <Clock size={9} />
+                        {stabRemainingInfo.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2 self-start">
+                    <Button
+                      variant={isStabOverdue ? 'primary' : 'secondary'}
+                      size="sm"
+                      leftIcon={<Check size={12} />}
+                      onClick={() => handleMarkTaskComplete('stability')}
+                      className="h-8 text-xs shrink-0 flex items-center justify-center"
+                    >
+                      Mark Done
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Row 3: Client Expectations Checkup */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isExpOverdue ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                      <h4 className="text-sm font-semibold text-foreground">Client Expectations Checkup</h4>
+                      <Badge variant="neutral">Every {client.expectationsCheckInterval || 3} mo</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed pl-4">
+                      Reach out directly to the client, confirm if hosting expectations and SLA response targets are fully met.
+                    </p>
+                    <div className="flex items-center gap-2 pl-4 flex-wrap">
+                      <div className="text-[11px] font-mono text-muted-foreground flex gap-2">
+                        <span>Last Checked: {client.expectationsCheckLastAt ? new Date(client.expectationsCheckLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
+                        <span>•</span>
+                        <span>Next Due: {expDue.toLocaleDateString('id-ID')}</span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${expRemainingInfo.bgClass} ${expRemainingInfo.colorClass}`}>
+                        <Clock size={9} />
+                        {expRemainingInfo.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2 self-start">
+                    <Button
+                      variant={isExpOverdue ? 'primary' : 'secondary'}
+                      size="sm"
+                      leftIcon={<Check size={12} />}
+                      onClick={() => handleMarkTaskComplete('expectations')}
+                      className="h-8 text-xs shrink-0 flex items-center justify-center"
+                    >
+                      Mark Done
+                    </Button>
+                  </div>
                 </div>
               </div>
+            </Card>
+          )}
 
-              {/* Row 2: Stability Checks */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 pb-6 mb-6 border-b border-border/40">
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isStabOverdue ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-                    <h4 className="text-sm font-semibold text-foreground">Stability &amp; Dependency Checkup</h4>
-                    <Badge variant="neutral">Every {client.stabilityCheckInterval || 1} mo</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed pl-4">
-                    Verify server logs, check NPM dependency vulnerabilities, run speed/Lighthouse tests, and verify backups.
-                  </p>
-                  <div className="flex items-center gap-2 pl-4 flex-wrap">
-                    <div className="text-[11px] font-mono text-muted-foreground flex gap-2">
-                      <span>Last Checked: {client.stabilityCheckLastAt ? new Date(client.stabilityCheckLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
-                      <span>•</span>
-                      <span>Next Due: {stabDue.toLocaleDateString('id-ID')}</span>
+          {/* Subscription / Hosting Details */}
+          {activeMainTab === 'hosting' && (
+            <Card padding="md">
+              <SectionHeading
+                title="Hosting subscription"
+                icon={<Layers size={16} />}
+                action={
+                  client.subscriptionType ? (
+                    <Badge variant="neutral" className="capitalize">
+                      {client.subscriptionType}
+                    </Badge>
+                  ) : undefined
+                }
+              />
+
+              {client.subscriptionType ? (
+                <div className="space-y-6">
+                  {/* Expiring warning */}
+                  {isExpiring && (
+                    <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                      <AlertTriangle
+                        className="text-amber-500 shrink-0 mt-0.5"
+                        size={15}
+                      />
+                      <div className="text-xs leading-relaxed">
+                        <span className="font-medium text-foreground">Renewal alert</span>
+                        <p className="text-muted-foreground mt-0.5">
+                          Expires in{' '}
+                          <span className="text-foreground font-medium">
+                            {remaining} {remaining === 1 ? 'month' : 'months'}
+                          </span>
+                          . Plan renewal is recommended.
+                        </p>
+                      </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${stabRemainingInfo.bgClass} ${stabRemainingInfo.colorClass}`}>
-                      <Clock size={9} />
-                      {stabRemainingInfo.label}
-                    </span>
-                  </div>
-                </div>
-                <div className="shrink-0 flex items-center gap-2 self-start">
-                  <Button
-                    variant={isStabOverdue ? 'primary' : 'secondary'}
-                    size="sm"
-                    leftIcon={<Check size={12} />}
-                    onClick={() => handleMarkTaskComplete('stability')}
-                    className="h-8 text-xs shrink-0 flex items-center justify-center"
-                  >
-                    Mark Done
-                  </Button>
-                </div>
-              </div>
+                  )}
 
-              {/* Row 3: Client Expectations Checkup */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isExpOverdue ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-                    <h4 className="text-sm font-semibold text-foreground">Client Expectations Checkup</h4>
-                    <Badge variant="neutral">Every {client.expectationsCheckInterval || 3} mo</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed pl-4">
-                    Reach out directly to the client, confirm if hosting expectations and SLA response targets are fully met.
-                  </p>
-                  <div className="flex items-center gap-2 pl-4 flex-wrap">
-                    <div className="text-[11px] font-mono text-muted-foreground flex gap-2">
-                      <span>Last Checked: {client.expectationsCheckLastAt ? new Date(client.expectationsCheckLastAt).toLocaleDateString('id-ID') : 'Never'}</span>
-                      <span>•</span>
-                      <span>Next Due: {expDue.toLocaleDateString('id-ID')}</span>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-xs text-muted-foreground">Monthly rate</p>
+                      <p className="text-lg font-semibold text-foreground mt-1 tabular-nums">
+                        {client.subscriptionType === 'static'
+                          ? formatCurrencyIDR(200000)
+                          : formatCurrencyIDR(350000)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">
+                        {client.subscriptionType} hosting
+                      </p>
                     </div>
-                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${expRemainingInfo.bgClass} ${expRemainingInfo.colorClass}`}>
-                      <Clock size={9} />
-                      {expRemainingInfo.label}
-                    </span>
-                  </div>
-                </div>
-                <div className="shrink-0 flex items-center gap-2 self-start">
-                  <Button
-                    variant={isExpOverdue ? 'primary' : 'secondary'}
-                    size="sm"
-                    leftIcon={<Check size={12} />}
-                    onClick={() => handleMarkTaskComplete('expectations')}
-                    className="h-8 text-xs shrink-0 flex items-center justify-center"
-                  >
-                    Mark Done
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
 
-          {/* Subscription */}
-          <Card padding="md">
-            <SectionHeading
-              title="Hosting subscription"
-              icon={<Layers size={16} />}
-              action={
-                client.subscriptionType ? (
-                  <Badge variant="neutral" className="capitalize">
-                    {client.subscriptionType}
-                  </Badge>
-                ) : undefined
-              }
-            />
-
-            {client.subscriptionType ? (
-              <div className="space-y-6">
-                {/* Expiring warning */}
-                {isExpiring && (
-                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                    <AlertTriangle
-                      className="text-amber-500 shrink-0 mt-0.5"
-                      size={15}
-                    />
-                    <div className="text-xs leading-relaxed">
-                      <span className="font-medium text-foreground">Renewal alert</span>
-                      <p className="text-muted-foreground mt-0.5">
-                        Expires in{' '}
-                        <span className="text-foreground font-medium">
-                          {remaining} {remaining === 1 ? 'month' : 'months'}
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-xs text-muted-foreground">Quota remaining</p>
+                      <p className="text-lg font-semibold text-foreground mt-1 tabular-nums">
+                        {remaining}
+                        <span className="text-muted-foreground font-normal text-sm">
+                          {' '}/ {client.subscriptionMonths} mo
                         </span>
-                        . Plan renewal is recommended.
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Based on contracted SLA
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-xs text-muted-foreground">Expiry</p>
+                      <p className="text-sm font-medium text-foreground mt-1 inline-flex items-center gap-1.5">
+                        <Calendar size={13} className="text-muted-foreground" />
+                        <span>{expiryDateString}</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Calculated from start date
                       </p>
                     </div>
                   </div>
-                )}
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-border bg-muted/20 p-4">
-                    <p className="text-xs text-muted-foreground">Monthly rate</p>
-                    <p className="text-lg font-semibold text-foreground mt-1 tabular-nums">
-                      {client.subscriptionType === 'static'
-                        ? formatCurrencyIDR(200000)
-                        : formatCurrencyIDR(350000)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">
-                      {client.subscriptionType} hosting
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-border bg-muted/20 p-4">
-                    <p className="text-xs text-muted-foreground">Quota remaining</p>
-                    <p className="text-lg font-semibold text-foreground mt-1 tabular-nums">
-                      {remaining}
-                      <span className="text-muted-foreground font-normal text-sm">
-                        {' '}/ {client.subscriptionMonths} mo
+                  {/* Progress bar */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span>Quota elapsed</span>
+                      <span className="text-foreground tabular-nums">
+                        {client.subscriptionMonths
+                          ? Math.round((remaining! / client.subscriptionMonths) * 100)
+                          : 0}
+                        % remaining
                       </span>
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Based on contracted SLA
-                    </p>
-                  </div>
+                    </div>
 
-                  <div className="rounded-xl border border-border bg-muted/20 p-4">
-                    <p className="text-xs text-muted-foreground">Expiry</p>
-                    <p className="text-sm font-medium text-foreground mt-1 inline-flex items-center gap-1.5">
-                      <Calendar size={13} className="text-muted-foreground" />
-                      <span>{expiryDateString}</span>
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Calculated from start date
-                    </p>
-                  </div>
-                </div>
+                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          remaining === 0
+                            ? 'bg-red-500'
+                            : isExpiring
+                            ? 'bg-amber-500'
+                            : 'bg-primary'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            (remaining! / (client.subscriptionMonths || 12)) * 100
+                          )}%`,
+                        }}
+                      />
+                    </div>
 
-                {/* Progress bar */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <span>Quota elapsed</span>
-                    <span className="text-foreground tabular-nums">
-                      {client.subscriptionMonths
-                        ? Math.round((remaining! / client.subscriptionMonths) * 100)
-                        : 0}
-                      % remaining
-                    </span>
-                  </div>
-
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        remaining === 0
-                          ? 'bg-red-500'
-                          : isExpiring
-                          ? 'bg-amber-500'
-                          : 'bg-primary'
-                      }`}
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          (remaining! / (client.subscriptionMonths || 12)) * 100
-                        )}%`,
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex justify-between text-[11px] text-muted-foreground">
-                    <span>
-                      Start:{' '}
-                      {client.subscriptionStartDate
-                        ? new Date(client.subscriptionStartDate).toLocaleDateString(
-                            'id-ID'
-                          )
-                        : 'N/A'}
-                    </span>
-                    <span>End: {expiryDateString}</span>
+                    <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <span>
+                        Start:{' '}
+                        {client.subscriptionStartDate
+                          ? new Date(client.subscriptionStartDate).toLocaleDateString(
+                              'id-ID'
+                            )
+                          : 'N/A'}
+                      </span>
+                      <span>End: {expiryDateString}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <EmptyState
-                icon={<Layers size={20} />}
-                title="No active subscription"
-                description="This client has no hosting plan. Edit profile to assign a static or dynamic plan."
-              />
-            )}
-          </Card>
+              ) : (
+                <EmptyState
+                  icon={<Layers size={20} />}
+                  title="No active subscription"
+                  description="This client has no hosting plan. Edit profile to assign a static or dynamic plan."
+                />
+              )}
+            </Card>
+          )}
 
-          {/* Connected Invoices & Tickets */}
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Connected Invoices */}
+          {/* Connected Invoices */}
+          {activeMainTab === 'billing' && (
             <Card padding="md">
               <SectionHeading
                 title={`Invoices (${invoices.length})`}
@@ -1679,9 +1829,9 @@ export default function ClientDetailPage() {
                 }
               />
 
-              <div className="space-y-2 max-h-[260px] overflow-y-auto -mr-1 pr-1">
+              <div className="space-y-2 max-h-[400px] overflow-y-auto -mr-1 pr-1">
                 {invoices.length > 0 ? (
-                  invoices.slice(0, 4).map((inv) => (
+                  invoices.map((inv) => (
                     <Link
                       key={inv.id}
                       href={`/admin/invoices?id=${inv.id}`}
@@ -1717,8 +1867,10 @@ export default function ClientDetailPage() {
                 )}
               </div>
             </Card>
+          )}
 
-            {/* Connected Support Tickets */}
+          {/* Connected Support Tickets */}
+          {activeMainTab === 'tickets' && (
             <Card padding="md">
               <SectionHeading
                 title={`Tickets (${tickets.length})`}
@@ -1734,9 +1886,9 @@ export default function ClientDetailPage() {
                 }
               />
 
-              <div className="space-y-2 max-h-[260px] overflow-y-auto -mr-1 pr-1">
+              <div className="space-y-2 max-h-[400px] overflow-y-auto -mr-1 pr-1">
                 {tickets.length > 0 ? (
-                  tickets.slice(0, 4).map((t) => (
+                  tickets.map((t) => (
                     <Link key={t.id} href={`/admin/tickets?id=${t.id}`} className="block">
                       <div className="p-3 rounded-xl border border-border bg-muted/10 hover:border-foreground/15 transition-colors text-xs">
                         <div className="flex justify-between items-start gap-2">
@@ -1767,7 +1919,7 @@ export default function ClientDetailPage() {
                 )}
               </div>
             </Card>
-          </div>
+          )}
         </div>
       </div>
 
@@ -2365,6 +2517,52 @@ export default function ClientDetailPage() {
           </div>,
           document.body
         )}
+
+      {/* --- TASK CARD CONTEXT MENU --- */}
+      {mounted && contextMenu && createPortal(
+        <div
+          className="fixed inset-0 z-[90] cursor-default"
+          onClick={() => setContextMenu(null)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu(null);
+          }}
+        >
+          <div
+            className="absolute z-[100] min-w-[160px] py-1.5 rounded-xl border border-border bg-card shadow-2xl animate-fade-in-scale"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+              boxShadow: '0 8px 30px -4px rgba(0,0,0,0.25)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                handleEditTaskClick(contextMenu.task);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors"
+            >
+              <Edit size={13} className="text-muted-foreground" />
+              Edit details
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleDeleteTaskClick(contextMenu.task.id);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+            >
+              <Trash2 size={13} className="text-red-500" />
+              Delete task
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

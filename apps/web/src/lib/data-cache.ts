@@ -134,7 +134,10 @@ export function invalidateCache(...keys: string[]): void {
       `%c[Cache Invalidation] 🧹 Invalidated key: "${key}"`,
       'color: #EC4899; font-weight: bold; background: #FDF2F8; padding: 2px 4px; border-radius: 4px;'
     );
-    cache.delete(key);
+    const existing = cache.get(key);
+    if (existing) {
+      existing.expiresAt = 0; // Mark as stale instead of deleting so reader hooks can still render it instantly
+    }
     // Notify all active hooks subscribed to this key to automatically re-fetch
     notify(key);
   }
@@ -215,11 +218,11 @@ export function useAdminData<T>(
     const unsubscribe = subscribe(key, () => {
       if (!active) return;
       const existing = cache.get(key);
-      if (existing) {
+      if (existing && existing.expiresAt > Date.now()) {
         setData(existing.value as T);
         setLoading(false);
       } else {
-        console.log(`%c[SWR Hook] 🔄 "${key}" Cache Invalidated! Triggering instant re-fetch.`, 'color: #EC4899;');
+        console.log(`%c[SWR Hook] 🔄 "${key}" Cache Invalidated or Stale! Triggering instant re-fetch.`, 'color: #EC4899;');
         load(true);
       }
     });
