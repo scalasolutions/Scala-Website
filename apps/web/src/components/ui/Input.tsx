@@ -51,6 +51,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         <input
           ref={ref}
           id={inputId}
+          {...props}
           className={cn(
             'h-10 w-full rounded-xl bg-muted border px-3.5 text-sm text-foreground',
             'placeholder:text-muted-foreground/70',
@@ -61,13 +62,33 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             leftIcon && 'pl-10',
             rightIcon && 'pr-10',
             'disabled:opacity-50 disabled:cursor-not-allowed',
+            props.type === 'date' && 'cursor-pointer',
             className
           )}
+          onClick={(e) => {
+            if (props.type === 'date') {
+              try {
+                (e.target as any).showPicker();
+              } catch (err) {
+                console.warn(err);
+              }
+            }
+            if (props.onClick) props.onClick(e);
+          }}
+          onFocus={(e) => {
+            if (props.type === 'date') {
+              try {
+                (e.target as any).showPicker();
+              } catch (err) {
+                console.warn(err);
+              }
+            }
+            if (props.onFocus) props.onFocus(e);
+          }}
           aria-invalid={hasError || undefined}
           aria-describedby={
             hasError ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined
           }
-          {...props}
         />
         {rightIcon && (
           <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground inline-flex pointer-events-none">

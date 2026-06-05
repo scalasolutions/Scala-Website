@@ -73,7 +73,8 @@ async function runRestore() {
       capitalInjections = [],
       payouts = [],
       invoiceLinePresets = [],
-      invoicePagePresets = []
+      invoicePagePresets = [],
+      clientTasks = []
     } = backup.data;
 
     // --- 1. CLEAN EXISTING DATA IN ORDER OF FOREIGN KEYS (Dependencies first) ---
@@ -81,6 +82,7 @@ async function runRestore() {
     await db.delete(schema.ticketMessages);
     await db.delete(schema.tickets);
     await db.delete(schema.invoices);
+    await db.delete(schema.clientTasks);
     await db.delete(schema.clients);
     await db.delete(schema.partners);
     await db.delete(schema.expenses);
@@ -98,7 +100,7 @@ async function runRestore() {
       await db.insert(schema.partners).values(partners);
     }
     
-    // b. Clients (Independent, but referenced by invoices/tickets)
+    // b. Clients (Independent, but referenced by invoices/tickets/tasks)
     if (clients.length > 0) {
       console.log(`👥 Restoring ${clients.length} Clients...`);
       // Parse ISO Date strings back to Date objects
@@ -113,6 +115,19 @@ async function runRestore() {
         updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
       }));
       await db.insert(schema.clients).values(parsedClients);
+    }
+
+    // b2. Client Tasks (Depends on Clients)
+    if (clientTasks.length > 0) {
+      console.log(`📋 Restoring ${clientTasks.length} Client Tasks...`);
+      const parsedTasks = clientTasks.map((t: any) => ({
+        ...t,
+        targetDate: t.targetDate ? new Date(t.targetDate) : null,
+        completedAt: t.completedAt ? new Date(t.completedAt) : null,
+        createdAt: t.createdAt ? new Date(t.createdAt) : new Date(),
+        updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date()
+      }));
+      await db.insert(schema.clientTasks).values(parsedTasks);
     }
 
     // c. Invoices (Depends on Clients)

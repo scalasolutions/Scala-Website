@@ -28,6 +28,7 @@ async function seed() {
     await db.delete(schema.ticketMessages);
     await db.delete(schema.tickets);
     await db.delete(schema.invoices);
+    await db.delete(schema.clientTasks);
     await db.delete(schema.clients);
 
     // 2. Insert Premium Clients
@@ -209,6 +210,66 @@ async function seed() {
     ]).returning();
 
     console.log(`✅ Successfully seeded ${ticketRecords.length} support tickets!`);
+
+    // 4.5 Seeding Client Tasks
+    console.log("📋 Seeding Client Tasks...");
+    const clientTasksRecords = await db.insert(schema.clientTasks).values([
+      // Tasks for Fredrick Yang (c1111111-1111-1111-1111-111111111111)
+      {
+        id: '10000000-0000-0000-0000-000000000001',
+        clientId: 'c1111111-1111-1111-1111-111111111111',
+        title: 'Review Midtrans payment integration flows',
+        description: 'Need to prepare the webhook secret verification update and test locally with sandbox.',
+        status: 'in_progress',
+        targetDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // due in 2 days
+      },
+      {
+        id: '10000000-0000-0000-0000-000000000002',
+        clientId: 'c1111111-1111-1111-1111-111111111111',
+        title: 'Draft landing page design v2',
+        description: 'Create new custom assets and prepare copywriting for the growth sparkline elements.',
+        status: 'to_prepare',
+        targetDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // OVERDUE by 3 days!
+        updatedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), // stale! (> 7 days)
+      },
+      {
+        id: '10000000-0000-0000-0000-000000000003',
+        clientId: 'c1111111-1111-1111-1111-111111111111',
+        title: 'Set up Google Analytics tracking code',
+        description: 'Successfully verified domain in search console and injected GA4 gtag script.',
+        status: 'achieved',
+        targetDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        completedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // achieved yesterday
+      },
+      // Tasks for Cyberdyne Systems (c2222222-2222-2222-2222-222222222222)
+      {
+        id: '10000000-0000-0000-0000-000000000004',
+        clientId: 'c2222222-2222-2222-2222-222222222222',
+        title: 'Perform NPM audit & fix vulnerabilities',
+        description: 'Run npm audit and update critical dependencies in production branch.',
+        status: 'in_progress',
+        targetDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      },
+      {
+        id: '10000000-0000-0000-0000-000000000005',
+        clientId: 'c2222222-2222-2222-2222-222222222222',
+        title: 'Prepare partnership contract terms summary',
+        description: 'Draft custom terms regarding server load and scalability tolerances.',
+        status: 'to_prepare',
+        targetDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+      },
+      // Tasks for Stark Industries (c3333333-3333-3333-3333-333333333333) (stale completed task, >14 days ago)
+      {
+        id: '10000000-0000-0000-0000-000000000006',
+        clientId: 'c3333333-3333-3333-3333-333333333333',
+        title: 'Point A-record to custom domain',
+        description: 'Verify domain and configure star-dashboard.starkindustries.com routing.',
+        status: 'achieved',
+        targetDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+        completedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000), // completed 20 days ago (no updates since!)
+      }
+    ]).returning();
+    console.log(`✅ Successfully seeded ${clientTasksRecords.length} client tasks!`);
 
     // 5. Insert Ticket Messages Logs
     console.log("💬 Seeding Ticket Thread logs...");

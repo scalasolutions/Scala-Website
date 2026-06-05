@@ -16,14 +16,15 @@ import {
   Wallet,
 } from 'lucide-react';
 
+import Link from 'next/link';
+
 const ticketCategoryLabels: Record<string, string> = {
   billing: 'Billing',
   technical: 'Technical',
   general: 'General',
   feature_request: 'Feature request',
 };
-import Link from 'next/link';
-import { MockClient, MockInvoice, MockTicket, getClients, getInvoices, getTickets } from '@/lib/db/queries';
+import { MockClient, MockInvoice, MockTicket, getClients, getInvoices, getTickets, getClientTasks } from '@/lib/db/queries';
 import {
   useAdminData,
   CACHE_KEYS,
@@ -42,11 +43,13 @@ export default function DashboardHome() {
   const { data: clientsData, loading: loadingClients } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
   const { data: invoicesData, loading: loadingInvoices } = useAdminData<MockInvoice[]>(CACHE_KEYS.INVOICES, getInvoices as any);
   const { data: ticketsData, loading: loadingTickets } = useAdminData<MockTicket[]>(CACHE_KEYS.TICKETS, getTickets);
+  const { data: tasksData, loading: loadingTasks } = useAdminData<any[]>(CACHE_KEYS.CLIENT_TASKS, getClientTasks);
 
   const clients = clientsData || [];
   const invoices = invoicesData || [];
   const tickets = ticketsData || [];
-  const loading = loadingClients || loadingInvoices || loadingTickets;
+  const tasks = tasksData || [];
+  const loading = loadingClients || loadingInvoices || loadingTickets || loadingTasks;
 
   if (loading) {
     return (
@@ -134,6 +137,50 @@ export default function DashboardHome() {
     }).format(val);
   };
 
+  const isTaskUrgent = (task: any) => {
+    if (task.status === 'achieved') return false;
+
+    const now = new Date();
+    if (task.targetDate) {
+      const dueDate = new Date(task.targetDate);
+      if (dueDate < now) return true;
+    }
+
+    const updatedDate = new Date(task.updatedAt || task.createdAt);
+    const timeDiff = now.getTime() - updatedDate.getTime();
+    const daysDiff = timeDiff / (1000 * 3600 * 24);
+    if (daysDiff > 7) return true;
+
+    return false;
+  };
+
+  const urgentTasks = tasks.filter(isTaskUrgent);
+
+  const urgentClients = clients.filter(c => {
+    if (c.status !== 'active') return false;
+
+    const hasUrgentTask = urgentTasks.some(t => t.clientId === c.id);
+    if (hasUrgentTask) return true;
+
+    const clientAchievedTasks = tasks.filter(t => t.clientId === c.id && t.status === 'achieved' && t.completedAt);
+    if (clientAchievedTasks.length > 0) {
+      const lastCompleted = new Date(
+        clientAchievedTasks.reduce((latest, t) => {
+          const tDate = new Date(t.completedAt);
+          return tDate > latest ? tDate : latest;
+        }, new Date(0))
+      );
+      const daysSinceLastCompleted = (Date.now() - lastCompleted.getTime()) / (1000 * 3600 * 24);
+      if (daysSinceLastCompleted > 14) return true;
+    } else {
+      const clientCreated = new Date(c.createdAt);
+      const daysSinceCreated = (Date.now() - clientCreated.getTime()) / (1000 * 3600 * 24);
+      if (daysSinceCreated > 14) return true;
+    }
+
+    return false;
+  });
+
   const openTickets = tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').slice(0, 3);
   const outstandingInvoices = invoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').slice(0, 4);
 
@@ -170,6 +217,66 @@ export default function DashboardHome() {
           </Link>
         </div>
       </Card>
+
+      {/* Urgent Operations Alerts */}
+      {urgentClients.length > 0 && (
+        <Card padding="md" className="border-red-500/15 bg-red-500/[0.01]">
+          <SectionHeading
+            icon={<AlertTriangle className="text-red-500 animate-pulse" size={16} />}
+            title="Urgent Operations Alerts"
+            description="Clients requiring immediate follow-up or updates (stale for >14 days or have overdue tasks)."
+            action={<Badge variant="danger">{urgentClients.length} Stale / Urgent</Badge>}
+          />
+          <div className="grid gap-3 sm:grid-cols-2 mt-4">
+            {urgentClients.map(c => {
+              const cUrgentTasks = urgentTasks.filter(t => t.clientId === c.id);
+              const clientAchievedTasks = tasks.filter(t => t.clientId === c.id && t.status === 'achieved' && t.completedAt);
+              
+              let reason = '';
+              if (cUrgentTasks.length > 0) {
+                reason = `${cUrgentTasks.length} overdue or stale task(s)`;
+              } else if (clientAchievedTasks.length > 0) {
+                const lastCompleted = new Date(
+                  clientAchievedTasks.reduce((latest, t) => {
+                    const tDate = new Date(t.completedAt);
+                    return tDate > latest ? tDate : latest;
+                  }, new Date(0))
+                );
+                const days = Math.floor((Date.now() - lastCompleted.getTime()) / (1000 * 3600 * 24));
+                reason = `No achievements in ${days} days (stale)`;
+              } else {
+                reason = 'No tasks achieved since onboarding (>14 days)';
+              }
+
+              const cDomain = c.websiteAddress ? c.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
+              const cFavicon = cDomain ? `https://www.google.com/s2/favicons?domain=${cDomain}&sz=64` : null;
+
+              return (
+                <div key={c.id} className="p-3.5 bg-card border border-border hover:border-red-500/20 rounded-xl flex items-center justify-between gap-3 transition-colors shadow-sm animate-fade-in-scale">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                      {cFavicon ? (
+                        <img src={cFavicon} alt={c.name} className="w-4 h-4 object-contain" onLoad={(e) => { (e.target as HTMLElement).style.display = 'block'; }} onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                      ) : null}
+                      <span className="text-[10px] font-bold text-muted-foreground">{c.name.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{c.companyName || c.name}</p>
+                      <p className="text-[10px] text-red-500 font-medium mt-0.5">{reason}</p>
+                    </div>
+                  </div>
+
+                  <Link href={`/admin/clients/${c.id}`} className="shrink-0">
+                    <Button variant="ghost" size="sm" className="!h-7 !px-2.5 text-[10px] font-extrabold flex items-center gap-1">
+                      Resolve <ArrowRight size={10} />
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* --- METRICS GRID --- */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">

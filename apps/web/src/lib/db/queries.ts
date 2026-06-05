@@ -108,6 +108,21 @@ let mockInvoices: MockInvoice[] = [];
 let mockTickets: MockTicket[] = [];
 let mockTicketMessages: MockTicketMessage[] = [];
 
+export interface MockClientTask {
+  id: string;
+  clientId: string;
+  title: string;
+  description: string | null;
+  status: 'to_prepare' | 'in_progress' | 'achieved';
+  targetDate: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+let mockClientTasks: MockClientTask[] = [];
+
+
 // ============================================================================
 // Query Executions with Fallback logic
 // ============================================================================
@@ -239,6 +254,7 @@ export async function updateClientStatus(id: string, status: 'pending' | 'active
 export async function deleteClient(id: string) {
   if (isDbConfigured()) {
     try {
+      await db.delete(schema.clientTasks).where(eq(schema.clientTasks.clientId, id));
       await db.delete(schema.invoices).where(eq(schema.invoices.clientId, id));
       await db.delete(schema.tickets).where(eq(schema.tickets.clientId, id));
       await db.delete(schema.clients).where(eq(schema.clients.id, id));
@@ -247,11 +263,132 @@ export async function deleteClient(id: string) {
       console.warn("DB Delete failed, running mock delete: ", e);
     }
   }
+  mockClientTasks = mockClientTasks.filter(t => t.clientId !== id);
   mockInvoices = mockInvoices.filter(inv => inv.clientId !== id);
   mockTickets = mockTickets.filter(t => t.clientId !== id);
   mockClients = mockClients.filter(c => c.id !== id);
   return true;
 }
+
+// --- CLIENT TASK QUERIES ---
+export async function getClientTasks() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.clientTasks.findMany({
+        orderBy: [desc(schema.clientTasks.createdAt)],
+        with: {
+          client: true
+        }
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return mockClientTasks.map(t => ({
+    ...t,
+    client: mockClients.find(c => c.id === t.clientId)
+  })).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function getClientTasksByClientId(clientId: string) {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.clientTasks.findMany({
+        where: eq(schema.clientTasks.clientId, clientId),
+        orderBy: [desc(schema.clientTasks.createdAt)]
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return mockClientTasks
+    .filter(t => t.clientId === clientId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function createClientTask(data: schema.NewClientTask) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.clientTasks).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newRef: MockClientTask = {
+    id: crypto.randomUUID(),
+    clientId: data.clientId,
+    title: data.title,
+    description: data.description || null,
+    status: (data.status || 'to_prepare') as 'to_prepare' | 'in_progress' | 'achieved',
+    targetDate: data.targetDate ? new Date(data.targetDate) : null,
+    completedAt: data.status === 'achieved' ? new Date() : (data.completedAt ? new Date(data.completedAt) : null),
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+  mockClientTasks.push(newRef);
+  return newRef;
+}
+
+export async function updateClientTask(id: string, data: Partial<schema.NewClientTask>) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.update(schema.clientTasks)
+        .set({ 
+          ...data, 
+          completedAt: data.status === 'achieved' ? new Date() : (data.status ? null : undefined),
+          updatedAt: new Date() 
+        })
+        .where(eq(schema.clientTasks.id, id))
+        .returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Update failed, running mock update: ", e);
+    }
+  }
+  const idx = mockClientTasks.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    const prevStatus = mockClientTasks[idx].status;
+    const nextStatus = data.status || prevStatus;
+    let completedAt = mockClientTasks[idx].completedAt;
+    if (nextStatus === 'achieved' && prevStatus !== 'achieved') {
+      completedAt = new Date();
+    } else if (nextStatus !== 'achieved') {
+      completedAt = null;
+    }
+    
+    mockClientTasks[idx] = {
+      ...mockClientTasks[idx],
+      ...data,
+      targetDate: data.targetDate !== undefined ? (data.targetDate ? new Date(data.targetDate) : null) : mockClientTasks[idx].targetDate,
+      completedAt,
+      updatedAt: new Date()
+    } as MockClientTask;
+    return mockClientTasks[idx];
+  }
+  return null;
+}
+
+export async function deleteClientTask(id: string) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.delete(schema.clientTasks)
+        .where(eq(schema.clientTasks.id, id))
+        .returning();
+      return results[0] || null;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  const idx = mockClientTasks.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    const deleted = mockClientTasks[idx];
+    mockClientTasks = mockClientTasks.filter(t => t.id !== id);
+    return deleted;
+  }
+  return null;
+}
+
 
 // --- INVOICE QUERIES ---
 export async function getInvoices() {

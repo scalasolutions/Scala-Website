@@ -661,7 +661,9 @@ export default function ClientsPage() {
                               </span>
                             )}
                             <Badge variant={statusVariant} className="capitalize">
-                              {client.status}
+                              {client.status === 'pending'
+                                ? `Pending | ${Math.floor((Date.now() - new Date(client.createdAt).getTime()) / (1000 * 60 * 60 * 24))}D`
+                                : client.status}
                             </Badge>
                             {!isOrganic && (
                               <Badge variant="neutral">via {sourcedLabel}</Badge>

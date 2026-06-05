@@ -8,6 +8,8 @@ export const ticketStatusEnum = pgEnum('ticket_status', ['open', 'in_progress', 
 export const ticketPriorityEnum = pgEnum('ticket_priority', ['low', 'medium', 'high', 'urgent']);
 export const ticketCategoryEnum = pgEnum('ticket_category', ['billing', 'technical', 'general', 'feature_request']);
 export const subscriptionTypeEnum = pgEnum('subscription_type', ['static', 'dynamic']);
+export const clientTaskStatusEnum = pgEnum('client_task_status', ['to_prepare', 'in_progress', 'achieved']);
+
 
 // 1. Clients Table
 export const clients = pgTable('clients', {
@@ -92,6 +94,7 @@ export const ticketMessages = pgTable('ticket_messages', {
 export const clientsRelations = relations(clients, ({ many }) => ({
   invoices: many(invoices),
   tickets: many(tickets),
+  tasks: many(clientTasks),
 }));
 
 export const invoicesRelations = relations(invoices, ({ one }) => ({
@@ -175,6 +178,24 @@ export const partners = pgTable('partners', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// 11. Client Tasks Table
+export const clientTasks = pgTable('client_tasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  status: clientTaskStatusEnum('status').notNull().default('to_prepare'),
+  targetDate: timestamp('target_date'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const clientTasksRelations = relations(clientTasks, ({ one }) => ({
+  client: one(clients, { fields: [clientTasks.clientId], references: [clients.id] }),
+}));
+
+
 // Types
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
@@ -196,3 +217,6 @@ export type InvoicePagePreset = typeof invoicePagePresets.$inferSelect;
 export type NewInvoicePagePreset = typeof invoicePagePresets.$inferInsert;
 export type Partner = typeof partners.$inferSelect;
 export type NewPartner = typeof partners.$inferInsert;
+export type ClientTask = typeof clientTasks.$inferSelect;
+export type NewClientTask = typeof clientTasks.$inferInsert;
+

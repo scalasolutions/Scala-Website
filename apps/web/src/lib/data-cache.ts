@@ -17,8 +17,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout } from './db/queries';
-import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts } from './db/queries';
+import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout, MockClientTask } from './db/queries';
+import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts, getClientTasks } from './db/queries';
 
 interface CacheEntry<T> {
   value: T;
@@ -262,6 +262,7 @@ export const CACHE_KEYS = {
   EXPENSES: 'admin:expenses',
   INJECTIONS: 'admin:injections',
   PAYOUTS: 'admin:payouts',
+  CLIENT_TASKS: 'admin:client_tasks',
 } as const;
 
 export const getCachedClients = (): Promise<MockClient[]> =>
@@ -284,3 +285,7 @@ export const getCachedInjections = (): Promise<MockCapitalInjection[]> =>
 
 export const getCachedPayouts = (): Promise<MockPayout[]> =>
   getCached(CACHE_KEYS.PAYOUTS, getPayouts as () => Promise<MockPayout[]>);
+
+export const getCachedClientTasks = (): Promise<any[]> =>
+  getCached(CACHE_KEYS.CLIENT_TASKS, getClientTasks);
+

@@ -31,6 +31,9 @@ import {
   Eye,
   EyeOff,
   MoreHorizontal,
+  Plus,
+  Trash2,
+  ClipboardList
 } from 'lucide-react';
 import { ClientAgreementPreview } from '../components/ClientAgreementPreview';
 import {
@@ -42,6 +45,10 @@ import {
   MockInvoice,
   MockTicket,
   MockPartner,
+  getClientTasks,
+  createClientTask,
+  updateClientTask,
+  deleteClientTask
 } from '@/lib/db/queries';
 import {
   invalidateCache,
@@ -50,14 +57,16 @@ import {
   getCachedInvoices,
   getCachedTickets,
   getCachedPartners,
+  useAdminData
 } from '@/lib/data-cache';
-import { getSubscriptionRemainingMonths, generateStrongPassword } from '@/lib/utils';
+import { getSubscriptionRemainingMonths, generateStrongPassword, cn } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import Textarea from '@/components/ui/Textarea';
 import SectionHeading from '@/components/ui/SectionHeading';
 import EmptyState from '@/components/ui/EmptyState';
 
@@ -108,6 +117,177 @@ export default function ClientDetailPage() {
   const [tcCustomTerms, setTcCustomTerms] = useState('');
   const [slaCustomTerms, setSlaCustomTerms] = useState('');
   const [agreementPreviewOpen, setAgreementPreviewOpen] = useState(false);
+
+  // Client tasks state & queries
+  const { data: tasksData, mutate: mutateTasks } = useAdminData<any[]>(CACHE_KEYS.CLIENT_TASKS, getClientTasks);
+  const clientTasks = (tasksData || []).filter(t => t.clientId === id);
+
+  // Group achieved tasks by day for the log
+  const clientAchievedTasks = clientTasks
+    .filter(t => t.status === 'achieved' && t.completedAt)
+    .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
+
+  const groupedClientAchievements = clientAchievedTasks.reduce((groups: Record<string, any[]>, task) => {
+    const completedDate = new Date(task.completedAt!);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    let dateKey = completedDate.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+    if (completedDate.toDateString() === today.toDateString()) {
+      dateKey = 'Today';
+    } else if (completedDate.toDateString() === yesterday.toDateString()) {
+      dateKey = 'Yesterday';
+    }
+
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(task);
+    return groups;
+  }, {});
+
+  // Task Board States
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<any | null>(null);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [taskStatus, setTaskStatus] = useState<'to_prepare' | 'in_progress' | 'achieved'>('to_prepare');
+  const [taskTargetDate, setTaskTargetDate] = useState('');
+  const [dragOverColumn, setDragOverColumn] = useState<'to_prepare' | 'in_progress' | 'achieved' | null>(null);
+
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData('text/plain', taskId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, column: 'to_prepare' | 'in_progress' | 'achieved') => {
+    e.preventDefault();
+    setDragOverColumn(column);
+  };
+
+  const handleDrop = async (e: React.DragEvent, nextStatus: 'to_prepare' | 'in_progress' | 'achieved') => {
+    e.preventDefault();
+    setDragOverColumn(null);
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (!taskId) return;
+
+    const task = clientTasks.find(t => t.id === taskId);
+    if (!task || task.status === nextStatus) return;
+
+    // Optimistic Update
+    const updatedTasks = (tasksData || []).map(t => 
+      t.id === taskId 
+        ? { 
+            ...t, 
+            status: nextStatus,
+            completedAt: nextStatus === 'achieved' ? new Date() : (t.status === 'achieved' ? null : t.completedAt),
+            updatedAt: new Date()
+          } 
+        : t
+    );
+    mutateTasks(updatedTasks);
+
+    // Persist Update
+    try {
+      await updateClientTask(taskId, { status: nextStatus });
+      invalidateCache(CACHE_KEYS.CLIENTS);
+      mutateTasks();
+    } catch (err) {
+      console.error('Failed to update task status', err);
+      mutateTasks();
+    }
+  };
+
+  const handleStatusChange = async (taskId: string, nextStatus: 'to_prepare' | 'in_progress' | 'achieved') => {
+    const task = clientTasks.find(t => t.id === taskId);
+    if (!task || task.status === nextStatus) return;
+
+    try {
+      await updateClientTask(taskId, { status: nextStatus });
+      invalidateCache(CACHE_KEYS.CLIENTS);
+      mutateTasks();
+    } catch (err) {
+      console.error('Failed to update task status', err);
+    }
+  };
+
+  const handleSubmitTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle) return;
+
+    startTransition(async () => {
+      try {
+        if (editingTask) {
+          await updateClientTask(editingTask.id, {
+            title: taskTitle,
+            description: taskDescription || null,
+            status: taskStatus,
+            targetDate: taskTargetDate ? new Date(taskTargetDate) : null,
+          });
+        } else {
+          await createClientTask({
+            clientId: id,
+            title: taskTitle,
+            description: taskDescription || null,
+            status: taskStatus,
+            targetDate: taskTargetDate ? new Date(taskTargetDate) : null,
+          });
+        }
+        
+        invalidateCache(CACHE_KEYS.CLIENTS);
+        mutateTasks();
+        
+        // Reset
+        setTaskTitle('');
+        setTaskDescription('');
+        setTaskStatus('to_prepare');
+        setTaskTargetDate('');
+        setEditingTask(null);
+        setTaskModalOpen(false);
+      } catch (err) {
+        console.error('Failed to save task', err);
+      }
+    });
+  };
+
+  const handleEditTaskClick = (task: any) => {
+    setEditingTask(task);
+    setTaskTitle(task.title);
+    setTaskDescription(task.description || '');
+    setTaskStatus(task.status);
+    setTaskTargetDate(task.targetDate ? new Date(task.targetDate).toISOString().substring(0, 10) : '');
+    setTaskModalOpen(true);
+  };
+
+  const handleDeleteTaskClick = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+    try {
+      await deleteClientTask(taskId);
+      invalidateCache(CACHE_KEYS.CLIENTS);
+      mutateTasks();
+    } catch (err) {
+      console.error('Failed to delete task', err);
+    }
+  };
+
+  const isTaskUrgent = (task: any) => {
+    if (task.status === 'achieved') return false;
+
+    const now = new Date();
+    if (task.targetDate) {
+      const dueDate = new Date(task.targetDate);
+      if (dueDate < now) return true;
+    }
+
+    const updatedDate = new Date(task.updatedAt || task.createdAt);
+    const timeDiff = now.getTime() - updatedDate.getTime();
+    const daysDiff = timeDiff / (1000 * 3600 * 24);
+    if (daysDiff > 7) return true;
+
+    return false;
+  };
 
   // Operations & Maintenance States
   const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
@@ -186,7 +366,7 @@ export default function ClientDetailPage() {
   // Prevent background scrolling when any modal is open
   useEffect(() => {
     const mainEl = document.querySelector('main');
-    if (editModalOpen || deleteModalOpen || agreementModalOpen || maintenanceModalOpen || agreementPreviewOpen) {
+    if (editModalOpen || deleteModalOpen || agreementModalOpen || maintenanceModalOpen || agreementPreviewOpen || taskModalOpen) {
       if (mainEl) mainEl.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
     } else {
@@ -197,7 +377,7 @@ export default function ClientDetailPage() {
       if (mainEl) mainEl.style.overflow = '';
       document.body.style.overflow = '';
     };
-  }, [editModalOpen, deleteModalOpen, agreementModalOpen, maintenanceModalOpen, agreementPreviewOpen]);
+  }, [editModalOpen, deleteModalOpen, agreementModalOpen, maintenanceModalOpen, agreementPreviewOpen, taskModalOpen]);
 
   // Click-outside handler for password actions dropdown
   useEffect(() => {
@@ -652,7 +832,9 @@ export default function ClientDetailPage() {
               <Badge variant="neutral">Organic</Badge>
             )}
             <Badge variant={statusVariant} className="capitalize">
-              {client.status}
+              {client.status === 'pending'
+                ? `Pending | ${Math.floor((Date.now() - new Date(client.createdAt).getTime()) / (1000 * 60 * 60 * 24))}D`
+                : client.status}
             </Badge>
           </div>
         </div>
@@ -985,7 +1167,214 @@ export default function ClientDetailPage() {
 
         {/* Right Columns: Subscription Details & Linked records */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Operations & Maintenance Reminders Card */}
+          {/* Operations & Client Tasks Kanban Card */}
+          <Card padding="md">
+            <SectionHeading
+              title="Client Board & Updates Tracker"
+              icon={<ClipboardList size={16} />}
+              action={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Plus size={12} />}
+                  onClick={() => {
+                    setEditingTask(null);
+                    setTaskTitle('');
+                    setTaskDescription('');
+                    setTaskStatus('to_prepare');
+                    setTaskTargetDate('');
+                    setTaskModalOpen(true);
+                  }}
+                  className="!h-8 text-xs flex justify-center items-center animate-fade-in-scale"
+                >
+                  Add Task
+                </Button>
+              }
+            />
+
+            <div className="grid gap-4 md:grid-cols-3 mt-5">
+              {(['to_prepare', 'in_progress', 'achieved'] as const).map((colStatus) => {
+                const colTasks = clientTasks.filter(t => {
+                  if (t.status !== colStatus) return false;
+                  if (colStatus === 'achieved') {
+                    if (!t.completedAt) return false;
+                    const completedDate = new Date(t.completedAt);
+                    const today = new Date();
+                    return completedDate.toDateString() === today.toDateString();
+                  }
+                  return true;
+                });
+                const colLabel = colStatus === 'to_prepare' ? 'To Prepare' : colStatus === 'in_progress' ? 'In Progress' : 'Achieved Today';
+                const colColor = colStatus === 'to_prepare' ? 'border-t-zinc-400 bg-zinc-500/[0.02]' : colStatus === 'in_progress' ? 'border-t-blue-500 bg-blue-500/[0.02]' : 'border-t-emerald-500 bg-emerald-500/[0.02]';
+                const isOver = dragOverColumn === colStatus;
+
+                return (
+                  <div
+                    key={colStatus}
+                    onDragOver={(e) => handleDragOver(e, colStatus)}
+                    onDrop={(e) => handleDrop(e, colStatus)}
+                    onDragLeave={() => setDragOverColumn(null)}
+                    className={cn(
+                      'rounded-xl border border-border p-3 transition-all duration-300 min-h-[220px] flex flex-col',
+                      isOver && 'border-primary ring-2 ring-primary/10 bg-primary/5',
+                      colColor
+                    )}
+                  >
+                    <div className="flex justify-between items-center pb-2 border-b border-border/60 mb-2 shrink-0">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        {colLabel}
+                        <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.2 rounded-full font-bold tabular-nums">
+                          {colTasks.length}
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[280px]">
+                      {colTasks.length === 0 ? (
+                        <div className="h-full flex items-center justify-center py-6 border border-dashed border-border/40 rounded-lg bg-muted/5">
+                          <p className="text-[10px] text-muted-foreground italic">Empty</p>
+                        </div>
+                      ) : (
+                        colTasks.map(task => {
+                          const urgent = isTaskUrgent(task);
+                          let dateLabel = '';
+                          if (task.targetDate) {
+                            const now = new Date();
+                            const due = new Date(task.targetDate);
+                            const days = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                            dateLabel = days < 0 ? `Overdue by ${Math.abs(days)}d` : days === 0 ? 'Due Today' : `Due in ${days}d`;
+                          }
+
+                          return (
+                            <div
+                              key={task.id}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, task.id)}
+                              className={cn(
+                                'relative bg-card border border-border rounded-lg p-2.5 shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing hover:border-foreground/15',
+                                urgent && 'border-red-500/20 dark:border-red-500/30 ring-1 ring-red-500/10 dark:ring-red-500/20 bg-red-500/[0.01]'
+                              )}
+                            >
+                              <div className="flex justify-between items-start gap-1">
+                                <h5 className="text-[11px] font-semibold text-foreground leading-snug truncate flex-1" title={task.title}>
+                                  {task.title}
+                                </h5>
+                                {urgent && (
+                                  <span className="text-[8px] font-black text-red-500 uppercase shrink-0 animate-pulse-subtle">
+                                    ⚠️ Urgent
+                                  </span>
+                                )}
+                              </div>
+                              {task.description && (
+                                <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1 leading-normal">
+                                  {task.description}
+                                </p>
+                              )}
+                              
+                              <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-border/40 text-[9px] text-muted-foreground">
+                                <span className={cn(
+                                  task.targetDate && (new Date(task.targetDate) < new Date() ? 'text-red-500 font-medium' : '')
+                                )}>
+                                  {dateLabel || 'No due date'}
+                                </span>
+                                
+                                <div className="flex items-center gap-1">
+                                  {colStatus !== 'achieved' && (
+                                    <button
+                                      onClick={() => handleStatusChange(task.id, 'achieved')}
+                                      className="p-0.5 rounded text-muted-foreground hover:text-emerald-500 transition-colors"
+                                      title="Mark Achieved"
+                                    >
+                                      <Check size={9} />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleEditTaskClick(task)}
+                                    className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit size={9} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTaskClick(task.id)}
+                                    className="p-0.5 rounded text-muted-foreground hover:text-red-500 transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={9} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Client Achievements Timeline Log */}
+          <Card padding="md">
+            <SectionHeading
+              icon={<CheckCircle className="text-emerald-500" size={16} />}
+              title="Daily Achievement Timeline"
+              description="Timeline log of completed tasks and updates for this client."
+            />
+
+            <div className="mt-4 space-y-4">
+              {Object.keys(groupedClientAchievements).length === 0 ? (
+                <div className="py-6 text-center text-xs text-muted-foreground italic flex flex-col items-center gap-1">
+                  <Clock size={14} className="text-muted-foreground/60" />
+                  <span>No updates achieved yet. Start moving items to 'Achieved Today'!</span>
+                </div>
+              ) : (
+                Object.keys(groupedClientAchievements).map((dateKey) => (
+                  <div key={dateKey} className="relative pl-4 border-l border-border/80 space-y-2">
+                    {/* Timeline dot */}
+                    <span className="absolute -left-[5px] top-1.5 w-[9px] h-[9px] rounded-full bg-emerald-500 border border-background ring-4 ring-emerald-500/10" />
+
+                    {/* Group header */}
+                    <h4 className="text-[10px] font-bold text-foreground uppercase tracking-wider">
+                      {dateKey}
+                    </h4>
+
+                    {/* Tasks in group */}
+                    <div className="grid gap-2">
+                      {groupedClientAchievements[dateKey].map((task) => (
+                        <div
+                          key={task.id}
+                          className="p-2.5 bg-muted/20 border border-border/60 hover:border-border rounded-lg text-xs flex items-start justify-between gap-3 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-semibold text-foreground truncate">{task.title}</p>
+                            {task.description && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                                {task.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <Badge variant="success" className="text-[8px] uppercase tracking-wider px-1">
+                              Achieved
+                            </Badge>
+                            {task.completedAt && (
+                              <p className="text-[9px] text-muted-foreground font-mono mt-0.5">
+                                {new Date(task.completedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+
+          {/* Operations & Maintenance Checklist Card */}
           <Card padding="md">
             <SectionHeading
               title="Operations & Maintenance Checklist"
@@ -1847,6 +2236,108 @@ export default function ClientDetailPage() {
           onClose={() => setAgreementPreviewOpen(false)}
         />
       )}
+
+      {/* --- TASK CREATION/EDIT MODAL --- */}
+      {mounted &&
+        taskModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 bg-background/85 backdrop-blur-md"
+              onClick={() => setTaskModalOpen(false)}
+            />
+
+            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
+              <div className="p-6 sm:p-8 text-left">
+                <SectionHeading
+                  title={editingTask ? 'Edit Task Details' : 'Create Client Task'}
+                  description={`Task/update follow-up for ${client.name}`}
+                  action={
+                    <button
+                      onClick={() => setTaskModalOpen(false)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
+                      aria-label="Close"
+                    >
+                      <X size={16} />
+                    </button>
+                  }
+                />
+
+                <form onSubmit={handleSubmitTask} className="space-y-5 mt-4">
+                  <Input
+                    label="Task / Update Title *"
+                    required
+                    placeholder="e.g. Review environment variables"
+                    value={taskTitle}
+                    onChange={(e) => setTaskTitle(e.target.value)}
+                  />
+
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-2">
+                      Description
+                    </label>
+                    <Textarea
+                      placeholder="Add details, notes, or guidelines..."
+                      rows={3}
+                      value={taskDescription}
+                      onChange={(e) => setTaskDescription(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-2">
+                        Status / Column
+                      </label>
+                      <Select
+                        value={taskStatus}
+                        onChange={(e) => setTaskStatus(e.target.value as any)}
+                      >
+                        <option value="to_prepare">To Prepare</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="achieved">Achieved</option>
+                      </Select>
+                    </div>
+
+                    <Input
+                      label="Target Date / Due Date"
+                      type="date"
+                      value={taskTargetDate}
+                      onChange={(e) => setTaskTargetDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 justify-end pt-4 border-t border-border mt-6">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="md"
+                      onClick={() => setTaskModalOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      disabled={isPending}
+                    >
+                      {isPending ? (
+                        <>
+                          <Loader2 className="animate-spin mr-1.5" size={14} />
+                          Saving...
+                        </>
+                      ) : (
+                        editingTask ? 'Save Changes' : 'Create Task'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -41,6 +41,16 @@ async function runBackup() {
       fs.mkdirSync(backupDir, { recursive: true });
     }
 
+    // Helper to query tables safely (in case they don't exist yet on the target DB schema)
+    const safeQuery = async <T>(queryPromise: Promise<T>, tableName: string): Promise<T | any[]> => {
+      try {
+        return await queryPromise;
+      } catch (err: any) {
+        console.warn(`⚠️ Warning: Could not fetch table "${tableName}". It may not exist in this database. Skipping...`);
+        return [];
+      }
+    };
+
     // Query all tables in a single operation
     const [
       clientsList,
@@ -52,18 +62,20 @@ async function runBackup() {
       payoutsList,
       invoiceLinePresetsList,
       invoicePagePresetsList,
-      partnersList
+      partnersList,
+      clientTasksList
     ] = await Promise.all([
-      db.select().from(schema.clients),
-      db.select().from(schema.invoices),
-      db.select().from(schema.tickets),
-      db.select().from(schema.ticketMessages),
-      db.select().from(schema.expenses),
-      db.select().from(schema.capitalInjections),
-      db.select().from(schema.payouts),
-      db.select().from(schema.invoiceLinePresets),
-      db.select().from(schema.invoicePagePresets),
-      db.select().from(schema.partners)
+      safeQuery(db.select().from(schema.clients), 'clients'),
+      safeQuery(db.select().from(schema.invoices), 'invoices'),
+      safeQuery(db.select().from(schema.tickets), 'tickets'),
+      safeQuery(db.select().from(schema.ticketMessages), 'ticketMessages'),
+      safeQuery(db.select().from(schema.expenses), 'expenses'),
+      safeQuery(db.select().from(schema.capitalInjections), 'capitalInjections'),
+      safeQuery(db.select().from(schema.payouts), 'payouts'),
+      safeQuery(db.select().from(schema.invoiceLinePresets), 'invoiceLinePresets'),
+      safeQuery(db.select().from(schema.invoicePagePresets), 'invoicePagePresets'),
+      safeQuery(db.select().from(schema.partners), 'partners'),
+      safeQuery(db.select().from(schema.clientTasks), 'clientTasks')
     ]);
 
     const backupData = {
@@ -79,7 +91,8 @@ async function runBackup() {
         payouts: payoutsList,
         invoiceLinePresets: invoiceLinePresetsList,
         invoicePagePresets: invoicePagePresetsList,
-        partners: partnersList
+        partners: partnersList,
+        clientTasks: clientTasksList
       }
     };
 
@@ -92,6 +105,7 @@ async function runBackup() {
     console.log(`   • Invoices: ${invoicesList.length}`);
     console.log(`   • Support Tickets: ${ticketsList.length}`);
     console.log(`   • Ticket Messages: ${ticketMessagesList.length}`);
+    console.log(`   • Client Tasks: ${clientTasksList.length}`);
     console.log(`   • Partners: ${partnersList.length}`);
     console.log(`   • Expenses: ${expensesList.length}`);
     console.log(`   • Presets: ${invoiceLinePresetsList.length + invoicePagePresetsList.length}`);

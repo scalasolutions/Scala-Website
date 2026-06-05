@@ -21,7 +21,8 @@ import {
   CheckCircle2,
   Clock,
   LogOut,
-  Coins
+  Coins,
+  ClipboardList
 } from 'lucide-react';
 import {
   useAdminData,
@@ -211,6 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navigation = [
     { href: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { href: '/admin/board', icon: <ClipboardList size={18} />, label: 'Client Board' },
     { href: '/admin/clients', icon: <Users size={18} />, label: 'Clients' },
     { href: '/admin/invoices', icon: <Receipt size={18} />, label: 'Invoices' },
     { href: '/admin/finance', icon: <Coins size={18} />, label: 'Finance' },
@@ -224,6 +226,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Breadcrumb segments
   const segmentLabels: Record<string, string> = {
     dashboard: 'Dashboard',
+    board: 'Client Board',
     clients: 'Clients',
     invoices: 'Invoices',
     finance: 'Finance',
