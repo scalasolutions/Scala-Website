@@ -166,6 +166,19 @@ export default function ClientBoardPage() {
 
   // Handle Drag Start
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('a') ||
+      target.closest('input') ||
+      target.closest('select') ||
+      target.closest('textarea') ||
+      target.closest('[role="menu"]') ||
+      target.closest('[role="menuitem"]')
+    ) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('text/plain', taskId);
     e.dataTransfer.effectAllowed = 'move';
   };
