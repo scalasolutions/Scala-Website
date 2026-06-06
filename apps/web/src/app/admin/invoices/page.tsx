@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
@@ -214,6 +214,41 @@ export default function InvoicesPage() {
   // Revert status from paid modal state
   const [revertModalOpen, setRevertModalOpen] = useState(false);
   const [invoiceToRevert, setInvoiceToRevert] = useState<MockInvoice | null>(null);
+
+  // Long press peek state
+  const [peekInvoice, setPeekInvoice] = useState<MockInvoice | null>(null);
+  const touchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPeekingRef = useRef(false);
+  const hasMovedRef = useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent, invoice: MockInvoice) => {
+    hasMovedRef.current = false;
+    isPeekingRef.current = false;
+    
+    if (touchTimeoutRef.current) clearTimeout(touchTimeoutRef.current);
+    
+    touchTimeoutRef.current = setTimeout(() => {
+      if (!hasMovedRef.current) {
+        isPeekingRef.current = true;
+        setPeekInvoice(invoice);
+        if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate(40); // Haptic vibration feedback
+        }
+      }
+    }, 500); // 500ms long press threshold
+  };
+
+  const handleTouchMove = () => {
+    if (!isPeekingRef.current) {
+      hasMovedRef.current = true;
+      if (touchTimeoutRef.current) clearTimeout(touchTimeoutRef.current);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimeoutRef.current) clearTimeout(touchTimeoutRef.current);
+    isPeekingRef.current = false;
+  };
 
   // Line items
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
@@ -904,7 +939,11 @@ export default function InvoicesPage() {
                             setPreviewInvoice(invoice);
                           }
                         }}
-                        className="min-w-0 flex-1 flex items-center justify-between gap-4 cursor-pointer active-press"
+                        onTouchStart={(e) => handleTouchStart(e, invoice)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        onTouchCancel={handleTouchEnd}
+                        className="min-w-0 flex-1 flex items-center justify-between gap-4 cursor-pointer active-press select-none"
                       >
                         {/* Left: client + invoice number */}
                         <div className="min-w-0 flex-1 flex items-center gap-3">
@@ -963,7 +1002,12 @@ export default function InvoicesPage() {
                             )}
                           </div>
                           <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                            <span className="font-mono">{invoice.invoiceNumber}</span>
+                            <span className="sm:hidden font-semibold text-foreground">
+                              {formatCurrencyIDR(invoice.total)}
+                            </span>
+                            <span className="hidden sm:inline font-mono">
+                              {invoice.invoiceNumber}
+                            </span>
                             <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
                             <span>
                               Issued:{' '}
@@ -1980,6 +2024,109 @@ export default function InvoicesPage() {
                 invalidateCache(CACHE_KEYS.PAYOUTS);
               }}
             />
+          )}
+
+          {/* ── Invoice long-press peek modal ── */}
+          {peekInvoice && (
+            (() => {
+              const client = clients.find((c) => c.id === peekInvoice.clientId);
+              const items = JSON.parse(peekInvoice.itemsJson) as InvoiceLineItem[];
+              const effectiveStatus = getEffectiveStatus(peekInvoice);
+              const dpAmount = peekInvoice.status === 'partially_paid' ? (peekInvoice.amountPaid || Math.round(peekInvoice.total * 0.5)) : Math.round(peekInvoice.total * 0.5);
+              const balanceDue = peekInvoice.status === 'paid' ? 0 : peekInvoice.total - (peekInvoice.amountPaid || 0);
+
+              return createPortal(
+                <div 
+                  onClick={() => setPeekInvoice(null)}
+                  className="fixed inset-0 z-[100] bg-background/55 backdrop-blur-xs flex items-center justify-center p-6 pointer-events-auto select-none animate-fade-in"
+                >
+                  <div 
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full max-w-xs bg-card/95 border border-border/80 rounded-3xl p-5 shadow-2xl animate-fade-in-scale flex flex-col gap-4"
+                    style={{ 
+                      boxShadow: '0 25px 60px -15px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                          Invoice Peek
+                        </span>
+                        <h4 className="text-sm font-extrabold text-foreground truncate mt-0.5">
+                          {client?.name || 'Unknown Client'}
+                        </h4>
+                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                          {peekInvoice.invoiceNumber}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={cn(
+                          "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold border capitalize select-none",
+                          getStatusBadge(effectiveStatus)
+                        )}>
+                          {effectiveStatus.replace('_', ' ')}
+                        </span>
+                        <button
+                          onClick={() => setPeekInvoice(null)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
+                          aria-label="Close peek"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="h-[1px] bg-border/60" />
+
+                    {/* Items List */}
+                    <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
+                      {items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-start gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-foreground truncate leading-snug">
+                              {item.name}
+                            </p>
+                            <p className="text-[9px] text-muted-foreground mt-0.5">
+                              Qty: {item.quantity} • {formatCurrencyIDR(item.price)}
+                            </p>
+                          </div>
+                          <span className="text-[11px] font-bold text-foreground tabular-nums shrink-0">
+                            {formatCurrencyIDR(item.price * item.quantity)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="h-[1px] bg-border/60" />
+
+                    {/* Totals & Payments */}
+                    <div className="flex flex-col gap-1.5 text-[11px]">
+                      <div className="flex justify-between items-center text-muted-foreground font-semibold">
+                        <span>Total</span>
+                        <span className="tabular-nums font-bold">{formatCurrencyIDR(peekInvoice.total)}</span>
+                      </div>
+                      {peekInvoice.status === 'partially_paid' && (
+                        <div className="flex justify-between items-center text-emerald-500 font-bold">
+                          <span>DP Paid</span>
+                          <span className="tabular-nums">-{formatCurrencyIDR(dpAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-foreground font-extrabold border-t border-dashed border-border/60 pt-1.5 mt-0.5">
+                        <span className="uppercase text-[9px] tracking-wide">Balance Due</span>
+                        <span className={cn(
+                          "tabular-nums",
+                          balanceDue > 0 ? "text-red-400" : "text-emerald-500"
+                        )}>
+                          {formatCurrencyIDR(balanceDue)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              );
+            })()
           )}
         </>
       )}
