@@ -612,98 +612,111 @@ export default function ClientsPage() {
                             </span>
                           )}
                         </div>
-                        {/* Left: name + meta */}
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-medium text-foreground truncate">
+                          <div className="flex flex-col gap-1.5">
+                            {/* Line 1: Client Name */}
+                            <p className="text-sm font-semibold text-foreground truncate">
                               {client.name}
                             </p>
-                            {hasOutstanding && (
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/admin/invoices?client=${client.id}`);
-                                }}
-                                className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none shrink-0"
-                              >
-                                Outstanding
-                                {/* Custom Tooltip on Hover */}
-                                <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-52 leading-relaxed normal-case select-none text-left">
-                                  <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
-                                    <span>⚠️ Unpaid Bills</span>
-                                    <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
-                                  </div>
-                                  <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
-                                    {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
-                                      <div key={inv.id} className="flex justify-between items-center gap-2">
-                                        <span className="text-zinc-400 truncate">{inv.invoiceNumber}</span>
-                                        <span className="text-zinc-100 shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </span>
-                              </span>
-                            )}
-                            {isMaintenanceOverdue && (
-                              <span
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/admin/clients/${client.id}?focus=maintenance`);
-                                }}
-                                className="relative group/maint cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider transition-all select-none shrink-0 hover:bg-amber-500/25 active:scale-95 animate-pulse-subtle"
-                              >
-                                ⚠️ Maint. Due
-                                {/* Custom Tooltip on Hover */}
-                                <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/maint:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-56 leading-relaxed normal-case select-none text-left">
-                                  <div className="text-[10px] uppercase tracking-wider text-amber-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
-                                    <span>⚠️ Maintenance Alert</span>
-                                    <span className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 rounded">Click to Resolve</span>
-                                  </div>
-                                  <div className="space-y-1 text-zinc-400 text-[10px] font-medium leading-relaxed">
-                                    Environment variables, stability checkups, or client reviews are overdue. Click to open operations panel.
-                                  </div>
-                                </span>
-                              </span>
-                            )}
-                            <Badge variant={statusVariant} className="capitalize">
-                              {client.status === 'pending'
-                                ? `Pending | ${Math.floor((Date.now() - new Date(client.createdAt).getTime()) / (1000 * 60 * 60 * 24))}D`
-                                : client.status}
-                            </Badge>
-                            {(() => {
-                              const taskCount = allTasks.filter(
-                                t => t.clientId === client.id && t.status !== 'achieved'
-                              ).length;
-                              if (taskCount === 0) return null;
-                              return (
+
+                            {/* Line 2: Badges Row in specific order: Outstanding, Status, Tasks, Partner */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {/* 1. Outstanding Badge */}
+                              {hasOutstanding && (
                                 <span
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(`/admin/clients/${client.id}?tab=board`);
+                                    router.push(`/admin/invoices?client=${client.id}`);
                                   }}
-                                  className="inline-flex items-center gap-1 text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold cursor-pointer hover:bg-primary/20 active:scale-95 transition-all select-none shrink-0"
-                                  title={`${taskCount} active task${taskCount !== 1 ? 's' : ''}`}
+                                  className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none shrink-0"
                                 >
-                                  <ClipboardList size={9} />
-                                  {taskCount}
+                                  Outstanding
+                                  {/* Custom Tooltip on Hover */}
+                                  <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-52 leading-relaxed normal-case select-none text-left">
+                                    <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
+                                      <span>⚠️ Unpaid Bills</span>
+                                      <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
+                                    </div>
+                                    <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
+                                      {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
+                                        <div key={inv.id} className="flex justify-between items-center gap-2">
+                                          <span className="text-zinc-400 truncate">{inv.invoiceNumber}</span>
+                                          <span className="text-zinc-100 shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </span>
                                 </span>
-                              );
-                            })()}
-                            {!isOrganic && (
-                              <Badge variant="neutral">via {sourcedLabel}</Badge>
-                            )}
-                          </div>
-                          <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1 truncate">
-                              <Building size={11} className="shrink-0" />
-                              {client.companyName || 'No company'}
-                            </span>
-                            {client.subscriptionType && (
-                              <span className="inline-flex items-center gap-1 capitalize">
-                                <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                                {client.subscriptionType} hosting
+                              )}
+                              {isMaintenanceOverdue && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/admin/clients/${client.id}?focus=maintenance`);
+                                  }}
+                                  className="relative group/maint cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider transition-all select-none shrink-0 hover:bg-amber-500/25 active:scale-95 animate-pulse-subtle"
+                                >
+                                  ⚠️ Maint. Due
+                                  {/* Custom Tooltip on Hover */}
+                                  <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/maint:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-56 leading-relaxed normal-case select-none text-left">
+                                    <div className="text-[10px] uppercase tracking-wider text-amber-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
+                                      <span>⚠️ Maintenance Alert</span>
+                                      <span className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 rounded">Click to Resolve</span>
+                                    </div>
+                                    <div className="space-y-1 text-zinc-400 text-[10px] font-medium leading-relaxed">
+                                      Environment variables, stability checkups, or client reviews are overdue. Click to open operations panel.
+                                    </div>
+                                  </span>
+                                </span>
+                              )}
+
+                              {/* 2. Status Badge */}
+                              <Badge variant={statusVariant} className="capitalize shrink-0 text-[10px] py-0.5 leading-none">
+                                {client.status === 'pending'
+                                  ? `Pending | ${Math.floor((Date.now() - new Date(client.createdAt).getTime()) / (1000 * 60 * 60 * 24))}D`
+                                  : client.status}
+                              </Badge>
+
+                              {/* 3. Tasks Badge */}
+                              {(() => {
+                                const taskCount = allTasks.filter(
+                                  t => t.clientId === client.id && t.status !== 'achieved'
+                                ).length;
+                                if (taskCount === 0) return null;
+                                return (
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      router.push(`/admin/board?client=${client.id}`);
+                                    }}
+                                    className="inline-flex items-center gap-1 text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold cursor-pointer hover:bg-primary/20 active:scale-95 transition-all select-none shrink-0"
+                                    title={`${taskCount} active task${taskCount !== 1 ? 's' : ''}`}
+                                  >
+                                    <ClipboardList size={9} />
+                                    {taskCount}
+                                  </span>
+                                );
+                              })()}
+
+                              {/* 4. Partner Badge */}
+                              {!isOrganic && (
+                                <Badge variant="neutral" className="text-[9px] py-0.5 leading-none shrink-0">via {sourcedLabel}</Badge>
+                              )}
+                            </div>
+
+                            {/* Line 3: Company Name / details */}
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                              <span className="inline-flex items-center gap-1 truncate font-medium">
+                                <Building size={11} className="shrink-0 text-muted-foreground/70" />
+                                {client.companyName || 'No company'}
                               </span>
-                            )}
+                              {client.subscriptionType && (
+                                <span className="inline-flex items-center gap-1 capitalize">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/35" />
+                                  {client.subscriptionType} hosting
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 

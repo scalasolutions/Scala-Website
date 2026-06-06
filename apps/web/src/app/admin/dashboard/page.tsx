@@ -553,7 +553,7 @@ export default function DashboardHome() {
               const oName = client?.name || 'Unknown Client';
 
               return (
-                <div key={invoice.id} className="flex items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
+                <div key={invoice.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
                   <div className="flex items-center gap-3 min-w-0">
                     {/* Logo avatar */}
                     <div className="w-8 h-8 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden">
@@ -578,13 +578,13 @@ export default function DashboardHome() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{oName}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {invoice.invoiceNumber} · Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
+                      <p className="text-xs text-muted-foreground mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <span className="font-mono">{invoice.invoiceNumber}</span> · Due {new Date(invoice.dueDate).toLocaleDateString('id-ID')}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <Badge variant={statusVariant} className="capitalize">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:shrink-0 w-full sm:w-auto mt-1 sm:mt-0 pt-2 sm:pt-0 border-t border-dashed border-border/40 sm:border-0">
+                    <Badge variant={statusVariant} className="capitalize shrink-0">
                       {invoice.status.replace('_', ' ')}
                     </Badge>
                     {invoice.status === 'partially_paid' ? (

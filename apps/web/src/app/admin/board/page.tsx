@@ -71,6 +71,17 @@ export default function ClientBoardPage() {
   const [search, setSearch] = useState('');
   const [showOnlyUrgent, setShowOnlyUrgent] = useState(false);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
+
+  // Load selected client filter from URL query param if present
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlClientId = params.get('client');
+      if (urlClientId) {
+        setSelectedClients([urlClientId]);
+      }
+    }
+  }, []);
   const [filterSearch, setFilterSearch] = useState('');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
@@ -103,6 +114,19 @@ export default function ClientBoardPage() {
     y: number;
     task: any;
   } | null>(null);
+
+  // Mobile active tab & media state
+  const [activeTab, setActiveTab] = useState<TaskStatus>('to_prepare');
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const media = window.matchMedia('(min-width: 768px)');
+    setIsDesktop(media.matches);
+    const listener = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, [mounted]);
 
   // Close context menu on scroll or escape
   useEffect(() => {
@@ -194,7 +218,7 @@ export default function ClientBoardPage() {
     
     // Quick boundary adjustment if close to right/bottom of screen
     const menuWidth = 160;
-    const menuHeight = 90;
+    const menuHeight = 185;
     if (x + menuWidth > window.innerWidth) {
       x -= menuWidth;
     }
@@ -202,6 +226,45 @@ export default function ClientBoardPage() {
       y -= menuHeight;
     }
     
+    setContextMenu({ x, y, task });
+  };
+
+  // Handle Card Click (Mobile context menu trigger)
+  const handleCardClick = (e: React.MouseEvent, task: any) => {
+    if (isDesktop) return;
+
+    // Do not trigger context menu if clicking interactive elements
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('a') ||
+      target.closest('input') ||
+      target.closest('select') ||
+      target.closest('textarea') ||
+      target.closest('[role="menu"]')
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Show context menu near the click/touch position
+    let x = e.clientX || (e as any).touches?.[0]?.clientX || window.innerWidth / 2 - 80;
+    let y = e.clientY || (e as any).touches?.[0]?.clientY || window.innerHeight / 2 - 45;
+
+    // Screen boundaries adjustment
+    const menuWidth = 180;
+    const menuHeight = 185;
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 8;
+    }
+    if (x < 8) x = 8;
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 8;
+    }
+    if (y < 8) y = 8;
+
     setContextMenu({ x, y, task });
   };
 
@@ -572,6 +635,56 @@ export default function ClientBoardPage() {
           </div>
         </Card>
 
+        {/* Mobile Column Tabs */}
+        <div className="flex md:hidden bg-muted/65 p-1 rounded-2xl border border-border/80 shadow-sm animate-fade-in">
+          {boardColumns.map((col) => {
+            const count = filteredTasks.filter(t => {
+              if (t.status !== col.id) return false;
+              if (col.id === 'achieved') {
+                if (!t.completedAt) return false;
+                const completedDate = new Date(t.completedAt);
+                const today = new Date();
+                return completedDate.toDateString() === today.toDateString();
+              }
+              return true;
+            }).length;
+            const isActive = activeTab === col.id;
+            
+            let activeColorClass = "";
+            if (isActive) {
+              if (col.id === 'to_prepare') activeColorClass = "bg-card text-foreground border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm";
+              else if (col.id === 'in_progress') activeColorClass = "bg-card text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm";
+              else activeColorClass = "bg-card text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm";
+            } else {
+              activeColorClass = "text-muted-foreground hover:text-foreground";
+            }
+
+            return (
+              <button
+                key={col.id}
+                type="button"
+                onClick={() => setActiveTab(col.id)}
+                className={cn(
+                  "flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-200 flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer relative",
+                  activeColorClass
+                )}
+              >
+                <span>{col.label}</span>
+                <span className={cn(
+                  "text-[9px] px-1.5 py-0.5 rounded-full font-bold tabular-nums",
+                  isActive 
+                    ? (col.id === 'to_prepare' ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300" 
+                       : col.id === 'in_progress' ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                       : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")
+                    : "bg-muted-foreground/10 text-muted-foreground/60"
+                )}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* --- KANBAN BOARD GRID --- */}
         <div className="grid gap-6 md:grid-cols-3 items-start">
           {boardColumns.map((col) => {
@@ -595,6 +708,7 @@ export default function ClientBoardPage() {
                 onDragLeave={() => setDragOverColumn(null)}
                 className={cn(
                   'rounded-2xl border border-border bg-card/60 backdrop-blur-sm transition-all duration-300 min-h-[500px] flex flex-col',
+                  activeTab !== col.id ? 'hidden md:flex' : 'flex',
                   isOver && 'border-primary ring-2 ring-primary/10 bg-primary/5',
                   getColumnHeaderBg(col.id)
                 )}
@@ -661,11 +775,13 @@ export default function ClientBoardPage() {
                       return (
                         <div
                           key={task.id}
-                          draggable={!contextMenu && !modalOpen}
+                          draggable={isDesktop && !contextMenu && !modalOpen}
                           onDragStart={(e) => handleDragStart(e, task.id)}
                           onContextMenu={(e) => handleContextMenu(e, task)}
+                          onClick={(e) => handleCardClick(e, task)}
                           className={cn(
-                            'group relative bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98] cursor-grab active:cursor-grabbing select-none',
+                            'group relative bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 select-none',
+                            isDesktop ? 'cursor-grab active:cursor-grabbing active:scale-[0.98]' : 'cursor-pointer active:bg-muted/30',
                             urgent && 'border-red-500/20 dark:border-red-500/30 ring-1 ring-red-500/10 dark:ring-red-500/20 bg-red-500/[0.01]',
                             isContextMenuOpen && 'border-primary ring-1 ring-primary/20 bg-primary/[0.02]'
                           )}
@@ -746,11 +862,30 @@ export default function ClientBoardPage() {
                                       icon: <Pencil size={12} />,
                                       onSelect: () => handleEditClick(task),
                                     },
+                                    ...(task.status !== 'to_prepare' ? [{
+                                      key: 'to_prepare',
+                                      label: 'Move to To Prepare',
+                                      icon: <ClipboardList size={12} className="text-zinc-500" />,
+                                      onSelect: () => handleStatusChange(task.id, 'to_prepare'),
+                                    }] : []),
+                                    ...(task.status !== 'in_progress' ? [{
+                                      key: 'in_progress',
+                                      label: 'Move to In Progress',
+                                      icon: <Clock size={12} className="text-blue-500" />,
+                                      onSelect: () => handleStatusChange(task.id, 'in_progress'),
+                                    }] : []),
+                                    ...(task.status !== 'achieved' ? [{
+                                      key: 'achieved',
+                                      label: 'Move to Achieved',
+                                      icon: <Check size={12} className="text-emerald-500" />,
+                                      onSelect: () => handleStatusChange(task.id, 'achieved'),
+                                    }] : []),
                                     {
                                       key: 'delete',
                                       label: 'Delete task',
                                       icon: <Trash2 size={12} className="text-red-500" />,
                                       onSelect: () => handleDeleteClick(task.id),
+                                      destructive: true,
                                     },
                                   ]}
                                 />
@@ -779,7 +914,7 @@ export default function ClientBoardPage() {
             {Object.keys(groupedAchievements).length === 0 ? (
               <div className="py-8 text-center text-xs text-muted-foreground italic flex flex-col items-center gap-1.5">
                 <Clock size={16} className="text-muted-foreground/60" />
-                <span>No updates achieved yet. Start moving items to 'Achieved'!</span>
+                <span>No updates achieved yet. Start moving items to &apos;Achieved&apos;!</span>
               </div>
             ) : (
               Object.keys(groupedAchievements).map((dateKey) => (
@@ -1032,7 +1167,7 @@ export default function ClientBoardPage() {
           }}
         >
           <div
-            className="absolute z-[100] min-w-[160px] py-1.5 rounded-xl border border-border bg-card shadow-2xl animate-fade-in-scale"
+            className="absolute z-[100] min-w-[180px] py-1.5 rounded-xl border border-border bg-card shadow-2xl animate-fade-in-scale"
             style={{
               left: `${contextMenu.x}px`,
               top: `${contextMenu.y}px`,
@@ -1046,18 +1181,64 @@ export default function ClientBoardPage() {
                 handleEditClick(contextMenu.task);
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
             >
               <Pencil size={13} className="text-muted-foreground" />
               Edit details
             </button>
+
+            {/* Quick status moves */}
+            <div className="px-3.5 py-1 text-[9px] font-bold text-muted-foreground/60 uppercase tracking-wider border-t border-border/60 mt-1 pt-1.5">
+              Move to
+            </div>
+            {contextMenu.task.status !== 'to_prepare' && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleStatusChange(contextMenu.task.id, 'to_prepare');
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+              >
+                <ClipboardList size={13} className="text-zinc-500" />
+                To Prepare
+              </button>
+            )}
+            {contextMenu.task.status !== 'in_progress' && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleStatusChange(contextMenu.task.id, 'in_progress');
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+              >
+                <Clock size={13} className="text-blue-500" />
+                In Progress
+              </button>
+            )}
+            {contextMenu.task.status !== 'achieved' && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleStatusChange(contextMenu.task.id, 'achieved');
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+              >
+                <Check size={13} className="text-emerald-500" />
+                Achieved
+              </button>
+            )}
+
+            <div className="border-t border-border/60 mt-1" />
             <button
               type="button"
               onClick={() => {
                 handleDeleteClick(contextMenu.task.id);
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
             >
               <Trash2 size={13} className="text-red-500" />
               Delete task
