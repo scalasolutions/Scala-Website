@@ -740,6 +740,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               pageNumber: pageNo,
               totalPages: numPages,
               websiteAddress: client?.websiteAddress,
+              invoiceSubtotal: parsedItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
             };
 
             let pageComponent = null;

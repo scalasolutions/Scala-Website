@@ -21,6 +21,7 @@ interface InvoiceBillingPageProps {
   showTotals?: boolean;
   showPayments?: boolean;
   receivedBy?: 'company' | 'fredrick' | 'nicholas';
+  invoiceSubtotal?: number;
 }
 
 const renderBankDetailsTable = (bank: 'BCA' | 'BNI', amount: number) => {
@@ -82,8 +83,9 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   showTotals = true,
   showPayments = true,
   receivedBy = 'company',
+  invoiceSubtotal,
 }) => {
-  const subtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = invoiceSubtotal !== undefined ? invoiceSubtotal : lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let discountAmount = 0;
   if (discountType === 'percentage' && discountValue) {
     discountAmount = Math.round(subtotal * (discountValue / 100));
