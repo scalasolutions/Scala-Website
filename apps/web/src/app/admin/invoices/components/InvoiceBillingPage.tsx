@@ -22,6 +22,7 @@ interface InvoiceBillingPageProps {
   showPayments?: boolean;
   receivedBy?: 'company' | 'fredrick' | 'nicholas';
   invoiceSubtotal?: number;
+  isDpCollection?: boolean;
 }
 
 const renderBankDetailsTable = (bank: 'BCA' | 'BNI', amount: number) => {
@@ -84,6 +85,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   showPayments = true,
   receivedBy = 'company',
   invoiceSubtotal,
+  isDpCollection = false,
 }) => {
   const subtotal = invoiceSubtotal !== undefined ? invoiceSubtotal : lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let discountAmount = 0;
@@ -302,8 +304,120 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
               </div>
             )}
 
-            {/* UNPAID STATE: Centered Bank Details Card */}
-            {status !== 'paid' && status !== 'written_off' && status !== 'partially_paid' && (
+            {/* UNPAID STATE (DP Collection): Side-by-side cards */}
+            {isDpCollection && status !== 'paid' && status !== 'written_off' && status !== 'partially_paid' && (() => {
+              const dpAmount = Math.round(total * 0.5);
+              const balanceDue = total - dpAmount;
+
+              return (
+                <div style={{ display: 'flex', gap: 24, width: '100%', alignItems: 'stretch', justifyContent: 'center' }}>
+                  {/* Left Side: Bank Details Card */}
+                  <div
+                    style={{
+                      flex: 7,
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderTop: '4px solid #CEF84E',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 4 }}>
+                      Payment Instructions
+                    </div>
+
+                    <div style={{ fontSize: 11.5, color: '#475569', lineHeight: '1.5' }}>
+                      Please transfer to the following account to pay the required 50% Down Payment (DP):
+                    </div>
+                    {receivedBy === 'company' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {renderBankDetailsTable('BCA', dpAmount)}
+                        <div style={{ height: 1, backgroundColor: '#e2e8f0', border: 'none', borderTop: '1px dashed #e2e8f0' }} />
+                        {renderBankDetailsTable('BNI', dpAmount)}
+                      </div>
+                    ) : (
+                      <div>
+                        {receivedBy === 'nicholas' ? renderBankDetailsTable('BCA', dpAmount) : renderBankDetailsTable('BNI', dpAmount)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Side: Payment Details Card */}
+                  <div
+                    style={{
+                      flex: 5,
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderTop: '4px solid #475569',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: 6 }}>
+                      Down Payment Breakdown
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {/* DP Required Row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 12.5 }}>
+                        <span style={{ color: '#334155', fontWeight: 600 }}>
+                          Down Payment (50%)
+                          <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
+                            Required to start project
+                          </span>
+                        </span>
+                        <span style={{ color: '#1e293b', fontWeight: 700 }}>
+                          {formatCurrencyIDR(dpAmount)}
+                        </span>
+                      </div>
+
+                      {/* Remaining Balance Row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 12.5 }}>
+                        <span style={{ color: '#334155', fontWeight: 600 }}>
+                          Remaining Balance
+                          <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
+                            Due upon completion
+                          </span>
+                        </span>
+                        <span style={{ color: '#64748b', fontWeight: 700 }}>
+                          {formatCurrencyIDR(balanceDue)}
+                        </span>
+                      </div>
+
+                      {/* Amount Due Now Row */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: 12.5,
+                          borderTop: '1px solid #cbd5e1',
+                          paddingTop: 10,
+                          marginTop: 4,
+                        }}
+                      >
+                        <span style={{ color: '#1e293b', fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>
+                          Amount Due Now
+                        </span>
+                        <span style={{ color: '#ef4444', fontWeight: 800, fontSize: 14 }}>
+                          {formatCurrencyIDR(dpAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* UNPAID STATE (Standard): Centered Bank Details Card */}
+            {!isDpCollection && status !== 'paid' && status !== 'written_off' && status !== 'partially_paid' && (
               <div
                 style={{
                   width: receivedBy === 'company' ? '660px' : '450px',
@@ -323,7 +437,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
                 </div>
 
                 <div style={{ fontSize: 12.5, color: '#475569', lineHeight: '1.6', textAlign: 'left' }}>
-                  If you cannot make an online payment, you can transfer to the following account and send the transfer receipt to our <strong style={{ fontWeight: 700 }}>Finance Team (+628 1881 5037)</strong>:
+                  Please transfer to the following account:
                 </div>
 
                 {receivedBy === 'company' ? (
@@ -372,7 +486,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
                     </div>
 
                     <div style={{ fontSize: 11.5, color: '#475569', lineHeight: '1.5' }}>
-                      If you cannot make an online payment, you can transfer to the following account:
+                      Please transfer to the following account:
                     </div>
                     {receivedBy === 'company' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -444,9 +558,14 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
               );
             })()}
 
+            {/* Contact Support Note */}
+            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center', marginTop: 20, marginBottom: -10, fontWeight: 500 }}>
+              If you have any issues, you can contact our <strong style={{ fontWeight: 700 }}>Finance Team (+62818815037)</strong>.
+            </div>
+
             {/* Footnotes */}
             <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: 24 }}>
-              * All billed monthly are billed at the end of the month
+              * Hosting & maintenance subscriptions are billed in advance on an annual basis.
             </div>
           </div>
         )}

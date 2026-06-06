@@ -192,6 +192,7 @@ export default function InvoicesPage() {
   const [hostingType, setHostingType] = useState<'static' | 'dynamic' | 'none'>('none');
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'none'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
+  const [isDpCollection, setIsDpCollection] = useState(false);
 
   // Partially paid fields
   const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -305,6 +306,8 @@ export default function InvoicesPage() {
     } else {
       setIncludedPages(['cover', 'tc1', 'tc2']);
     }
+
+    setIsDpCollection(invoice.isDpCollection || false);
 
     setPasteMode(false);
     setPastedText('');
@@ -544,6 +547,7 @@ export default function InvoicesPage() {
     setAmountPaid(0);
     setProofOfPaymentUrl('');
     setReceivedBy('company');
+    setIsDpCollection(false);
     setLineItems([
       {
         name: 'Starter Company Profile Package',
@@ -589,6 +593,7 @@ export default function InvoicesPage() {
             amountPaid,
             proofOfPaymentUrl: proofOfPaymentUrl || null,
             receivedBy,
+            isDpCollection,
           });
 
           if (updatedInv) {
@@ -627,6 +632,7 @@ export default function InvoicesPage() {
             amountPaid,
             proofOfPaymentUrl: proofOfPaymentUrl || null,
             receivedBy,
+            isDpCollection,
           });
 
           if (newInv) {
@@ -1217,6 +1223,26 @@ export default function InvoicesPage() {
                             <option value="partially_paid">Partially paid — milestone collection</option>
                             <option value="paid">Paid — fully collected</option>
                           </Select>
+
+                          <div className="sm:col-span-2 flex items-center justify-between p-3.5 rounded-xl border border-border bg-muted/10">
+                            <div className="space-y-0.5">
+                              <label className="text-xs font-semibold text-foreground">
+                                Down Payment (DP) Invoice
+                              </label>
+                              <p className="text-[10px] text-muted-foreground">
+                                Enable to automatically calculate 50% Down Payment (DP) collection details for the client.
+                              </p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isDpCollection}
+                                onChange={(e) => setIsDpCollection(e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-border rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"></div>
+                            </label>
+                          </div>
 
                           {status === 'partially_paid' && (
                             <div className="sm:col-span-2 animate-fade-in-scale">

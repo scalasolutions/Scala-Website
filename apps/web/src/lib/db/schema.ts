@@ -64,6 +64,7 @@ export const invoices = pgTable('invoices', {
   discountType: text('discount_type'), // 'percentage' | 'fixed' | null
   discountValue: integer('discount_value').default(0),
   receivedBy: text('received_by').notNull().default('company'), // 'company' | 'fredrick' | 'nicholas'
+  isDpCollection: boolean('is_dp_collection').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

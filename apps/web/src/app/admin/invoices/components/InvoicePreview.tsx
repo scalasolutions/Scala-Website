@@ -323,6 +323,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const [pagePresets, setPagePresets] = useState<MockInvoicePagePreset[]>([]);
   const [titlePresets, setTitlePresets] = useState<MockInvoicePagePreset[]>([]);
   const [modifyMenuOpen, setModifyMenuOpen] = useState(false);
+  const [previewIsDpCollection, setPreviewIsDpCollection] = useState(invoice.isDpCollection || false);
 
   const [mobilePreparedOpen, setMobilePreparedOpen] = useState(false);
   const [mobilePageJumpOpen, setMobilePageJumpOpen] = useState(false);
@@ -455,6 +456,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
       setZoomPercent(roundedPercent);
       setCurrentPage(0);
     }, 0);
+    setPreviewIsDpCollection(invoice.isDpCollection || false);
     const container = scrollContainerRef.current;
     if (container) container.scrollTop = 0;
     return () => clearTimeout(timer);
@@ -495,7 +497,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const activePages: Array<{ key: string; label: string; content?: string; chunk?: BillingPageChunk }> = [];
   
   // 1. Billing is always included (split into pages dynamically if needed to prevent overlap)
-  const hasPayments = invoice.status === 'paid' || invoice.status === 'partially_paid';
+  const hasPayments = invoice.status === 'paid' || invoice.status === 'partially_paid' || previewIsDpCollection;
   const billingChunks = splitBillingItems(parsedItems, hasPayments);
   
   billingChunks.forEach(chunk => {
@@ -760,6 +762,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   showTotals={chunk.showTotals}
                   showPayments={chunk.showPayments}
                   receivedBy={invoice.receivedBy}
+                  isDpCollection={previewIsDpCollection}
                 />
               );
             } else if (page.key === 'cover') {
@@ -809,10 +812,34 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
       {/* Close scrollable content container */}
       </div>
 
-      {/* ── Floating right controls panel (Prepared By Signature & Pages Navigator) ── */}
+       {/* ── Floating right controls panel (Prepared By Signature & Pages Navigator) ── */}
       <div
         className="hidden md:flex absolute bottom-6 right-[15px] z-20 print:hidden flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
       >
+        {/* DP Collection Toggle Card */}
+        <div 
+          className="bg-card border border-border rounded-2xl p-3 shadow-xl flex flex-col gap-1 transition-all duration-300 animate-fade-in"
+          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+        >
+          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/80 pb-1 mb-1">
+            Billing Mode
+          </span>
+          <div className="flex items-center justify-between gap-1.5 py-0.5">
+            <span className="text-[10px] font-black text-foreground">
+              DP Collection
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={previewIsDpCollection}
+                onChange={(e) => setPreviewIsDpCollection(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-8 h-4.5 bg-border rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:after:translate-x-[14px]"></div>
+            </label>
+          </div>
+        </div>
+
         {/* Prepared By Selector */}
         {includedPageKeys.includes('cover') && (
           <div 

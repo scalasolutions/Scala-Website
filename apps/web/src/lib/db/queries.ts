@@ -64,6 +64,7 @@ export interface MockInvoice {
   discountType: 'percentage' | 'fixed' | null;
   discountValue: number;
   receivedBy: 'company' | 'fredrick' | 'nicholas';
+  isDpCollection: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -450,6 +451,7 @@ export async function createInvoice(data: schema.NewInvoice) {
     discountType: (data.discountType || null) as 'percentage' | 'fixed' | null,
     discountValue: data.discountValue !== undefined && data.discountValue !== null ? Number(data.discountValue) : 0,
     receivedBy: data.receivedBy as any || 'company',
+    isDpCollection: data.isDpCollection || false,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -553,6 +555,7 @@ export async function updateInvoice(id: string, data: Partial<schema.NewInvoice>
       discountType: data.discountType !== undefined ? (data.discountType as 'percentage' | 'fixed' | null) : mockInvoices[idx].discountType,
       discountValue: data.discountValue !== undefined && data.discountValue !== null ? Number(data.discountValue) : mockInvoices[idx].discountValue,
       includedPagesJson: data.includedPagesJson !== undefined ? data.includedPagesJson : mockInvoices[idx].includedPagesJson,
+      isDpCollection: data.isDpCollection !== undefined ? data.isDpCollection : mockInvoices[idx].isDpCollection,
       updatedAt: new Date()
     } as MockInvoice;
     return mockInvoices[idx];

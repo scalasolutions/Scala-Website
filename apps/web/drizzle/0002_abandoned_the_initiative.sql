@@ -1,0 +1,1 @@
+ALTER TABLE "invoices" ADD COLUMN "is_dp_collection" boolean DEFAULT false NOT NULL;
