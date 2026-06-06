@@ -276,6 +276,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   onClose,
   onModify,
 }) => {
+  // Resolve client details
+  const client = clients.find(c => c.id === invoice.clientId);
+  const clientName = client?.name || 'Unknown Client';
+  const companyName = client?.companyName || 'No Company';
+  const displayName = companyName && companyName !== 'No Company' && companyName !== clientName
+    ? `${clientName} • ${companyName}`
+    : clientName;
+  const parsedItems = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
+  const clientRefCode = getClientRefCode(companyName || clientName, invoice.invoiceNumber);
+  const formattedDate = formatDateClean(invoice.createdAt || invoice.issuedAt || new Date());
+
   const [mounted, setMounted] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [currentPage, setCurrentPage] = useState(0);
@@ -380,6 +391,30 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     };
   }, []);
 
+  // Dynamically set document title on print to control the PDF filename
+  useEffect(() => {
+    let originalTitle = '';
+    
+    const handleBeforePrint = () => {
+      originalTitle = document.title;
+      document.title = `${clientName} - ${invoice.invoiceNumber}`;
+    };
+
+    const handleAfterPrint = () => {
+      if (originalTitle) {
+        document.title = originalTitle;
+      }
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, [clientName, invoice.invoiceNumber]);
+
   // Reset zoom and scroll to top when invoice changes
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -422,16 +457,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     return key;
   };
 
-  // Resolve client details
-  const client = clients.find(c => c.id === invoice.clientId);
-  const clientName = client?.name || 'Unknown Client';
-  const companyName = client?.companyName || 'No Company';
-  const displayName = companyName && companyName !== 'No Company' && companyName !== clientName
-    ? `${clientName} • ${companyName}`
-    : clientName;
-  const parsedItems = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
-  const clientRefCode = getClientRefCode(companyName || clientName, invoice.invoiceNumber);
-  const formattedDate = formatDateClean(invoice.createdAt || invoice.issuedAt || new Date());
+  // Client details resolved at top of component
 
   const includedPageKeys = getIncludedPageKeys();
 
