@@ -583,7 +583,16 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
 
   const handlePrint = () => {
+    const originalTitle = document.title;
+    const businessName = companyName && companyName !== 'No Company' ? companyName : clientName;
+    document.title = `${businessName} - ${invoice.invoiceNumber}`;
+
     window.print();
+
+    // Restore original title after a short delay to ensure print UI captures it on all platforms (especially mobile)
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 500);
   };
 
   if (!mounted) return null;
