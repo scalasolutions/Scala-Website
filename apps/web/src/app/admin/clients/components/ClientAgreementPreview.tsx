@@ -163,9 +163,14 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
   const [zoomPercent, setZoomPercent] = useState(100);
   const [preparedBy, setPreparedBy] = useState<'nicholas' | 'fredrick' | 'both'>('nicholas');
   const [currentPage, setCurrentPage] = useState(0);
+  const [mobilePreparedOpen, setMobilePreparedOpen] = useState(false);
+  const [mobilePageJumpOpen, setMobilePageJumpOpen] = useState(false);
+
   const outerPagesRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const mobilePreparedRef = useRef<HTMLDivElement>(null);
+  const mobilePageJumpRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScroll = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -177,10 +182,10 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
   useEffect(() => {
     setMounted(true);
     const computeScale = () => {
-      const availH = window.innerHeight - 200;
-      const availW = window.innerWidth - 80;
+      const availH = window.innerHeight - (window.innerWidth < 640 ? 160 : 200);
+      const availW = window.innerWidth - (window.innerWidth < 640 ? 24 : 120);
       const rawScale = Math.max(0.2, Math.min(availH / PAGE_H, availW / PAGE_W, 1.2));
-      const roundedPercent = Math.round((rawScale * 1.8) * 10) * 10;
+      const roundedPercent = Math.round(rawScale * 100);
       setZoomPercent(roundedPercent);
     };
     computeScale();
@@ -195,6 +200,23 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
+    };
+  }, []);
+
+  // Click outside listener for mobile HUD popovers
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (mobilePreparedRef.current && !mobilePreparedRef.current.contains(target)) {
+        setMobilePreparedOpen(false);
+      }
+      if (mobilePageJumpRef.current && !mobilePageJumpRef.current.contains(target)) {
+        setMobilePageJumpOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
@@ -331,7 +353,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
         {/* Toolbar Center Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Page navigation */}
-          <div className="flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
+          <div className="hidden md:flex items-center rounded-xl bg-muted/40 border border-border p-0.5">
             <button
               onClick={() => scrollToPage(Math.max(0, currentPage - 1))}
               disabled={currentPage === 0}
@@ -377,7 +399,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
           {/* Action Download button */}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md"
+            className="flex items-center gap-1.5 p-2.5 md:px-3 md:py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md"
             title="Download PDF"
           >
             <Download size={13} />
@@ -387,19 +409,19 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
           {/* Action Print button */}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-foreground font-semibold text-xs hover:bg-muted transition-all cursor-pointer"
+            className="flex items-center gap-1.5 p-2.5 md:px-3 md:py-2 rounded-xl bg-card border border-border text-foreground font-semibold text-xs hover:bg-muted transition-all cursor-pointer"
             title="Print SLA Document"
           >
             <Printer size={13} />
             <span className="hidden lg:inline">Print</span>
           </button>
 
-          <div className="h-6 w-[1px] bg-border/60 mx-1 hidden sm:block" />
+          <div className="h-6 w-[1px] bg-border/60 mx-1 hidden md:block" />
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+            className="hidden md:block p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
             title="Close Preview"
           >
             <X size={18} />
@@ -697,7 +719,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
 
       {/* ── Floating right controls panel (Prepared By Signature Selector) ── */}
       <div
-        className="absolute bottom-6 right-6 z-20 print:hidden flex flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
+        className="hidden md:flex absolute bottom-6 right-[15px] z-20 print:hidden flex-col gap-3 pointer-events-auto w-36 lg:w-40 shrink-0"
       >
         <div 
           className="group bg-card border border-border rounded-2xl p-3 shadow-xl flex flex-col gap-2 transition-all duration-300 animate-fade-in"
@@ -725,6 +747,127 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* ── Mobile Bottom HUD ── */}
+      <div
+        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-card/85 dark:bg-card/85 backdrop-blur-md border border-border/80 px-4 py-2 rounded-full shadow-2xl print:hidden pointer-events-auto shrink-0 select-none"
+        style={{ boxShadow: '0 10px 32px rgba(0,0,0,0.15)' }}
+      >
+        {/* Page navigation: Prev */}
+        <button
+          onClick={() => scrollToPage(Math.max(0, currentPage - 1))}
+          disabled={currentPage === 0}
+          className="p-1.5 rounded-full hover:bg-muted text-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+          title="Previous Page"
+        >
+          <ChevronLeft size={16} />
+        </button>
+
+        {/* Page indicator & Tap to Jump Trigger */}
+        <div ref={mobilePageJumpRef} className="relative">
+          <button
+            onClick={() => setMobilePageJumpOpen(!mobilePageJumpOpen)}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide cursor-pointer transition-all border ${
+              mobilePageJumpOpen
+                ? 'bg-primary border-primary text-primary-foreground'
+                : 'bg-muted/55 border-border/60 text-foreground hover:bg-muted hover:border-border'
+            }`}
+          >
+            {currentPage + 1} / {numPages}
+          </button>
+
+          {/* Page Jump Grid Popover */}
+          {mobilePageJumpOpen && (
+            <div
+              className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-card border border-border backdrop-blur-md rounded-2xl p-3 shadow-2xl flex flex-col gap-2 min-w-[150px] z-40 animate-fade-in"
+              style={{ boxShadow: '0 10px 40px -6px rgba(0,0,0,0.25)' }}
+            >
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center block border-b border-border/60 pb-1 mb-0.5">
+                Jump to Page
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 justify-items-center">
+                {Array.from({ length: numPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      scrollToPage(i);
+                      setMobilePageJumpOpen(false);
+                    }}
+                    title={`Page ${i + 1}`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all cursor-pointer border ${
+                      currentPage === i
+                        ? 'bg-primary border-primary text-primary-foreground font-black'
+                        : 'bg-muted/40 border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Page navigation: Next */}
+        <button
+          onClick={() => scrollToPage(Math.min(numPages - 1, currentPage + 1))}
+          disabled={currentPage === numPages - 1}
+          className="p-1.5 rounded-full hover:bg-muted text-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+          title="Next Page"
+        >
+          <ChevronRight size={16} />
+        </button>
+
+        {/* Divider */}
+        <div className="h-4 w-[1px] bg-border/60" />
+
+        {/* Prepared By Initials Selector */}
+        <div ref={mobilePreparedRef} className="relative">
+          <button
+            onClick={() => setMobilePreparedOpen(!mobilePreparedOpen)}
+            className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border transition-all cursor-pointer ${
+              mobilePreparedOpen
+                ? 'bg-primary border-primary text-primary-foreground'
+                : 'bg-muted/55 border-border/60 text-foreground hover:bg-muted hover:border-border'
+            }`}
+            title={`Prepared by: ${preparedBy}`}
+          >
+            {preparedBy === 'nicholas' ? 'N' : preparedBy === 'fredrick' ? 'F' : 'N&F'}
+          </button>
+
+          {/* Prepared By Touch Popover */}
+          {mobilePreparedOpen && (
+            <div
+              className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-card border border-border backdrop-blur-md rounded-2xl p-1.5 shadow-2xl flex flex-col gap-0.5 min-w-[130px] z-40 animate-fade-in text-[10px] font-bold"
+              style={{ boxShadow: '0 10px 40px -6px rgba(0,0,0,0.25)' }}
+            >
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center block border-b border-border/60 pb-1 mb-1">
+                Prepared By
+              </span>
+              {[
+                { id: 'nicholas', label: 'Nicholas' },
+                { id: 'fredrick', label: 'Fredrick' },
+                { id: 'both', label: 'Both' }
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    setPreparedBy(opt.id as any);
+                    setMobilePreparedOpen(false);
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-colors flex items-center cursor-pointer font-black ${
+                    preparedBy === opt.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>,
