@@ -119,6 +119,61 @@ export default function ClientBoardPage() {
   const [activeTab, setActiveTab] = useState<TaskStatus>('to_prepare');
   const [isDesktop, setIsDesktop] = useState(true);
 
+  // Floating sidebar drawer state for mobile viewports
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  // Swipe gesture detection & auto-dismiss when tapping outside on mobile viewports
+  useEffect(() => {
+    if (isDesktop || !mounted) return;
+
+    const handleWindowTouchStart = (e: TouchEvent) => {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+    };
+
+    const handleWindowTouchEnd = (e: TouchEvent) => {
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const diffX = touchStartX.current - endX;
+      const diffY = touchStartY.current - endY;
+
+      // Swipe Left starting from the right edge region (right 100px of screen) opens drawer
+      if (diffX > 40 && Math.abs(diffY) < 40) {
+        if (touchStartX.current > window.innerWidth - 100) {
+          setDrawerOpen(true);
+        }
+      }
+
+      // Swipe Right anywhere on screen closes drawer
+      if (diffX < -40 && Math.abs(diffY) < 40) {
+        if (drawerOpen) {
+          setDrawerOpen(false);
+        }
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!drawerOpen) return;
+      const target = e.target as HTMLElement;
+      // Close only if click is outside both drawer panel and floating pull tab handle
+      if (!target.closest('[data-drawer]') && !target.closest('[data-pull-tab]')) {
+        setDrawerOpen(false);
+      }
+    };
+
+    window.addEventListener('touchstart', handleWindowTouchStart, { passive: true });
+    window.addEventListener('touchend', handleWindowTouchEnd, { passive: true });
+    document.addEventListener('mousedown', handleClickOutside, true);
+
+    return () => {
+      window.removeEventListener('touchstart', handleWindowTouchStart);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+      document.removeEventListener('mousedown', handleClickOutside, true);
+    };
+  }, [isDesktop, drawerOpen, mounted]);
+
   useEffect(() => {
     if (!mounted) return;
     const media = window.matchMedia('(min-width: 768px)');
@@ -474,6 +529,113 @@ export default function ClientBoardPage() {
 
   return (
     <>
+      {mounted && createPortal(
+        <>
+          {/* Floating Pull-tab Handle */}
+          <button
+            type="button"
+            data-pull-tab
+            onClick={() => setDrawerOpen(!drawerOpen)}
+            className={cn(
+              "fixed top-[22%] -translate-y-1/2 z-50 md:hidden",
+              "flex flex-col items-center justify-center w-[30px] h-20",
+              "bg-primary/95 hover:bg-primary backdrop-blur-md text-primary-foreground",
+              "rounded-l-2xl border border-r-0 border-border/20 shadow-2xl",
+              "transition-all duration-300 ease-out cursor-pointer select-none",
+              drawerOpen ? "right-[-40px] opacity-0 pointer-events-none" : "right-0 opacity-100"
+            )}
+            aria-label="Open board navigation"
+          >
+            <ChevronRight className="h-4 w-4 transform rotate-180" />
+            <div className="text-[9px] font-black uppercase tracking-wider select-none mt-1 [writing-mode:vertical-lr] rotate-180">
+              Tabs
+            </div>
+          </button>
+
+          {/* Floating Side Drawer */}
+          <div
+            data-drawer
+            className={cn(
+              "fixed top-[22%] -translate-y-1/2 z-50 md:hidden",
+              "w-[84px] bg-card/95 backdrop-blur-md rounded-l-3xl border-l border-y border-border/80 shadow-2xl p-2 flex flex-col gap-2.5",
+              "transition-all duration-300 ease-out",
+              drawerOpen ? "right-0 opacity-100 visible" : "right-[-120px] opacity-0 invisible pointer-events-none"
+            )}
+          >
+            {boardColumns.map((col) => {
+              const count = filteredTasks.filter(t => {
+                if (t.status !== col.id) return false;
+                if (col.id === 'achieved') {
+                  if (!t.completedAt) return false;
+                  const completedDate = new Date(t.completedAt);
+                  const today = new Date();
+                  return completedDate.toDateString() === today.toDateString();
+                }
+                return true;
+              }).length;
+              const isActive = activeTab === col.id;
+              
+              let activeColorClass = "";
+              let iconColorClass = "";
+              if (isActive) {
+                if (col.id === 'to_prepare') {
+                  activeColorClass = "bg-card text-foreground border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm";
+                  iconColorClass = "text-zinc-700 dark:text-zinc-300";
+                } else if (col.id === 'in_progress') {
+                  activeColorClass = "bg-card text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm";
+                  iconColorClass = "text-blue-500 dark:text-blue-400";
+                } else {
+                  activeColorClass = "bg-card text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm";
+                  iconColorClass = "text-emerald-500 dark:text-emerald-400";
+                }
+              } else {
+                activeColorClass = "text-muted-foreground hover:text-foreground hover:bg-background/25";
+                iconColorClass = "text-muted-foreground/60";
+              }
+
+              const icon = col.id === 'to_prepare' ? (
+                <ClipboardList size={16} className={iconColorClass} />
+              ) : col.id === 'in_progress' ? (
+                <Clock size={16} className={iconColorClass} />
+              ) : (
+                <CheckCircle2 size={16} className={iconColorClass} />
+              );
+
+              const shortLabel = col.id === 'to_prepare' ? 'Prepare' : col.id === 'in_progress' ? 'Progress' : 'Achieved';
+
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(col.id);
+                    setDrawerOpen(false);
+                  }}
+                  className={cn(
+                    "w-full py-3 px-1 text-[10px] font-bold rounded-xl transition-all duration-200 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center relative",
+                    activeColorClass
+                  )}
+                >
+                  {icon}
+                  <span className="leading-tight">{shortLabel}</span>
+                  <span className={cn(
+                    "text-[9px] px-1.5 py-0.5 rounded-full font-bold tabular-nums",
+                    isActive 
+                      ? (col.id === 'to_prepare' ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300" 
+                         : col.id === 'in_progress' ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                         : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")
+                      : "bg-muted-foreground/10 text-muted-foreground/60"
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>,
+        document.body
+      )}
+
       <div className="space-y-8 animate-fade-up">
         {/* Page Header */}
         <PageHeader
@@ -635,58 +797,10 @@ export default function ClientBoardPage() {
           </div>
         </Card>
 
-        {/* Mobile Column Tabs */}
-        <div className="flex md:hidden bg-muted/65 p-1 rounded-2xl border border-border/80 shadow-sm animate-fade-in">
-          {boardColumns.map((col) => {
-            const count = filteredTasks.filter(t => {
-              if (t.status !== col.id) return false;
-              if (col.id === 'achieved') {
-                if (!t.completedAt) return false;
-                const completedDate = new Date(t.completedAt);
-                const today = new Date();
-                return completedDate.toDateString() === today.toDateString();
-              }
-              return true;
-            }).length;
-            const isActive = activeTab === col.id;
-            
-            let activeColorClass = "";
-            if (isActive) {
-              if (col.id === 'to_prepare') activeColorClass = "bg-card text-foreground border border-zinc-200/50 dark:border-zinc-700/50 shadow-sm";
-              else if (col.id === 'in_progress') activeColorClass = "bg-card text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm";
-              else activeColorClass = "bg-card text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm";
-            } else {
-              activeColorClass = "text-muted-foreground hover:text-foreground";
-            }
 
-            return (
-              <button
-                key={col.id}
-                type="button"
-                onClick={() => setActiveTab(col.id)}
-                className={cn(
-                  "flex-1 py-3 text-xs font-bold rounded-xl transition-all duration-200 flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer relative",
-                  activeColorClass
-                )}
-              >
-                <span>{col.label}</span>
-                <span className={cn(
-                  "text-[9px] px-1.5 py-0.5 rounded-full font-bold tabular-nums",
-                  isActive 
-                    ? (col.id === 'to_prepare' ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300" 
-                       : col.id === 'in_progress' ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                       : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")
-                    : "bg-muted-foreground/10 text-muted-foreground/60"
-                )}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
 
         {/* --- KANBAN BOARD GRID --- */}
-        <div className="grid gap-6 md:grid-cols-3 items-start">
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-3 items-start">
           {boardColumns.map((col) => {
             const columnTasks = filteredTasks.filter(t => {
               if (t.status !== col.id) return false;
