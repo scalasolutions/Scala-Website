@@ -940,7 +940,7 @@ export default function InvoicesPage() {
                           </div>
                           <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-medium text-foreground truncate">
+                            <p className="text-xs sm:text-sm font-medium text-foreground leading-tight">
                               {client?.name || 'Unknown client'}
                             </p>
                             <span className={cn(

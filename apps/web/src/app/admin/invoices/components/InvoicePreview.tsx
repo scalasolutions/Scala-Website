@@ -381,6 +381,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const client = clients.find(c => c.id === invoice.clientId);
   const clientName = client?.name || 'Unknown Client';
   const companyName = client?.companyName || 'No Company';
+  const displayName = companyName && companyName !== 'No Company' && companyName !== clientName
+    ? `${clientName} • ${companyName}`
+    : clientName;
   const parsedItems = JSON.parse(invoice.itemsJson) as InvoiceLineItem[];
   const clientRefCode = getClientRefCode(companyName || clientName, invoice.invoiceNumber);
   const formattedDate = formatDateClean(invoice.createdAt || invoice.issuedAt || new Date());
@@ -501,12 +504,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             <ArrowLeft size={16} />
           </button>
           <div className="min-w-0">
-            <h2 className="text-sm md:text-base font-extrabold text-foreground truncate">
-              Invoice {invoice.invoiceNumber}
+            <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-foreground leading-tight">
+              {displayName}
             </h2>
             <div className="hidden sm:flex items-center gap-2 mt-0.5 flex-wrap">
-              <p className="text-[10px] text-muted-foreground font-mono truncate">
-                {clientName}
+              <p className="text-[10px] text-muted-foreground font-mono">
+                Ref: {invoice.invoiceNumber}
               </p>
               <span className="text-[10px] uppercase font-black tracking-widest text-primary-ink dark:text-primary shrink-0 bg-primary-soft dark:bg-primary/10 px-2.5 py-0.5 rounded border border-primary-ink/10 dark:border-transparent font-bold">
                 Rp {invoice.total.toLocaleString('id-ID')}
