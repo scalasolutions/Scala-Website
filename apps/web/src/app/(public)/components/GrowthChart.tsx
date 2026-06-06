@@ -95,7 +95,7 @@ export default function GrowthChart() {
         </div>
 
         {/* The chart itself — fixed height so SSR layout is stable */}
-        <div className="h-[220px] md:h-[260px] mt-2 -ml-3">
+        <div className="h-[220px] md:h-[260px] mt-2 -ml-3 pointer-events-none select-none">
           <ResponsiveContainer width="100%" height="100%" key={version}>
             <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <defs>

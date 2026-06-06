@@ -48,7 +48,7 @@ const PAGE_STYLE: React.CSSProperties = {
 const PRINT_CSS = `
   @media print {
     @page {
-      size: auto;
+      size: A4;
       margin: 0mm;
     }
 
@@ -75,6 +75,51 @@ const PRINT_CSS = `
       padding: 0 !important;
       background: white !important;
       background-color: white !important;
+    }
+
+    #invoice-preview-overlay {
+      position: static !important;
+      display: block !important;
+      height: auto !important;
+      width: 100% !important;
+      background: white !important;
+      overflow: visible !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      opacity: 1 !important;
+      transform: none !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    #invoice-preview-scroll-container {
+      position: static !important;
+      display: block !important;
+      height: auto !important;
+      width: 100% !important;
+      overflow: visible !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    #invoice-canvas-container {
+      display: block !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      height: auto !important;
+      width: 100% !important;
+      overflow: visible !important;
+    }
+
+    #invoice-canvas-unscale {
+      position: static !important;
+      display: block !important;
+      width: 100% !important;
+      height: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      transform: none !important;
     }
 
     /* Target the exact dashboard layout parents by matching their unique hierarchy */
@@ -125,7 +170,7 @@ const PRINT_CSS = `
       width: 210mm !important;
       height: 297mm !important;
       margin: 0 auto !important;
-      padding: 20mm 20mm !important;
+      padding: 14.7mm 16.8mm !important;
       border: none !important;
       box-shadow: none !important;
       border-radius: 0px !important;
@@ -599,6 +644,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
       {/* ── Scrollable content container ── */}
       <div 
+        id="invoice-preview-scroll-container"
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto print:overflow-visible"
         onScroll={handleScroll}
