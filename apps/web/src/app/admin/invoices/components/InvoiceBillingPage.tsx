@@ -19,7 +19,49 @@ interface InvoiceBillingPageProps {
   dpAt?: Date | string | null;
   websiteAddress?: string | null;
   showTotals?: boolean;
+  showPayments?: boolean;
+  receivedBy?: 'company' | 'fredrick' | 'nicholas';
 }
+
+const renderBankDetailsTable = (bank: 'BCA' | 'BNI', amount: number) => {
+  const isBCA = bank === 'BCA';
+  const logoUrl = isBCA ? '/bca-logo.png' : '/bni-logo.png';
+  const accountName = isBCA ? 'Nicholas Chairnando' : 'Sdr Fredrick';
+  const accountNumber = isBCA ? '0828222280' : '1934433334';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Bank Row */}
+      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 8, borderBottom: '1px dashed #e2e8f0' }}>
+        <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bank:</span>
+        <span style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+          <img src={logoUrl} alt={bank} style={{ height: 22, width: 'auto', objectFit: 'contain' }} />
+        </span>
+      </div>
+      {/* Nama Row */}
+      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 8, borderBottom: '1px dashed #e2e8f0' }}>
+        <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name:</span>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+          {accountName}
+        </span>
+      </div>
+      {/* Rekening Row */}
+      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 8, borderBottom: '1px dashed #e2e8f0' }}>
+        <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Account:</span>
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: '#1e293b', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
+          {accountNumber}
+        </span>
+      </div>
+      {/* Nominal Row */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount:</span>
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: '#16a34a' }}>
+          {formatCurrencyIDR(amount)}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   companyName,
@@ -38,6 +80,8 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   dpAt,
   websiteAddress,
   showTotals = true,
+  showPayments = true,
+  receivedBy = 'company',
 }) => {
   const subtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let discountAmount = 0;
@@ -213,90 +257,196 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
                 <span style={{ fontSize: 14, fontWeight: 800 }}>{formatCurrencyIDR(total)}</span>
               </div>
             </div>
+          </>
+        )}
 
-            {/* Payment History and Balance Details */}
-            {(status === 'paid' || status === 'partially_paid') && (() => {
-              const dpAmount = status === 'partially_paid' ? (amountPaid || Math.round(total * 0.5)) : Math.round(total * 0.5);
-              const finalPaymentAmount = total - dpAmount;
-              const balanceDue = status === 'paid' ? 0 : total - (amountPaid || 0);
+        {/* Centered Texts and Cards Block */}
+        {showPayments !== false && (
+          <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {/* Header texts */}
+            <div style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8', textAlign: 'center', marginBottom: 8 }}>
+              Thank you for your business!
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#111111', textAlign: 'center', marginBottom: 6 }}>
+              VAT/PPN not included.
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', maxWidth: 480, marginBottom: 24, lineHeight: 1.5 }}>
+              This invoice is only for services offered by Scala Solutions. API fees and other expenses are not included.
+            </div>
 
+            {/* PAID STATE: Green Badge Card */}
+            {status === 'paid' && (
+              <div
+                style={{
+                  width: '450px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderTop: '4px solid #10b981',
+                  borderRadius: '12px',
+                  padding: '24px 32px',
+                  boxShadow: '0 4px 20px -2px rgba(16,185,129,0.05), 0 2px 8px -1px rgba(16,185,129,0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#15803d', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  PAID
+                </div>
+                <div style={{ fontSize: 13, color: '#166534', fontWeight: 500, textAlign: 'center', lineHeight: 1.5 }}>
+                  Thank you, payment for this invoice has been received in full.
+                </div>
+              </div>
+            )}
+
+            {/* UNPAID STATE: Centered Bank Details Card */}
+            {status !== 'paid' && status !== 'written_off' && status !== 'partially_paid' && (
+              <div
+                style={{
+                  width: receivedBy === 'company' ? '660px' : '450px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderTop: '4px solid #CEF84E',
+                  borderRadius: '12px',
+                  padding: '20px 24px',
+                  boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 10, marginBottom: 4 }}>
+                  Payment Instructions
+                </div>
+
+                <div style={{ fontSize: 12.5, color: '#475569', lineHeight: '1.6', textAlign: 'left' }}>
+                  If you cannot make an online payment, you can transfer to the following account and send the transfer receipt to our <strong style={{ fontWeight: 700 }}>Finance Team (+628 1881 5037)</strong>:
+                </div>
+
+                {receivedBy === 'company' ? (
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'stretch' }}>
+                    <div style={{ flex: 1 }}>
+                      {renderBankDetailsTable('BCA', total)}
+                    </div>
+                    <div style={{ width: 1, backgroundColor: '#e2e8f0' }} />
+                    <div style={{ flex: 1 }}>
+                      {renderBankDetailsTable('BNI', total)}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {receivedBy === 'nicholas' ? renderBankDetailsTable('BCA', total) : renderBankDetailsTable('BNI', total)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PARTIALLY PAID STATE: Side-by-side cards */}
+            {status === 'partially_paid' && (() => {
+              const dpAmount = amountPaid || Math.round(total * 0.5);
+              const balanceDue = total - dpAmount;
               const dpDateStr = dpAt ? formatDateClean(dpAt) : (paidAt ? formatDateClean(paidAt) : formattedDate);
-              const finalDateStr = paidAt ? formatDateClean(paidAt) : '';
 
               return (
-                <div style={{ display: 'flex', marginTop: 16 }}>
-                  {/* Spacer matching Description column width */}
-                  <div style={{ flex: 7 }} />
-                  
-                  {/* Premium Payment Details card */}
+                <div style={{ display: 'flex', gap: 24, width: '100%', alignItems: 'stretch', justifyContent: 'center' }}>
+                  {/* Left Side: Bank Details Card */}
+                  <div
+                    style={{
+                      flex: 7,
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderTop: '4px solid #CEF84E',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 4 }}>
+                      Payment Instructions
+                    </div>
+
+                    <div style={{ fontSize: 11.5, color: '#475569', lineHeight: '1.5' }}>
+                      If you cannot make an online payment, you can transfer to the following account:
+                    </div>
+                    {receivedBy === 'company' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {renderBankDetailsTable('BCA', balanceDue)}
+                        <div style={{ height: 1, backgroundColor: '#e2e8f0', border: 'none', borderTop: '1px dashed #e2e8f0' }} />
+                        {renderBankDetailsTable('BNI', balanceDue)}
+                      </div>
+                    ) : (
+                      <div>
+                        {receivedBy === 'nicholas' ? renderBankDetailsTable('BCA', balanceDue) : renderBankDetailsTable('BNI', balanceDue)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Side: Payment Details Card */}
                   <div
                     style={{
                       flex: 5,
                       backgroundColor: '#f8fafc',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      padding: '14px 18px',
+                      borderTop: '4px solid #475569',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 10,
+                      gap: 12,
                     }}
                   >
-                    <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: 6 }}>
                       Payment Details
                     </div>
-                    
-                    {/* DP Row */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 13 }}>
-                      <span style={{ color: '#334155', fontWeight: 600 }}>
-                        50% Down Payment (DP)
-                        <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
-                          Received on {dpDateStr}
-                        </span>
-                      </span>
-                      <span style={{ color: '#0f172a', fontWeight: 700, paddingTop: 1 }}>
-                        {formatCurrencyIDR(dpAmount)}
-                      </span>
-                    </div>
-
-                    {/* Final Payment Row (if fully paid) */}
-                    {status === 'paid' && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 13, borderTop: '1px dashed #e2e8f0', paddingTop: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {/* DP Row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 12.5 }}>
                         <span style={{ color: '#334155', fontWeight: 600 }}>
-                          50% Final Payment
+                          Down Payment (DP)
                           <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
-                            Received on {finalDateStr}
+                            Received on {dpDateStr}
                           </span>
                         </span>
-                        <span style={{ color: '#0f172a', fontWeight: 700, paddingTop: 1 }}>
-                          {formatCurrencyIDR(finalPaymentAmount)}
+                        <span style={{ color: '#1e293b', fontWeight: 700 }}>
+                          {formatCurrencyIDR(dpAmount)}
                         </span>
                       </div>
-                    )}
 
-                    {/* Balance Due Row */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        fontSize: 13,
-                        borderTop: '1px solid #cbd5e1',
-                        paddingTop: 10,
-                        marginTop: 2,
-                      }}
-                    >
-                      <span style={{ color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>
-                        Balance Due
-                      </span>
-                      <span style={{ color: balanceDue > 0 ? '#ef4444' : '#10b981', fontWeight: 800 }}>
-                        {formatCurrencyIDR(balanceDue)}
-                      </span>
+                      {/* Balance Due Row */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: 12.5,
+                          borderTop: '1px solid #cbd5e1',
+                          paddingTop: 10,
+                          marginTop: 4,
+                        }}
+                      >
+                        <span style={{ color: '#1e293b', fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>
+                          Balance Due
+                        </span>
+                        <span style={{ color: balanceDue > 0 ? '#ef4444' : '#10b981', fontWeight: 800, fontSize: 14 }}>
+                          {formatCurrencyIDR(balanceDue)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               );
             })()}
-          </>
+
+            {/* Footnotes */}
+            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: 24 }}>
+              * All billed monthly are billed at the end of the month
+            </div>
+          </div>
         )}
 
         <InvoicePageFooter pageNumber={pageNumber} totalPages={totalPages} />

@@ -206,6 +206,7 @@ const estimateItemHeight = (item: InvoiceLineItem): number => {
 interface BillingPageChunk {
   items: InvoiceLineItem[];
   showTotals: boolean;
+  showPayments: boolean;
   pageNumber: number;
 }
 
@@ -213,7 +214,8 @@ interface BillingPageChunk {
 const splitBillingItems = (lineItems: InvoiceLineItem[], hasPayments: boolean): BillingPageChunk[] => {
   const chunks: BillingPageChunk[] = [];
   const USABLE_HEIGHT = 750; // safe A4 content vertical space (increased to fit more on a single page)
-  const TOTALS_HEIGHT = hasPayments ? 260 : 60; // realistic space allocation for totals card
+  const TOTALS_HEIGHT = 110; // realistic space allocation for subtotal, discount, and total pill
+  const PAYMENTS_HEIGHT = 350; // space allocation for payments card section (unpaid/paid card + centered texts + footnotes)
 
   let currentPageItems: InvoiceLineItem[] = [];
   let currentHeight = 0;
@@ -226,6 +228,7 @@ const splitBillingItems = (lineItems: InvoiceLineItem[], hasPayments: boolean): 
       chunks.push({
         items: currentPageItems,
         showTotals: false,
+        showPayments: false,
         pageNumber: chunks.length + 1,
       });
       currentPageItems = [item];
@@ -236,26 +239,52 @@ const splitBillingItems = (lineItems: InvoiceLineItem[], hasPayments: boolean): 
     }
   }
 
-  // Check if totals fit on the final page, otherwise split totals into a new final page
+  // Now determine how to handle totals and payments on the final chunk of items
+  // 1. Check if the items + totals block fit on the current page
   if (currentHeight + TOTALS_HEIGHT > USABLE_HEIGHT) {
+    // Totals block doesn't fit on this page, so we push current items to a page without totals/payments
     if (currentPageItems.length > 0) {
       chunks.push({
         items: currentPageItems,
         showTotals: false,
+        showPayments: false,
         pageNumber: chunks.length + 1,
       });
     }
+    // Create a new final page that will contain both totals and payments
     chunks.push({
       items: [],
       showTotals: true,
+      showPayments: true,
       pageNumber: chunks.length + 1,
     });
   } else {
-    chunks.push({
-      items: currentPageItems,
-      showTotals: true,
-      pageNumber: chunks.length + 1,
-    });
+    // Totals block fits! Let's check if the payments section also fits on this page
+    if (currentHeight + TOTALS_HEIGHT + PAYMENTS_HEIGHT > USABLE_HEIGHT) {
+      // Payments section doesn't fit, but totals block does.
+      // So render totals here, but NOT payments.
+      chunks.push({
+        items: currentPageItems,
+        showTotals: true,
+        showPayments: false,
+        pageNumber: chunks.length + 1,
+      });
+      // Push the payments section to the next page
+      chunks.push({
+        items: [],
+        showTotals: false,
+        showPayments: true,
+        pageNumber: chunks.length + 1,
+      });
+    } else {
+      // Both fit beautifully on the same page!
+      chunks.push({
+        items: currentPageItems,
+        showTotals: true,
+        showPayments: true,
+        pageNumber: chunks.length + 1,
+      });
+    }
   }
 
   return chunks;
@@ -397,7 +426,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     
     const handleBeforePrint = () => {
       originalTitle = document.title;
-      document.title = `${clientName} - ${invoice.invoiceNumber}`;
+      const businessName = companyName && companyName !== 'No Company' ? companyName : clientName;
+      document.title = `${businessName} - ${invoice.invoiceNumber}`;
     };
 
     const handleAfterPrint = () => {
@@ -413,7 +443,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
       window.removeEventListener('beforeprint', handleBeforePrint);
       window.removeEventListener('afterprint', handleAfterPrint);
     };
-  }, [clientName, invoice.invoiceNumber]);
+  }, [clientName, companyName, invoice.invoiceNumber]);
 
   // Reset zoom and scroll to top when invoice changes
   useEffect(() => {
@@ -727,6 +757,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   paidAt={invoice.paidAt}
                   dpAt={invoice.dpAt}
                   showTotals={chunk.showTotals}
+                  showPayments={chunk.showPayments}
+                  receivedBy={invoice.receivedBy}
                 />
               );
             } else if (page.key === 'cover') {
