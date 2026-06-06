@@ -421,28 +421,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     };
   }, []);
 
-  // Dynamically set document title on print to control the PDF filename
+  // Dynamically set document title when the preview is active to control the tab name and PDF filename
   useEffect(() => {
-    let originalTitle = '';
-    
-    const handleBeforePrint = () => {
-      originalTitle = document.title;
-      const businessName = companyName && companyName !== 'No Company' ? companyName : clientName;
-      document.title = `${businessName} - ${invoice.invoiceNumber}`;
-    };
-
-    const handleAfterPrint = () => {
-      if (originalTitle) {
-        document.title = originalTitle;
-      }
-    };
-
-    window.addEventListener('beforeprint', handleBeforePrint);
-    window.addEventListener('afterprint', handleAfterPrint);
+    const originalTitle = document.title;
+    const businessName = companyName && companyName !== 'No Company' ? companyName : clientName;
+    document.title = `${businessName} - ${invoice.invoiceNumber}`;
 
     return () => {
-      window.removeEventListener('beforeprint', handleBeforePrint);
-      window.removeEventListener('afterprint', handleAfterPrint);
+      document.title = originalTitle;
     };
   }, [clientName, companyName, invoice.invoiceNumber]);
 
@@ -583,16 +569,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
 
   const handlePrint = () => {
-    const originalTitle = document.title;
-    const businessName = companyName && companyName !== 'No Company' ? companyName : clientName;
-    document.title = `${businessName} - ${invoice.invoiceNumber}`;
-
     window.print();
-
-    // Restore original title after a short delay to ensure print UI captures it on all platforms (especially mobile)
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 500);
   };
 
   if (!mounted) return null;

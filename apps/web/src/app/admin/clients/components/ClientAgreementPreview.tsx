@@ -198,28 +198,14 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
     };
   }, []);
 
-  // Dynamically set document title on print to control the PDF filename
+  // Dynamically set document title when the preview is active to control the tab name and PDF filename
   useEffect(() => {
-    let originalTitle = '';
-    
-    const handleBeforePrint = () => {
-      originalTitle = document.title;
-      const businessName = client.companyName || client.name;
-      document.title = `SLA Agreement - ${businessName}`;
-    };
-
-    const handleAfterPrint = () => {
-      if (originalTitle) {
-        document.title = originalTitle;
-      }
-    };
-
-    window.addEventListener('beforeprint', handleBeforePrint);
-    window.addEventListener('afterprint', handleAfterPrint);
+    const originalTitle = document.title;
+    const businessName = client.companyName || client.name;
+    document.title = `SLA Agreement - ${businessName}`;
 
     return () => {
-      window.removeEventListener('beforeprint', handleBeforePrint);
-      window.removeEventListener('afterprint', handleAfterPrint);
+      document.title = originalTitle;
     };
   }, [client.name, client.companyName]);
 
@@ -277,16 +263,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
   };
 
   const handlePrint = () => {
-    const originalTitle = document.title;
-    const businessName = client.companyName || client.name;
-    document.title = `SLA Agreement - ${businessName}`;
-
     window.print();
-
-    // Restore original title after a short delay to ensure print UI captures it on all platforms (especially mobile)
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 500);
   };
 
   const formattedDate = new Date(client.subscriptionStartDate || client.createdAt).toLocaleDateString('en-US', {
