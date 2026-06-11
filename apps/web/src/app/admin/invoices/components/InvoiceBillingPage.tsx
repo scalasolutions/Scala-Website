@@ -336,11 +336,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
                     {receivedBy === 'company' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {renderBankDetailsTable('BCA', dpAmount)}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
-                          <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.12em', textTransform: 'uppercase' }}>OR</span>
-                          <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
-                        </div>
+                        <div style={{ height: 1, backgroundColor: '#e2e8f0', border: 'none', borderTop: '1px dashed #e2e8f0' }} />
                         {renderBankDetailsTable('BNI', dpAmount)}
                       </div>
                     ) : (
@@ -449,11 +445,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
                     <div style={{ flex: 1 }}>
                       {renderBankDetailsTable('BCA', total)}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                      <div style={{ flex: 1, width: 1, backgroundColor: '#e2e8f0' }} />
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.12em', textTransform: 'uppercase' }}>OR</span>
-                      <div style={{ flex: 1, width: 1, backgroundColor: '#e2e8f0' }} />
-                    </div>
+                    <div style={{ width: 1, backgroundColor: '#e2e8f0' }} />
                     <div style={{ flex: 1 }}>
                       {renderBankDetailsTable('BNI', total)}
                     </div>
@@ -499,11 +491,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
                     {receivedBy === 'company' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {renderBankDetailsTable('BCA', balanceDue)}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
-                          <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.12em', textTransform: 'uppercase' }}>OR</span>
-                          <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
-                        </div>
+                        <div style={{ height: 1, backgroundColor: '#e2e8f0', border: 'none', borderTop: '1px dashed #e2e8f0' }} />
                         {renderBankDetailsTable('BNI', balanceDue)}
                       </div>
                     ) : (
