@@ -47,6 +47,10 @@ const PRINT_CSS = `
       margin: 0mm;
     }
 
+    body > *:not(#agreement-preview-overlay) {
+      display: none !important;
+    }
+
     * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -585,6 +589,9 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   <p className="mt-1">
                     Uptime targets exclude scheduled maintenance windows (announced 24 hours in advance), Force Majeure events, client-side domain/DNS configuration failures, third-party API or upstream service outages, or periods where the client account is in payment default.
                   </p>
+                  <p className="mt-1.5 text-[10px] text-zinc-600 leading-relaxed border-l-2 border-zinc-300 pl-2">
+                    <strong className="text-zinc-950">Resource Limits &amp; Traffic Spikes:</strong> Hosting plans include standard resource allocations. In the event of an extraordinary traffic spike or high server load, Scala Solutions will deploy optimal caching and routing strategies to maximize performance and actively reduce data transfer overhead, minimizing potential overage fees. However, if cumulative resource consumption exceeds standard plan allocations, excess overage costs will be billed to the Client to ensure uninterrupted network availability.
+                  </p>
                 </div>
 
                 <div>
@@ -595,37 +602,51 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   <table className="w-full border-collapse border border-zinc-200 rounded-xl overflow-hidden mt-2 text-[10px]">
                     <thead>
                       <tr className="bg-zinc-50 text-zinc-900 font-extrabold border-b border-zinc-200">
-                        <th className="border border-zinc-200 p-2 text-left">Priority Tier</th>
-                        <th className="border border-zinc-200 p-2 text-left">Initial Response Time</th>
-                        <th className="border border-zinc-200 p-2 text-left">Target Update Cycle</th>
+                        <th className="border border-zinc-200 p-1.5 text-left">Priority Tier</th>
+                        <th className="border border-zinc-200 p-1.5 text-left">Initial Response Time</th>
+                        <th className="border border-zinc-200 p-1.5 text-left">Target Update Cycle</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="border border-zinc-200 p-2 font-bold text-red-600 bg-red-50/20">🚨 Urgent / Severity 1</td>
-                        <td className="border border-zinc-200 p-2">&le; 2 Business Hours</td>
-                        <td className="border border-zinc-200 p-2">Every 4 Hours</td>
+                        <td className="border border-zinc-200 p-1.5 font-bold text-red-600 bg-red-50/20">🚨 Urgent / Severity 1</td>
+                        <td className="border border-zinc-200 p-1.5">&le; 2 Business Hours</td>
+                        <td className="border border-zinc-200 p-1.5">Every 4 Hours</td>
                       </tr>
                       <tr>
-                        <td className="border border-zinc-200 p-2 font-bold text-amber-600 bg-amber-50/20">⚠️ High / Severity 2</td>
-                        <td className="border border-zinc-200 p-2">&le; 6 Business Hours</td>
-                        <td className="border border-zinc-200 p-2">Every 12 Hours</td>
+                        <td className="border border-zinc-200 p-1.5 font-bold text-amber-600 bg-amber-50/20">⚠️ High / Severity 2</td>
+                        <td className="border border-zinc-200 p-1.5">&le; 6 Business Hours</td>
+                        <td className="border border-zinc-200 p-1.5">Every 12 Hours</td>
                       </tr>
                       <tr>
-                        <td className="border border-zinc-200 p-2 text-zinc-700">💬 Medium & Low / Severity 3</td>
-                        <td className="border border-zinc-200 p-2">&le; 24 Business Hours</td>
-                        <td className="border border-zinc-200 p-2">Upon Resolution</td>
+                        <td className="border border-zinc-200 p-1.5 text-zinc-700">💬 Medium & Low / Severity 3</td>
+                        <td className="border border-zinc-200 p-1.5">&le; 24 Business Hours</td>
+                        <td className="border border-zinc-200 p-1.5">Upon Resolution</td>
                       </tr>
                     </tbody>
                   </table>
-                  <p className="mt-2 text-[10px] text-zinc-500 italic">
+                  <p className="mt-1.5 text-[10px] text-zinc-500 italic">
                     Support is strictly limited to infrastructure stability, network availability, and server configurations. Support explicitly excludes custom application coding, design revisions, database tuning, training, or code modified by the client or third parties without Scala Solutions' explicit written approval.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">3. Uptime Guarantees &amp; Service Credits</h3>
+                  <p>
+                    If the hosting services experience cumulative downtime in any calendar month exceeding the thresholds below (excluding Section 1 exceptions), the Client is entitled to receive a Service Credit offset against their next monthly hosting invoice:
+                  </p>
+                  <ul className="list-disc pl-5 mt-1 space-y-0.5 text-[10px] text-zinc-700">
+                    <li>Cumulative monthly downtime exceeding <strong className="text-zinc-950">10 minutes</strong>: <span className="font-bold text-zinc-900">15% Service Credit</span></li>
+                    <li>Cumulative monthly downtime exceeding <strong className="text-zinc-950">1 hour</strong>: <span className="font-bold text-zinc-900">50% Service Credit</span></li>
+                  </ul>
+                  <p className="mt-1 text-[9px] text-zinc-500 italic">
+                    Credit claims must be submitted via the Support Tickets panel in the Client Portal within thirty (30) days of the billing cycle end date.
                   </p>
                 </div>
 
                 {client.slaCustomTerms && (
                   <div>
-                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">3. Custom SLA Commitments</h3>
+                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">4. Custom SLA Commitments</h3>
                     <p className="italic text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 mt-1 leading-relaxed">
                       {client.slaCustomTerms}
                     </p>
@@ -636,16 +657,16 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               {/* Sign-Off Authorization */}
               <div className="border-t border-zinc-200 pt-4 mt-5">
                 <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">
-                  {client.slaCustomTerms ? '4.' : '3.'} Execution &amp; Authorization
+                  {client.slaCustomTerms ? '5.' : '4.'} Execution &amp; Authorization
                 </h3>
                 <p className="text-[10px] text-zinc-500 leading-relaxed mb-8">
                   By signing below, or by authorization signature status verified in the Scala Solutions Admin Console, both the Contractor (Scala Solutions) and the Client (Entity listed) agree to be legally bound by this Services Agreement and Uptime SLA.
                 </p>
 
                 {/* Signatures Dual Box */}
-                <div className="grid grid-cols-2 gap-8 text-[11px]">
+                <div className="grid grid-cols-2 gap-4 text-[11px]">
                   {/* Scala Side */}
-                  <div className="border border-zinc-200 rounded-xl p-4 relative flex flex-col justify-between min-h-[145px]">
+                  <div className="border border-zinc-200 rounded-xl p-3 relative flex flex-col justify-between min-h-[110px]">
                     <div>
                       <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-extrabold block mb-1">Authorized Contractor Signature</span>
                       
@@ -656,7 +677,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                               src="/chai-signature.png"
                               alt="Nicholas Signature"
                               className="h-10 w-auto object-contain mix-blend-multiply block"
-                              style={{ maxHeight: '40px' }}
+                              style={{ maxHeight: '36px' }}
                             />
                             <div className="mt-1">
                               <div className="text-[9px] font-black text-zinc-900 leading-tight">Nicholas Chairnando</div>
@@ -671,7 +692,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                               src="/digital-signature-fred.png"
                               alt="Fredrick Signature"
                               className="h-10 w-auto object-contain mix-blend-multiply block"
-                              style={{ maxHeight: '40px' }}
+                              style={{ maxHeight: '36px' }}
                             />
                             <div className="mt-1">
                               <div className="text-[9px] font-black text-zinc-900 leading-tight">Fredrick Yang</div>
@@ -682,23 +703,23 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                       </div>
                     </div>
                     {/* Contractor Signature Footer */}
-                    <div className="mt-3 border-t border-zinc-100 pt-2 flex items-center justify-between">
+                    <div className="mt-2 border-t border-zinc-100 pt-1.5 flex items-center justify-between">
                       <span className="text-[9px] font-bold text-zinc-800 uppercase tracking-wider">✓ Approved & Verified</span>
                     </div>
                   </div>
 
                   {/* Client Side */}
-                  <div className="border border-zinc-200 rounded-xl p-4 relative flex flex-col justify-between min-h-[145px]">
+                  <div className="border border-zinc-200 rounded-xl p-3 relative flex flex-col justify-between min-h-[110px]">
                     <div>
                       <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-extrabold block">Authorized Client Representative</span>
-                      <p className="font-bold text-zinc-900 mt-2">{client.name}</p>
+                      <p className="font-bold text-zinc-900 mt-1">{client.name}</p>
                       <p className="text-zinc-500 text-[10px]">{client.companyName || 'Representative'}</p>
                     </div>
 
-                    <div className="mt-3 border-t border-zinc-100 pt-2 flex flex-col gap-1.5">
+                    <div className="mt-2 border-t border-zinc-100 pt-1.5 flex flex-col gap-1">
                       <div className="flex justify-between gap-4">
-                        <div className="flex-1 border-b border-zinc-300 h-8"></div>
-                        <div className="w-24 border-b border-zinc-300 h-8"></div>
+                        <div className="flex-1 border-b border-zinc-300 h-6"></div>
+                        <div className="w-20 border-b border-zinc-300 h-6"></div>
                       </div>
                       <div className="flex justify-between text-[7px] text-zinc-400 font-mono uppercase tracking-wider">
                         <span>Signature</span>
