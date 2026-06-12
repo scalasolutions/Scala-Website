@@ -28,7 +28,7 @@ const PAGE_STYLE: React.CSSProperties = {
   width: `${PAGE_W}px`,
   height: `${PAGE_H}px`,
   backgroundColor: 'white',
-  padding: '64px 72px',
+  padding: '64px 72px 112px 72px',
   fontFamily: "'Outfit','Inter',sans-serif",
   color: '#111111',
   boxSizing: 'border-box',
@@ -135,7 +135,7 @@ const PRINT_CSS = `
       width: 210mm !important;
       height: 297mm !important;
       margin: 0 auto !important;
-      padding: 20mm 20mm !important;
+      padding: 20mm 20mm 28mm 20mm !important;
       border: none !important;
       box-shadow: none !important;
       border-radius: 0px !important;
@@ -465,7 +465,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
             {/* ────────────────────────────────────────────────────────── */}
             <div ref={el => { pageRefs.current[0] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
               {/* Cover Header */}
-              <div className="flex justify-between items-start border-b-2 border-zinc-900 pb-6 mb-8">
+              <div className="flex justify-between items-start border-b-2 border-zinc-900 pb-4 mb-5">
                 <div>
                   <ScalaLogo variant="full" theme="light" className="h-8 w-auto -ml-1 text-zinc-950" />
                   <p className="text-[10px] text-zinc-500 mt-2 uppercase tracking-wider font-semibold">Web Infrastructure & Hosting Agreements</p>
@@ -476,13 +476,13 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               </div>
 
               {/* Title Section */}
-              <div className="mb-8">
-                <h1 className="text-2xl font-extrabold text-zinc-950 uppercase tracking-tight leading-none mb-2">Master Services Agreement</h1>
+              <div className="mb-5">
+                <h1 className="text-2xl font-extrabold text-zinc-950 uppercase tracking-tight leading-none mb-1">Services Agreement</h1>
                 <p className="text-sm text-zinc-500">Effective as of <span className="font-semibold text-zinc-800">{formattedDate}</span>, between Scala Solutions and the client named below.</p>
               </div>
 
               {/* Client Info InfoBox */}
-              <div className="grid grid-cols-2 gap-4 bg-zinc-50 border border-zinc-200 rounded-xl p-5 mb-8 text-xs">
+              <div className="grid grid-cols-2 gap-4 bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-5 text-xs">
                 <div>
                   <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-extrabold block mb-1">Contractor</span>
                   <p className="font-bold text-zinc-900">Scala Solutions (Indonesia)</p>
@@ -498,7 +498,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               </div>
 
               {/* T&C Core Content */}
-              <div className="text-zinc-800 space-y-3 leading-relaxed text-[11px] font-medium">
+              <div className="text-zinc-800 space-y-2.5 leading-relaxed text-[11px] font-medium">
                 <div>
                   <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">1. Scope of Work, Revisions & Delivery Acceptance</h3>
                   <p>
@@ -533,16 +533,18 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   </p>
                 </div>
 
-                {client.tcCustomTerms ? (
-                  <div className="bg-zinc-50/50 border border-dashed border-zinc-300 rounded-xl p-4 mt-2">
-                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">★ Special Rider & Custom Clauses</h3>
-                    <p className="italic text-zinc-700">{client.tcCustomTerms}</p>
-                  </div>
-                ) : (
+                <div>
+                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">5. Governing Law &amp; Dispute Resolution</h3>
+                  <p>
+                    This Services Agreement is governed and construed in accordance with the laws of the Republic of Indonesia. Both parties submit to the exclusive jurisdiction of the court chambers located in Jakarta for any legal actions arising under this contract.
+                  </p>
+                </div>
+
+                {client.tcCustomTerms && (
                   <div>
-                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">5. Governing Law & Dispute Resolution</h3>
-                    <p>
-                      This Master Services Agreement is governed and construed in accordance with the laws of the Republic of Indonesia. Both parties submit to the exclusive jurisdiction of the court chambers located in Jakarta for any legal actions arising under this contract.
+                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">6. Additional Terms &amp; Conditions</h3>
+                    <p className="italic text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 mt-1 leading-relaxed">
+                      {client.tcCustomTerms}
                     </p>
                   </div>
                 )}
@@ -550,7 +552,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
 
               {/* Page Footer */}
               <div className="absolute bottom-16 left-16 right-16 flex justify-between items-center text-[10px] text-zinc-400 font-bold border-t border-zinc-100 pt-3">
-                <span>Scala Master Services Agreement</span>
+                <span>Scala Services Agreement</span>
                 <span>Page 1 of 2</span>
               </div>
             </div>
@@ -560,18 +562,18 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
             {/* ────────────────────────────────────────────────────────── */}
             <div ref={el => { pageRefs.current[1] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
               {/* Mini Header */}
-              <div className="flex justify-between items-center border-b border-zinc-200 pb-3 mb-6 text-[10px] font-bold text-zinc-400">
+              <div className="flex justify-between items-center border-b border-zinc-200 pb-2.5 mb-5 text-[10px] font-bold text-zinc-400">
                 <span>SCALA SOLUTIONS &bull; SLA SCHEDULE</span>
               </div>
 
               {/* Title */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <h2 className="text-xl font-extrabold text-zinc-950 uppercase tracking-tight">Service Level Agreement (SLA)</h2>
                 <p className="text-[11px] text-zinc-500 mt-1">This Schedule outlines network availability targets, support tickets resolution times, and the signature sign-off.</p>
               </div>
 
               {/* SLA Details */}
-              <div className="space-y-4 text-[11px] text-zinc-800 leading-relaxed font-medium mb-8">
+              <div className="space-y-3 text-[11px] text-zinc-800 leading-relaxed font-medium mb-5">
                 <div>
                   <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">1. Uptime Commitment & Exclusions</h3>
                   <p>
@@ -622,18 +624,22 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                 </div>
 
                 {client.slaCustomTerms && (
-                  <div className="bg-zinc-50/50 border border-dashed border-zinc-300 rounded-xl p-4 mt-2">
-                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">★ Custom SLA Commitments</h3>
-                    <p className="italic text-zinc-700">{client.slaCustomTerms}</p>
+                  <div>
+                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">3. Custom SLA Commitments</h3>
+                    <p className="italic text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 mt-1 leading-relaxed">
+                      {client.slaCustomTerms}
+                    </p>
                   </div>
                 )}
               </div>
 
               {/* Sign-Off Authorization */}
-              <div className="border-t border-zinc-200 pt-6 mt-8">
-                <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">3. Execution & Authorization</h3>
+              <div className="border-t border-zinc-200 pt-4 mt-5">
+                <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">
+                  {client.slaCustomTerms ? '4.' : '3.'} Execution &amp; Authorization
+                </h3>
                 <p className="text-[10px] text-zinc-500 leading-relaxed mb-8">
-                  By signing below, or by authorization signature status verified in the Scala Solutions Admin Console, both the Contractor (Scala Solutions) and the Client (Entity listed) agree to be legally bound by this Master Services Agreement and Uptime SLA.
+                  By signing below, or by authorization signature status verified in the Scala Solutions Admin Console, both the Contractor (Scala Solutions) and the Client (Entity listed) agree to be legally bound by this Services Agreement and Uptime SLA.
                 </p>
 
                 {/* Signatures Dual Box */}
@@ -705,7 +711,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
 
               {/* Page Footer */}
               <div className="absolute bottom-16 left-16 right-16 flex justify-between items-center text-[10px] text-zinc-400 font-bold border-t border-zinc-100 pt-3">
-                <span>Scala Master Services Agreement</span>
+                <span>Scala Services Agreement</span>
                 <span>Page 2 of 2</span>
               </div>
             </div>

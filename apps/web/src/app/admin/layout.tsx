@@ -428,7 +428,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 Scala solutions
               </Link>
               {pathSegments.map((segment, index) => {
-                const label = segmentLabels[segment] || segment;
+                let label = segmentLabels[segment] || segment;
+                let isClientName = false;
+                if (clientsData) {
+                  const matchedClient = clientsData.find((c) => c.id === segment);
+                  if (matchedClient) {
+                    label = matchedClient.name;
+                    isClientName = true;
+                  }
+                }
                 const href = '/admin/' + pathSegments.slice(0, index + 1).join('/');
                 const isLast = index === pathSegments.length - 1;
 
@@ -436,11 +444,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <React.Fragment key={segment}>
                     <ChevronRight size={12} className="text-muted-foreground/40 shrink-0" />
                     {isLast ? (
-                      <span className="text-foreground font-medium capitalize truncate max-w-[200px]">
+                      <span className={cn("text-foreground font-medium truncate max-w-[200px]", !isClientName && "capitalize")}>
                         {label}
                       </span>
                     ) : (
-                      <Link href={href} className="hover:text-foreground transition-colors capitalize">
+                      <Link href={href} className={cn("hover:text-foreground transition-colors", !isClientName && "capitalize")}>
                         {label}
                       </Link>
                     )}

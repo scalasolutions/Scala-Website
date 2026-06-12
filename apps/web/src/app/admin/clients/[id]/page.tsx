@@ -1153,15 +1153,21 @@ export default function ClientDetailPage() {
 
           {/* SLA & T&C Agreement Card */}
           <Card padding="md" className="relative">
-            <SectionHeading
-              title="SLA & T&C Agreement"
-              icon={<FileText size={16} />}
-              action={
-                <Badge variant={client.tcStatus === 'signed' ? 'success' : 'warning'} className="capitalize">
-                  {client.tcStatus === 'signed' ? 'Signed' : 'Pending Signature'}
-                </Badge>
-              }
-            />
+            <div className="flex items-start gap-3 mb-5">
+              <span className="shrink-0 w-9 h-9 rounded-lg bg-muted/50 text-muted-foreground border border-border flex items-center justify-center mt-0.5">
+                <FileText size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-semibold tracking-tight text-foreground leading-tight">
+                  SLA &amp; T&amp;C Agreement
+                </h2>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  <Badge variant={client.tcStatus === 'signed' ? 'success' : 'warning'} className="capitalize">
+                    {client.tcStatus === 'signed' ? 'Signed' : 'Pending Signature'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-4 text-sm mt-3">
               {client.tcStatus === 'signed' ? (
