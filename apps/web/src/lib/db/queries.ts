@@ -4,6 +4,7 @@ import { db } from './index';
 import * as schema from './schema';
 import { desc, eq, like } from 'drizzle-orm';
 import { put } from '@vercel/blob';
+import { auth } from '@/auth';
 
 // Check if a real database connection is available and configured
 const isDbConfigured = () => {
@@ -1582,3 +1583,172 @@ export async function deletePartner(id: string) {
   mockPartners = mockPartners.filter(p => p.id !== id);
   return true;
 }
+
+// ============================================================================
+// Unified & Secure Parallelized Loaders
+// ============================================================================
+
+export async function getAdminOverviewData() {
+  const session = await auth();
+  if (!session || !session.user || (session.user as any).role !== 'admin') {
+    throw new Error("Unauthorized access. Admin role required.");
+  }
+
+  const [
+    clients,
+    invoices,
+    tickets,
+    tasks,
+    partners,
+    expenses,
+    injections,
+    payouts
+  ] = await Promise.all([
+    getClients(),
+    getInvoices(),
+    getTickets(),
+    getClientTasks(),
+    getPartners(),
+    getExpenses(),
+    getCapitalInjections(),
+    getPayouts()
+  ]);
+
+  return {
+    clients,
+    invoices,
+    tickets,
+    tasks,
+    partners,
+    expenses,
+    injections,
+    payouts
+  };
+}
+
+export async function getClientPortalData() {
+  const session = await auth();
+  if (!session || !session.user || (session.user as any).role !== 'client') {
+    throw new Error("Unauthorized access. Client role required.");
+  }
+
+  const clientId = (session.user as any).id;
+
+  if (isDbConfigured()) {
+    try {
+      const [client, invoicesList, ticketsList] = await Promise.all([
+        db.query.clients.findFirst({
+          where: eq(schema.clients.id, clientId)
+        }),
+        db.query.invoices.findMany({
+          where: eq(schema.invoices.clientId, clientId),
+          orderBy: [desc(schema.invoices.createdAt)],
+          with: {
+            client: true
+          }
+        }),
+        db.query.tickets.findMany({
+          where: eq(schema.tickets.clientId, clientId),
+          orderBy: [desc(schema.tickets.createdAt)],
+          with: {
+            client: true,
+            messages: true
+          }
+        })
+      ]);
+
+      return {
+        client: client || null,
+        invoices: invoicesList,
+        tickets: ticketsList
+      };
+    } catch (e) {
+      console.warn("DB Query failed for getClientPortalData, falling back to mock data: ", e);
+    }
+  }
+
+  // Fallback to mock data
+  const mockClientRecord = mockClients.find(c => c.id === clientId) || null;
+  const mockInvoicesList = mockInvoices
+    .filter(inv => inv.clientId === clientId)
+    .map(inv => ({
+      ...inv,
+      client: mockClientRecord
+    }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  
+  const mockTicketsList = mockTickets
+    .filter(t => t.clientId === clientId)
+    .map(t => ({
+      ...t,
+      client: mockClientRecord,
+      messages: mockTicketMessages.filter(m => m.ticketId === t.id)
+    }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  return {
+    client: mockClientRecord,
+    invoices: mockInvoicesList,
+    tickets: mockTicketsList
+  };
+}
+
+export async function getClientInvoiceDetail(invoiceId: string) {
+  const session = await auth();
+  if (!session || !session.user || (session.user as any).role !== 'client') {
+    throw new Error("Unauthorized access. Client role required.");
+  }
+
+  const clientId = (session.user as any).id;
+
+  if (isDbConfigured()) {
+    try {
+      const activeInvoice = await db.query.invoices.findFirst({
+        where: eq(schema.invoices.id, invoiceId),
+        with: {
+          client: true
+        }
+      });
+
+      if (!activeInvoice) {
+        throw new Error("Invoice not found.");
+      }
+
+      if (activeInvoice.clientId !== clientId) {
+        throw new Error("Access Denied. You do not have permission to view this invoice.");
+      }
+
+      return {
+        invoice: activeInvoice,
+        client: activeInvoice.client || null
+      };
+    } catch (e) {
+      const err = e as Error;
+      if (err.message?.includes("Access Denied") || err.message?.includes("not found")) {
+        throw e;
+      }
+      console.warn("DB Query failed for getClientInvoiceDetail, falling back to mock data: ", e);
+    }
+  }
+
+  // Fallback to mock data
+  const mockInvoiceRecord = mockInvoices.find(inv => inv.id === invoiceId);
+  if (!mockInvoiceRecord) {
+    throw new Error("Invoice not found.");
+  }
+
+  if (mockInvoiceRecord.clientId !== clientId) {
+    throw new Error("Access Denied. You do not have permission to view this invoice.");
+  }
+
+  const mockClientRecord = mockClients.find(c => c.id === clientId) || null;
+
+  return {
+    invoice: {
+      ...mockInvoiceRecord,
+      client: mockClientRecord
+    },
+    client: mockClientRecord
+  };
+}
+

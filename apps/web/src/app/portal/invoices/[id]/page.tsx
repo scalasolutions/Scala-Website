@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSession } from 'next-auth/react';
 import { Loader2, ArrowLeft, ShieldAlert } from 'lucide-react';
-import { getInvoices, getClients } from '@/lib/db/queries';
+import { getClientInvoiceDetail } from '@/lib/db/queries';
 import { InvoicePreview } from '@/app/admin/invoices/components/InvoicePreview';
 import Link from 'next/link';
 
@@ -28,32 +28,15 @@ export default function ClientInvoicePreviewPage() {
           return;
         }
         setSession(sess);
-        const clientId = (sess.user as any).id;
 
-        // 1. Fetch all clients and active client invoices
-        const allClients = await getClients();
-        setClients(allClients);
+        console.log("[Portal Invoice] 🔐 Fetching secure client invoice details...");
+        const data = await getClientInvoiceDetail(invoiceId);
 
-        const allInvoices = await getInvoices();
-        const activeInvoice = allInvoices.find(inv => inv.id === invoiceId);
-
-        if (!activeInvoice) {
-          setError('Invoice not found.');
-          setLoading(false);
-          return;
-        }
-
-        // 2. Strict tenancy isolation: Ensure the invoice belongs to this logged-in client
-        if (activeInvoice.clientId !== clientId) {
-          setError('Access Denied. You do not have permissions to view this document.');
-          setLoading(false);
-          return;
-        }
-
-        setInvoice(activeInvoice);
-      } catch (err) {
+        setInvoice(data.invoice);
+        setClients([data.client]); // Wrap single client inside an array as InvoicePreview expects list of clients
+      } catch (err: any) {
         console.error("Failed to load invoice preview for client portal:", err);
-        setError('Failed to load invoice details.');
+        setError(err.message || 'Failed to load invoice details.');
       } finally {
         setLoading(false);
       }

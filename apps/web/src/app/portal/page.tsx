@@ -26,9 +26,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { 
-  getClients, 
-  getInvoices, 
-  getTickets, 
+  getClientPortalData,
   getTicketDetails,
   createTicket, 
   createTicketMessage,
@@ -216,29 +214,22 @@ export default function ClientPortal() {
     }
   };
 
-  // ── Load portal data ──
   const loadPortalData = async () => {
     try {
       const sess = await getSession();
       if (sess && sess.user) {
         setSession(sess);
-        const clientId = (sess.user as any).id;
         
-        const clients = await getClients();
-        const activeClient = clients.find(c => c.id === clientId);
-        setClient(activeClient);
-
-        const allInvoices = await getInvoices();
-        const clientInvoices = allInvoices.filter(inv => inv.clientId === clientId);
-        setInvoices(clientInvoices);
-
-        const allTickets = await getTickets();
-        const clientTickets = allTickets.filter(t => t.clientId === clientId);
-        setTickets(clientTickets);
+        console.log("[Portal Load] 🔐 Loading secure tenant-isolated client portal metadata...");
+        const data = await getClientPortalData();
+        
+        setClient(data.client);
+        setInvoices(data.invoices);
+        setTickets(data.tickets);
         
         // Auto-select first ticket if none selected
-        if (clientTickets.length > 0 && !selectedTicketId) {
-          setSelectedTicketId(clientTickets[0].id);
+        if (data.tickets.length > 0 && !selectedTicketId) {
+          setSelectedTicketId(data.tickets[0].id);
         }
       }
     } catch (e) {
@@ -356,9 +347,8 @@ export default function ClientPortal() {
       setIsModalOpen(false);
       addToast('success', 'Support ticket created successfully!');
       
-      const allTickets = await getTickets();
-      const clientTickets = allTickets.filter(t => t.clientId === client.id);
-      setTickets(clientTickets);
+      const freshData = await getClientPortalData();
+      setTickets(freshData.tickets);
       if (newT) {
         setSelectedTicketId(newT.id);
       }

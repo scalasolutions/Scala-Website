@@ -22,13 +22,15 @@ import {
   Clock,
   LogOut,
   Coins,
-  ClipboardList
+  ClipboardList,
+  Loader2
 } from 'lucide-react';
 import {
   useAdminData,
   CACHE_KEYS,
+  primeCache,
 } from '@/lib/data-cache';
-import { getClients, getInvoices, getTickets, MockClient, MockInvoice } from '@/lib/db/queries';
+import { getClients, getInvoices, getTickets, getAdminOverviewData, MockClient, MockInvoice } from '@/lib/db/queries';
 import { getSubscriptionRemainingMonths, cn } from '@/lib/utils';
 import ScalaLogo from '@/components/ui/ScalaLogo';
 import Badge from '@/components/ui/Badge';
@@ -99,13 +101,54 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Notifications, Profile, & Cache State
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   
   const notificationsDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
 
-  const { data: clientsData } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
-  const { data: invoicesData } = useAdminData<(MockInvoice & { client?: MockClient })[]>(CACHE_KEYS.INVOICES, getInvoices as any);
-  const { data: ticketsData } = useAdminData<any[]>(CACHE_KEYS.TICKETS, getTickets);
+  // ── Unified Initial Cache Seeding ──
+  useEffect(() => {
+    async function loadAdminData() {
+      try {
+        console.log("[Admin Init] 🚀 Bootstrapping unified admin console ledger cache...");
+        const data = await getAdminOverviewData();
+        
+        // Populate cache keys synchronously so that when we set initializing=false,
+        // all child page queries hit the cache instantly without displaying loading skeletons.
+        primeCache(CACHE_KEYS.CLIENTS, data.clients);
+        primeCache(CACHE_KEYS.INVOICES, data.invoices);
+        primeCache(CACHE_KEYS.TICKETS, data.tickets);
+        primeCache(CACHE_KEYS.CLIENT_TASKS, data.tasks);
+        primeCache(CACHE_KEYS.PARTNERS, data.partners);
+        primeCache(CACHE_KEYS.EXPENSES, data.expenses);
+        primeCache(CACHE_KEYS.INJECTIONS, data.injections);
+        primeCache(CACHE_KEYS.PAYOUTS, data.payouts);
+        
+        console.log("[Admin Init] 🎉 Control console ledger caches successfully primed!");
+      } catch (err) {
+        console.error("[Admin Init] Failed to bootstrap console data:", err);
+      } finally {
+        setInitializing(false);
+      }
+    }
+    loadAdminData();
+  }, []);
+
+  const { data: clientsData } = useAdminData<MockClient[]>(
+    CACHE_KEYS.CLIENTS, 
+    getClients, 
+    { enabled: !initializing }
+  );
+  const { data: invoicesData } = useAdminData<(MockInvoice & { client?: MockClient })[]>(
+    CACHE_KEYS.INVOICES, 
+    getInvoices as any, 
+    { enabled: !initializing }
+  );
+  const { data: ticketsData } = useAdminData<any[]>(
+    CACHE_KEYS.TICKETS, 
+    getTickets, 
+    { enabled: !initializing }
+  );
 
   const notifications = React.useMemo(() => {
     if (!clientsData || !invoicesData || !ticketsData) return [];
@@ -234,6 +277,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
   const segments = pathname.split('/').filter(Boolean);
   const pathSegments = segments.slice(1).length > 0 ? segments.slice(1) : ['dashboard'];
+
+  if (initializing) {
+    return (
+      <div className={`min-h-screen w-full flex flex-col items-center justify-center transition-colors duration-300 ${
+        theme === 'dark' ? 'bg-[#090A0F]' : 'bg-slate-50'
+      }`}>
+        <Loader2 size={32} className="animate-spin text-primary mb-3" />
+        <p className="text-xs font-bold tracking-widest uppercase opacity-60">Synchronizing Control Console...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">

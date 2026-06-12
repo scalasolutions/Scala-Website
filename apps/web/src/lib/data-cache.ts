@@ -152,17 +152,32 @@ export function clearAllCache(): void {
   cache.clear();
 }
 
+/** Manually seed or update a cache entry and notify active React components. */
+export function primeCache(key: string, value: unknown, ttlMs: number = DEFAULT_TTL_MS): void {
+  console.log(
+    `%c[Cache Prime] 🌱 Primed key: "${key}" (expires in ${Math.round(ttlMs / 1000)}s)`,
+    'color: #10B981; font-weight: bold; background: #E0F2FE; padding: 2px 4px; border-radius: 4px;'
+  );
+  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  notify(key);
+}
+
+
 // ---------------------------------------------------------------------------
 // Custom React Hook for SWR & Pub/Sub
 // ---------------------------------------------------------------------------
 export function useAdminData<T>(
-  key: string,
+  key: string | null,
   fetcher: FetcherFn<T>,
-  options?: { ttl?: number }
+  options?: { ttl?: number; enabled?: boolean }
 ) {
+  const enabled = options?.enabled !== false && key !== null;
+  const actualKey = key ?? '';
+
   // Synchronous cache lookup on init prevents loading state flash if data is available
   const [data, setData] = useState<T | null>(() => {
-    const existing = cache.get(key);
+    if (!enabled) return null;
+    const existing = cache.get(actualKey);
     if (existing) {
       return existing.value as T;
     }
@@ -171,43 +186,46 @@ export function useAdminData<T>(
 
   // Check if current cache entry is fresh
   const isFresh = () => {
-    const existing = cache.get(key);
+    if (!enabled) return false;
+    const existing = cache.get(actualKey);
     return !!(existing && existing.expiresAt > Date.now());
   };
 
   // Only set loading to true if there is absolutely no existing data in cache
   const [loading, setLoading] = useState(() => {
-    const existing = cache.get(key);
+    if (!enabled) return false;
+    const existing = cache.get(actualKey);
     return !existing;
   });
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
 
     async function load(forceRefresh = false) {
       if (!forceRefresh && isFresh()) {
-        console.log(`%c[SWR Hook] 🟢 "${key}" (Cache is fresh, skipping background query)`, 'color: #10B981;');
+        console.log(`%c[SWR Hook] 🟢 "${actualKey}" (Cache is fresh, skipping background query)`, 'color: #10B981;');
         if (active) setLoading(false);
         return;
       }
 
       try {
-        const existing = cache.get(key);
+        const existing = cache.get(actualKey);
         // Only trigger loading visual overlay if we don't have any cached data to show AND no active state data
         if (active && !existing && !data) {
-          console.log(`%c[SWR Hook] 🔴 "${key}" - Initial Load: No cached data. Rendering loading skeletons...`, 'color: #EF4444; font-weight: bold;');
+          console.log(`%c[SWR Hook] 🔴 "${actualKey}" - Initial Load: No cached data. Rendering loading skeletons...`, 'color: #EF4444; font-weight: bold;');
           setLoading(true);
         } else if (active && existing) {
-          console.log(`%c[SWR Hook] 🟣 "${key}" - Stale-While-Revalidate: Instant cache render. Triggering silent background query...`, 'color: #8B5CF6; font-weight: bold;');
+          console.log(`%c[SWR Hook] 🟣 "${actualKey}" - Stale-While-Revalidate: Instant cache render. Triggering silent background query...`, 'color: #8B5CF6; font-weight: bold;');
         }
         
-        const val = await getCached(key, fetcher, options?.ttl);
+        const val = await getCached(actualKey, fetcher, options?.ttl);
         if (active) {
           setData(val);
           setLoading(false);
         }
       } catch (err) {
-        console.error(`useAdminData loading error for key ${key}:`, err);
+        console.error(`useAdminData loading error for key ${actualKey}:`, err);
         if (active) setLoading(false);
       }
     }
@@ -215,14 +233,14 @@ export function useAdminData<T>(
     load();
 
     // Subscribe to cache changes/invalidations
-    const unsubscribe = subscribe(key, () => {
+    const unsubscribe = subscribe(actualKey, () => {
       if (!active) return;
-      const existing = cache.get(key);
+      const existing = cache.get(actualKey);
       if (existing && existing.expiresAt > Date.now()) {
         setData(existing.value as T);
         setLoading(false);
       } else {
-        console.log(`%c[SWR Hook] 🔄 "${key}" Cache Invalidated or Stale! Triggering instant re-fetch.`, 'color: #EC4899;');
+        console.log(`%c[SWR Hook] 🔄 "${actualKey}" Cache Invalidated or Stale! Triggering instant re-fetch.`, 'color: #EC4899;');
         load(true);
       }
     });
@@ -231,20 +249,21 @@ export function useAdminData<T>(
       active = false;
       unsubscribe();
     };
-  }, [key, fetcher, options?.ttl]);
+  }, [actualKey, fetcher, options?.ttl, enabled]);
 
   // Trigger cache invalidation or optimistic manual updates
   const mutate = async (optimisticData?: T) => {
+    if (!enabled) return;
     if (optimisticData !== undefined) {
-      cache.set(key, {
+      cache.set(actualKey, {
         value: optimisticData,
         expiresAt: Date.now() + (options?.ttl ?? DEFAULT_TTL_MS),
       });
       setData(optimisticData);
       setLoading(false);
-      notify(key);
+      notify(actualKey);
     } else {
-      invalidateCache(key);
+      invalidateCache(actualKey);
     }
   };
 
