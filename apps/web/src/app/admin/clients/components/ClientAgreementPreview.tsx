@@ -179,7 +179,10 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const effectiveScale = zoomPercent / 100;
-  const numPages = 2;
+  const numPages = client.tcCustomTerms ? 3 : 2;
+  if (pageRefs.current.length > numPages) {
+    pageRefs.current = pageRefs.current.slice(0, numPages);
+  }
   const totalUnscaledHeight = PAGE_H * numPages + PAGE_GAP * (numPages - 1);
 
   // Auto-fit scale on mount / resize & lock body scroll
@@ -544,27 +547,59 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   </p>
                 </div>
 
-                {client.tcCustomTerms && (
-                  <div>
-                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">6. Additional Terms &amp; Conditions</h3>
-                    <p className="italic text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 mt-1 leading-relaxed">
-                      {client.tcCustomTerms}
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Page Footer */}
               <div className="absolute bottom-16 left-16 right-16 flex justify-between items-center text-[10px] text-zinc-400 font-bold border-t border-zinc-100 pt-3">
                 <span>Scala Services Agreement</span>
-                <span>Page 1 of 2</span>
+                <span>Page 1 of {numPages}</span>
               </div>
             </div>
 
             {/* ────────────────────────────────────────────────────────── */}
+            {/* PAGE 2 (Optional): ADDITIONAL TERMS & CONDITIONS            */}
+            {/* ────────────────────────────────────────────────────────── */}
+            {client.tcCustomTerms && (
+              <div ref={el => { pageRefs.current[1] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
+                {/* Cover Header */}
+                <div className="flex justify-between items-start border-b-2 border-zinc-900 pb-4 mb-5">
+                  <div>
+                    <ScalaLogo variant="full" theme="light" className="h-8 w-auto -ml-1 text-zinc-950" />
+                    <p className="text-[10px] text-zinc-500 mt-2 uppercase tracking-wider font-semibold">Web Infrastructure & Hosting Agreements</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] bg-zinc-100 text-zinc-800 border border-zinc-200 px-2.5 py-0.5 rounded font-black tracking-wider uppercase">Contractual SLA</span>
+                  </div>
+                </div>
+
+                {/* Title Section */}
+                <div className="mb-5">
+                  <h1 className="text-2xl font-extrabold text-zinc-950 uppercase tracking-tight leading-none mb-1">Additional Terms &amp; Conditions</h1>
+                  <p className="text-sm text-zinc-500">This section details additional terms and conditions specific to {client.companyName || client.name}.</p>
+                </div>
+
+                {/* Content Box */}
+                <div className="text-zinc-800 space-y-3 leading-relaxed text-[11px] font-medium">
+                  <div>
+                    <h3 className="font-bold text-zinc-950 text-xs mb-1.5 uppercase tracking-wider text-primary">6. Special &amp; Client-Specific Clauses</h3>
+                    <p className="italic text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl p-4 leading-relaxed whitespace-pre-wrap">
+                      {client.tcCustomTerms}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Page Footer */}
+                <div className="absolute bottom-16 left-16 right-16 flex justify-between items-center text-[10px] text-zinc-400 font-bold border-t border-zinc-100 pt-3">
+                  <span>Scala Services Agreement</span>
+                  <span>Page 2 of {numPages}</span>
+                </div>
+              </div>
+            )}
+
+            {/* ────────────────────────────────────────────────────────── */}
             {/* PAGE 2: SLA AGREEMENT & SIGNATURES                        */}
             {/* ────────────────────────────────────────────────────────── */}
-            <div ref={el => { pageRefs.current[1] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
+            <div ref={el => { pageRefs.current[client.tcCustomTerms ? 2 : 1] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
               {/* Mini Header */}
               <div className="flex justify-between items-center border-b border-zinc-200 pb-2.5 mb-5 text-[10px] font-bold text-zinc-400">
                 <span>SCALA SOLUTIONS &bull; SLA SCHEDULE</span>
@@ -584,7 +619,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                     Scala Solutions commits to delivering a monthly network availability uptime target for all hosting services:
                   </p>
                   <ul className="list-disc pl-5 mt-1 space-y-1 text-[10px] text-zinc-700">
-                    <li><strong className="text-zinc-950">Standard Cloud Hosting Plan</strong>: <span className="font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">99.99% Network Availability Target</span></li>
+                    <li><strong className="text-zinc-950">Standard Cloud Hosting Plan</strong>: <span className="font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">99.99% Network Availability Target</span> <span className="text-zinc-500 font-normal ml-1">(equivalent to less than 4.4 minutes of downtime per month)</span></li>
                   </ul>
                   <p className="mt-1">
                     Uptime targets exclude scheduled maintenance windows (announced 24 hours in advance), Force Majeure events, client-side domain/DNS configuration failures, third-party API or upstream service outages, or periods where the client account is in payment default.
@@ -733,7 +768,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               {/* Page Footer */}
               <div className="absolute bottom-16 left-16 right-16 flex justify-between items-center text-[10px] text-zinc-400 font-bold border-t border-zinc-100 pt-3">
                 <span>Scala Services Agreement</span>
-                <span>Page 2 of 2</span>
+                <span>Page {client.tcCustomTerms ? 3 : 2} of {numPages}</span>
               </div>
             </div>
 
