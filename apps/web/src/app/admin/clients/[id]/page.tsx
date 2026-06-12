@@ -100,6 +100,9 @@ export default function ClientDetailPage() {
   const [subscriptionStartDate, setSubscriptionStartDate] = useState<string>('');
   const [portalPassword, setPortalPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [modalShowPassword, setModalShowPassword] = useState(false);
+  const [modalPasswordCopied, setModalPasswordCopied] = useState(false);
+  const [modalEmailCopied, setModalEmailCopied] = useState(false);
   const [sourcedBy, setSourcedBy] = useState('organic');
 
   // Password Management States
@@ -703,6 +706,32 @@ export default function ClientDetailPage() {
       currency: 'IDR',
       maximumFractionDigits: 0,
     }).format(val);
+  };
+
+  const generateSuggestedEmail = (company: string, clientName: string) => {
+    const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+    
+    const nameParts = clientName.trim().split(/\s+/);
+    const firstName = nameParts[0] ? nameParts[0].toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+    const lastName = nameParts[1] ? nameParts[1].toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+    
+    const cleanCompany = cleanString(company);
+    
+    // 1. If we have both name and business name
+    if (firstName && cleanCompany) {
+      return `${firstName}@${cleanCompany}.com`;
+    }
+    
+    // 2. If we only have name, use surname as domain + random suffix to prevent clashes
+    if (firstName) {
+      const rand = Math.floor(Math.random() * 900) + 100; // 3-digit random number
+      const domain = lastName || 'client';
+      return `${firstName}${rand}@${domain}.com`;
+    }
+    
+    // 3. Fallback: fully random email
+    const randVal = Math.floor(Math.random() * 9000) + 1000;
+    return `client${randVal}@example.com`;
   };
 
   const handleUpdateClient = async (e: React.FormEvent) => {
@@ -2214,19 +2243,67 @@ export default function ClientDetailPage() {
                       }}
                       error={nameError || undefined}
                     />
-                    <Input
-                      ref={emailInputRef}
-                      label="Email *"
-                      type="email"
-                      required
-                      placeholder="e.g. fredrick@anakweb.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (emailError) setEmailError('');
-                      }}
-                      error={emailError || undefined}
-                    />
+                    <div className="space-y-1.5 w-full">
+                      <label className="text-xs font-medium text-muted-foreground block">
+                        Email *
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          ref={emailInputRef}
+                          type="email"
+                          required
+                          placeholder="e.g. fredrick@anakweb.com"
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (emailError) setEmailError('');
+                          }}
+                          className={cn(
+                            "h-10 w-full rounded-xl bg-muted border pl-3.5 pr-20 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 transition-colors",
+                            emailError
+                              ? "border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/25"
+                              : "border-border focus-visible:border-primary focus-visible:ring-primary/35"
+                          )}
+                        />
+                        <div className="absolute right-2 flex items-center gap-1 bg-muted/80 backdrop-blur-sm pl-1 py-0.5 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(email);
+                              setModalEmailCopied(true);
+                              setTimeout(() => setModalEmailCopied(false), 2000);
+                            }}
+                            disabled={!email}
+                            title="Copy email"
+                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                          >
+                            {modalEmailCopied ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEmail(generateSuggestedEmail(companyName, name));
+                              if (emailError) setEmailError('');
+                            }}
+                            title="Suggest email username"
+                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center"
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        </div>
+                      </div>
+                      {emailError && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {emailError}
+                        </p>
+                      )}
+                      {modalEmailCopied && (
+                        <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1 animate-fade-in font-medium">
+                          <CheckCircle size={12} />
+                          Email copied!
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -2251,16 +2328,60 @@ export default function ClientDetailPage() {
                     value={websiteAddress}
                     onChange={(e) => setWebsiteAddress(e.target.value)}
                   />
-
-                  <Input
-                    label="Portal password"
-                    placeholder="Custom portal password"
-                    value={portalPassword}
-                    onChange={(e) => setPortalPassword(e.target.value)}
-                    className="font-mono"
-                  />
-
-                  {/* Subscription block */}
+                  <div className="space-y-1.5 w-full">
+                    <label className="text-xs font-medium text-muted-foreground block">
+                      Portal password
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type={modalShowPassword ? 'text' : 'password'}
+                        placeholder="Custom portal password"
+                        value={portalPassword}
+                        onChange={(e) => setPortalPassword(e.target.value)}
+                        className="h-10 w-full rounded-xl bg-muted border border-border pl-3.5 pr-24 text-sm text-foreground font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1 bg-muted/80 backdrop-blur-sm pl-1 py-0.5 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setModalShowPassword(!modalShowPassword)}
+                          title={modalShowPassword ? 'Hide password' : 'Show password'}
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center"
+                        >
+                          {modalShowPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(portalPassword);
+                            setModalPasswordCopied(true);
+                            setTimeout(() => setModalPasswordCopied(false), 2000);
+                          }}
+                          disabled={!portalPassword}
+                          title="Copy password"
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          {modalPasswordCopied ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPortalPassword(generateStrongPassword());
+                            setModalShowPassword(true);
+                          }}
+                          title="Generate strong password"
+                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center"
+                        >
+                          <RotateCcw size={13} />
+                        </button>
+                      </div>
+                    </div>
+                    {modalPasswordCopied && (
+                      <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1 animate-fade-in font-medium">
+                        <CheckCircle size={12} />
+                        Password copied!
+                      </p>
+                    )}
+                  </div>                  {/* Subscription block */}
                   <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
                     <p className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
                       Hosting subscription

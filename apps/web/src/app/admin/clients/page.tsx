@@ -23,6 +23,10 @@ import {
   FileText,
   RotateCcw,
   ClipboardList,
+  Copy,
+  Eye,
+  EyeOff,
+  CheckCircle,
 } from 'lucide-react';
 import { ClientAgreementPreview } from './components/ClientAgreementPreview';
 import {
@@ -105,10 +109,11 @@ export default function ClientsPage() {
   const [subscriptionMonths, setSubscriptionMonths] = useState<number>(12);
   const [subscriptionStartDate, setSubscriptionStartDate] = useState<string>(
     new Date().toISOString().substring(0, 10)
-  );
-  const [portalPassword, setPortalPassword] = useState('');
+  );  const [portalPassword, setPortalPassword] = useState('');
   const [sourcedBy, setSourcedBy] = useState('organic');
-
+  const [modalShowPassword, setModalShowPassword] = useState(false);
+  const [modalPasswordCopied, setModalPasswordCopied] = useState(false);
+  const [modalEmailCopied, setModalEmailCopied] = useState(false);
   // SLA Agreement & Maintenance Reminders configuration states
   const [selectedAgreementClient, setSelectedAgreementClient] = useState<MockClient | null>(null);
   const [envRotationInterval, setEnvRotationInterval] = useState<number>(6);
@@ -1092,8 +1097,10 @@ export default function ClientsPage() {
                         }}
                         error={nameError || undefined}
                       />
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-muted-foreground">Email *</label>
+                      <div className="space-y-1.5 w-full">
+                        <label className="text-xs font-semibold text-muted-foreground block">
+                          Email *
+                        </label>
                         <div className="relative flex items-center">
                           <input
                             ref={emailInputRef}
@@ -1106,21 +1113,50 @@ export default function ClientsPage() {
                               if (emailError) setEmailError('');
                             }}
                             className={cn(
-                              "w-full bg-background border pl-3 pr-10 py-2 rounded-xl text-xs focus:outline-none text-foreground",
+                              "h-10 w-full rounded-xl bg-muted border pl-3.5 pr-20 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 transition-colors",
                               emailError
-                                ? "border-red-500 focus:border-red-500"
-                                : "border-border focus:border-primary/50"
+                                ? "border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/25"
+                                : "border-border focus-visible:border-primary focus-visible:ring-primary/35"
                             )}
                           />
-                          <button
-                            type="button"
-                            onClick={() => setEmail(generateSuggestedEmail(companyName, name))}
-                            title="Generate suggested email"
-                            className="absolute right-2.5 p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
-                          >
-                            <RotateCcw size={13} />
-                          </button>
+                          <div className="absolute right-2 flex items-center gap-1 bg-muted/80 backdrop-blur-sm pl-1 py-0.5 rounded-lg">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(email);
+                                setModalEmailCopied(true);
+                                setTimeout(() => setModalEmailCopied(false), 2000);
+                              }}
+                              disabled={!email}
+                              title="Copy email"
+                              className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                            >
+                              {modalEmailCopied ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEmail(generateSuggestedEmail(companyName, name));
+                                if (emailError) setEmailError('');
+                              }}
+                              title="Generate suggested email"
+                              className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center"
+                            >
+                              <RotateCcw size={13} />
+                            </button>
+                          </div>
                         </div>
+                        {emailError && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {emailError}
+                          </p>
+                        )}
+                        {modalEmailCopied && (
+                          <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1 animate-fade-in font-medium">
+                            <CheckCircle size={12} />
+                            Email copied!
+                          </p>
+                        )}
                       </div>
                       <Input
                         label="Phone number"
@@ -1290,26 +1326,57 @@ export default function ClientsPage() {
                         />
                       </div>
                     </div>
-
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-muted-foreground">Portal password</label>
                       <div className="relative flex items-center">
                         <input
-                          type="text"
+                          type={modalShowPassword ? 'text' : 'password'}
                           placeholder="Password"
                           value={portalPassword}
                           onChange={(e) => setPortalPassword(e.target.value)}
-                          className="w-full bg-background border border-border pl-3 pr-10 py-2 rounded-xl text-xs font-mono focus:outline-none focus:border-primary/50 text-foreground"
+                          className="w-full bg-background border border-border pl-3 pr-24 py-2 rounded-xl text-xs font-mono focus:outline-none focus:border-primary/50 text-foreground"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setPortalPassword(generateStrongPassword())}
-                          title="Generate strong password"
-                          className="absolute right-2.5 p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
-                        >
-                          <RotateCcw size={13} />
-                        </button>
+                        <div className="absolute right-2 flex items-center gap-1 bg-background/80 backdrop-blur-sm pl-1 py-0.5 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => setModalShowPassword(!modalShowPassword)}
+                            title={modalShowPassword ? 'Hide password' : 'Show password'}
+                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
+                          >
+                            {modalShowPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(portalPassword);
+                              setModalPasswordCopied(true);
+                              setTimeout(() => setModalPasswordCopied(false), 2000);
+                            }}
+                            disabled={!portalPassword}
+                            title="Copy password"
+                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                          >
+                            {modalPasswordCopied ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPortalPassword(generateStrongPassword());
+                              setModalShowPassword(true);
+                            }}
+                            title="Generate strong password"
+                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        </div>
                       </div>
+                      {modalPasswordCopied && (
+                        <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1 animate-fade-in font-medium">
+                          <CheckCircle size={12} />
+                          Password copied!
+                        </p>
+                      )}
                     </div>
                   </section>
 

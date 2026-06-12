@@ -493,8 +493,8 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                 <div>
                   <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-extrabold block mb-1">Contractor</span>
                   <p className="font-bold text-zinc-900">Scala Solutions (Indonesia)</p>
-                  <p className="text-zinc-600 mt-0.5">Email: admin@scala.sh</p>
-                  <p className="text-zinc-600 mt-0.5">Website: www.scalapremier.com</p>
+                  <p className="text-zinc-600 mt-0.5">Email: scalsolutions.dev@gmail.com</p>
+                  <p className="text-zinc-600 mt-0.5">Website: www.scalasolutions.id</p>
                 </div>
                 <div>
                   <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-extrabold block mb-1">Client Entity</span>
@@ -536,7 +536,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                 <div>
                   <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">4. Client Portal & Account Operations</h3>
                   <p>
-                    Scala Solutions provides the Client with secure access to the Scala Client Portal (portal.scala.sh). The Client shall utilize the Portal as the primary digital environment for account operations: (i) opening and communicating on technical support tickets; (ii) viewing and paying outstanding invoices; (iii) monitoring cloud infrastructure resources and uptime SLA reports; and (iv) digitally reviewing and signing authorized service contracts or addendums. Any support requests, ticket actions, or signature authorizations submitted under verified Client credentials will be deemed fully authorized and legally binding on the Client.
+                    Scala Solutions provides the Client with secure access to the Scala Client Portal (scalasolutions.id/portal). The Client shall utilize the Portal as the primary digital environment for account operations: (i) opening and communicating on technical support tickets; (ii) viewing and paying outstanding invoices; (iii) monitoring cloud infrastructure resources and uptime SLA reports; and (iv) digitally reviewing and signing authorized service contracts or addendums. Any support requests, ticket actions, or signature authorizations submitted under verified Client credentials will be deemed fully authorized and legally binding on the Client.
                   </p>
                 </div>
 
@@ -644,17 +644,17 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="border border-zinc-200 p-1.5 font-bold text-red-600 bg-red-50/20">🚨 Urgent / Severity 1</td>
+                        <td className="border border-zinc-200 p-1.5 font-bold text-red-600 bg-red-50/20">Urgent / Severity 1</td>
                         <td className="border border-zinc-200 p-1.5">&le; 2 Business Hours</td>
                         <td className="border border-zinc-200 p-1.5">Every 4 Hours</td>
                       </tr>
                       <tr>
-                        <td className="border border-zinc-200 p-1.5 font-bold text-amber-600 bg-amber-50/20">⚠️ High / Severity 2</td>
+                        <td className="border border-zinc-200 p-1.5 font-bold text-amber-600 bg-amber-50/20">High / Severity 2</td>
                         <td className="border border-zinc-200 p-1.5">&le; 6 Business Hours</td>
                         <td className="border border-zinc-200 p-1.5">Every 12 Hours</td>
                       </tr>
                       <tr>
-                        <td className="border border-zinc-200 p-1.5 text-zinc-700">💬 Medium & Low / Severity 3</td>
+                        <td className="border border-zinc-200 p-1.5 text-zinc-700">Medium & Low / Severity 3</td>
                         <td className="border border-zinc-200 p-1.5">&le; 24 Business Hours</td>
                         <td className="border border-zinc-200 p-1.5">Upon Resolution</td>
                       </tr>
