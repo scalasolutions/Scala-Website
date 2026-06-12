@@ -29,6 +29,7 @@ import {
   useAdminData,
   CACHE_KEYS,
   primeCache,
+  clearAllCache,
 } from '@/lib/data-cache';
 import { getClients, getInvoices, getTickets, getAdminOverviewData, MockClient, MockInvoice } from '@/lib/db/queries';
 import { getSubscriptionRemainingMonths, cn } from '@/lib/utils';
@@ -108,6 +109,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // ── Unified Initial Cache Seeding ──
   useEffect(() => {
+    // 1. Immediately check if we have cached data in localStorage
+    // to bypass the loading screen on subsequent visits.
+    const hasClients = localStorage.getItem('scala_cache:admin:clients');
+    const hasInvoices = localStorage.getItem('scala_cache:admin:invoices');
+    const hasTickets = localStorage.getItem('scala_cache:admin:tickets');
+    
+    if (hasClients && hasInvoices && hasTickets) {
+      console.log("[Admin Init] ⚡ Found existing cache in localStorage, bypassing loading screen!");
+      setInitializing(false);
+    }
+
     async function loadAdminData() {
       try {
         console.log("[Admin Init] 🚀 Bootstrapping unified admin console ledger cache...");
@@ -388,7 +400,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
             <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => {
+                clearAllCache();
+                signOut({ callbackUrl: '/login' });
+              }}
               title="Sign Out"
               className={cn(
                 'p-1.5 rounded-lg hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-[opacity,color,background-color,width,padding] duration-300 ease-out cursor-pointer shrink-0',
@@ -689,7 +704,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   {/* Sign out */}
                   <div className="p-1">
                     <button
-                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      onClick={() => {
+                        clearAllCache();
+                        signOut({ callbackUrl: '/login' });
+                      }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors text-left cursor-pointer"
                     >
                       <LogOut size={14} />

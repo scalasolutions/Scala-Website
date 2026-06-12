@@ -33,6 +33,7 @@ import {
   updateClient
 } from '@/lib/db/queries';
 import Link from 'next/link';
+import { clearAllCache, getCachedSync, primeCache } from '@/lib/data-cache';
 
 // ─────────────────────────────────────────────
 // Toast notification system
@@ -125,13 +126,29 @@ function ConfirmDialog({ message, onConfirm, onCancel, theme }: ConfirmDialogPro
 export default function ClientPortal() {
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [session, setSession] = useState<any>(null);
-  const [client, setClient] = useState<any>(null);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [client, setClient] = useState<any>(() => {
+    const cached = getCachedSync<any>('portal:overview');
+    return cached?.client || null;
+  });
+  const [invoices, setInvoices] = useState<any[]>(() => {
+    const cached = getCachedSync<any>('portal:overview');
+    return cached?.invoices || [];
+  });
+  const [tickets, setTickets] = useState<any[]>(() => {
+    const cached = getCachedSync<any>('portal:overview');
+    return cached?.tickets || [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = getCachedSync<any>('portal:overview');
+    return !cached;
+  });
 
   // Ticketing state
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(() => {
+    const cached = getCachedSync<any>('portal:overview');
+    return cached?.tickets?.[0]?.id || null;
+  });
+
   const [activeTicket, setActiveTicket] = useState<any>(null);
   const [ticketMessages, setTicketMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState<string>('');
@@ -222,6 +239,8 @@ export default function ClientPortal() {
         
         console.log("[Portal Load] 🔐 Loading secure tenant-isolated client portal metadata...");
         const data = await getClientPortalData();
+        
+        primeCache('portal:overview', data);
         
         setClient(data.client);
         setInvoices(data.invoices);
@@ -348,6 +367,7 @@ export default function ClientPortal() {
       addToast('success', 'Support ticket created successfully!');
       
       const freshData = await getClientPortalData();
+      primeCache('portal:overview', freshData);
       setTickets(freshData.tickets);
       if (newT) {
         setSelectedTicketId(newT.id);
@@ -386,6 +406,10 @@ export default function ClientPortal() {
       });
       if (updated) {
         setClient(updated);
+        const currentCached = getCachedSync<any>('portal:overview');
+        if (currentCached) {
+          primeCache('portal:overview', { ...currentCached, client: updated });
+        }
         setIsPasswordModalOpen(false);
         setNewPortalPassword('');
         setShowNewPassword(false);
@@ -562,7 +586,10 @@ export default function ClientPortal() {
 
             {/* Logout button */}
             <button 
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => {
+                clearAllCache();
+                signOut({ callbackUrl: '/login' });
+              }}
               className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer active-press ${
                 theme === 'dark'
                   ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/25'

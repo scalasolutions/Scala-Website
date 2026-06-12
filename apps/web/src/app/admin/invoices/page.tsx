@@ -38,6 +38,9 @@ import {
   invalidateCache,
   CACHE_KEYS,
   useAdminData,
+  getCachedSync,
+  getCachedLinePresets,
+  getCachedPagePresets,
 } from '@/lib/data-cache';
 import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
@@ -160,10 +163,18 @@ export default function InvoicesPage() {
   const invoices = invoicesData || [];
   const clients = clientsData || [];
 
-  const [linePresets, setLinePresets] = useState<MockInvoiceLinePreset[]>([]);
-  const [allPagePresets, setAllPagePresets] = useState<MockInvoicePagePreset[]>([]);
+  const [linePresets, setLinePresets] = useState<MockInvoiceLinePreset[]>(() => {
+    return getCachedSync<MockInvoiceLinePreset[]>(CACHE_KEYS.LINE_PRESETS) || [];
+  });
+  const [allPagePresets, setAllPagePresets] = useState<MockInvoicePagePreset[]>(() => {
+    return getCachedSync<MockInvoicePagePreset[]>(CACHE_KEYS.PAGE_PRESETS) || [];
+  });
   const [includedPages, setIncludedPages] = useState<string[]>(['cover', 'tc1', 'tc2']);
-  const [presetsLoading, setPresetsLoading] = useState(true);
+  const [presetsLoading, setPresetsLoading] = useState(() => {
+    const hasLines = getCachedSync<MockInvoiceLinePreset[]>(CACHE_KEYS.LINE_PRESETS);
+    const hasPages = getCachedSync<MockInvoicePagePreset[]>(CACHE_KEYS.PAGE_PRESETS);
+    return !(hasLines && hasPages);
+  });
   const loading = loadingInvoices || loadingClients || presetsLoading;
 
   const [search, setSearch] = useState('');
@@ -403,8 +414,8 @@ export default function InvoicesPage() {
     async function loadPresets() {
       try {
         const [presets, pages] = await Promise.all([
-          getInvoiceLinePresets(),
-          getInvoicePagePresets(),
+          getCachedLinePresets(),
+          getCachedPagePresets(),
         ]);
         setLinePresets(presets as MockInvoiceLinePreset[]);
         setAllPagePresets(pages as MockInvoicePagePreset[]);

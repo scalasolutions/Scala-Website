@@ -7,16 +7,28 @@ import { Loader2, ArrowLeft, ShieldAlert } from 'lucide-react';
 import { getClientInvoiceDetail } from '@/lib/db/queries';
 import { InvoicePreview } from '@/app/admin/invoices/components/InvoicePreview';
 import Link from 'next/link';
+import { getCachedSync, primeCache } from '@/lib/data-cache';
 
 export default function ClientInvoicePreviewPage() {
   const router = useRouter();
   const params = useParams();
   const invoiceId = params?.id as string;
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const cacheKey = `portal:invoice:${invoiceId}`;
+
+  const [invoice, setInvoice] = useState<any>(() => {
+    const cached = getCachedSync<any>(cacheKey);
+    return cached?.invoice || null;
+  });
+  const [clients, setClients] = useState<any[]>(() => {
+    const cached = getCachedSync<any>(cacheKey);
+    return cached?.client ? [cached.client] : [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = getCachedSync<any>(cacheKey);
+    return !cached;
+  });
   const [session, setSession] = useState<any>(null);
-  const [invoice, setInvoice] = useState<any>(null);
-  const [clients, setClients] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -31,6 +43,8 @@ export default function ClientInvoicePreviewPage() {
 
         console.log("[Portal Invoice] 🔐 Fetching secure client invoice details...");
         const data = await getClientInvoiceDetail(invoiceId);
+
+        primeCache(cacheKey, data);
 
         setInvoice(data.invoice);
         setClients([data.client]); // Wrap single client inside an array as InvoicePreview expects list of clients

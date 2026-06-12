@@ -17,8 +17,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout, MockClientTask } from './db/queries';
-import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts, getClientTasks } from './db/queries';
+import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout, MockClientTask, MockInvoiceLinePreset, MockInvoicePagePreset } from './db/queries';
+import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts, getClientTasks, getInvoiceLinePresets, getInvoicePagePresets } from './db/queries';
 
 interface CacheEntry<T> {
   value: T;
@@ -102,7 +102,9 @@ export async function getCached<T>(
         `%c[Fetch Completed] ✅ Key: "${key}" | Duration: ${duration.toFixed(2)}ms (Successfully saved in cache)`,
         'color: #10B981; font-weight: bold; text-decoration: underline; background: #ECFDF5; padding: 2px 4px; border-radius: 4px;'
       );
-      cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+      const entry = { value, expiresAt: Date.now() + ttlMs };
+      cache.set(key, entry);
+      saveToLocalStorage(key, entry);
       inFlight.delete(key);
       // Notify active hooks that fresh data has arrived
       notify(key);
@@ -123,6 +125,53 @@ export async function getCached<T>(
   return promise;
 }
 
+const LOCAL_STORAGE_KEY_PREFIX = 'scala_cache:';
+
+function jsonReviver(key: string, value: any) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d*)?(?:Z|[-+]\d{2}:?\d{2})?$/.test(value)) {
+    return new Date(value);
+  }
+  return value;
+}
+
+function saveToLocalStorage(key: string, entry: CacheEntry<unknown>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + key, JSON.stringify(entry));
+  } catch (err) {
+    console.error(`Failed to save key "${key}" to localStorage:`, err);
+  }
+}
+
+export function initializeCacheFromLocalStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    let restoredCount = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+        const cacheKey = key.slice(LOCAL_STORAGE_KEY_PREFIX.length);
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const entry = JSON.parse(raw, jsonReviver);
+          cache.set(cacheKey, entry);
+          restoredCount++;
+        }
+      }
+    }
+    if (restoredCount > 0) {
+      console.log(`%c[Cache Restore] 🎒 Restored ${restoredCount} entries from localStorage`, 'color: #3B82F6; font-weight: bold; background: #EFF6FF; padding: 2px 4px; border-radius: 4px;');
+    }
+  } catch (err) {
+    console.error("Failed to restore cache from localStorage:", err);
+  }
+}
+
+// Automatically bootstrap cache from localStorage if running in browser
+if (typeof window !== 'undefined') {
+  initializeCacheFromLocalStorage();
+}
+
 /**
  * Immediately invalidate one or more cache keys.
  * Call this after any mutation (create/update/delete) so the next read
@@ -137,6 +186,20 @@ export function invalidateCache(...keys: string[]): void {
     const existing = cache.get(key);
     if (existing) {
       existing.expiresAt = 0; // Mark as stale instead of deleting so reader hooks can still render it instantly
+      saveToLocalStorage(key, existing);
+    } else {
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(LOCAL_STORAGE_KEY_PREFIX + key);
+          if (raw) {
+            const entry = JSON.parse(raw, jsonReviver);
+            entry.expiresAt = 0;
+            saveToLocalStorage(key, entry);
+          }
+        } catch (err) {
+          console.error("Failed to invalidate key in localStorage:", err);
+        }
+      }
     }
     // Notify all active hooks subscribed to this key to automatically re-fetch
     notify(key);
@@ -150,6 +213,21 @@ export function clearAllCache(): void {
     'color: #EC4899; font-weight: bold; background: #FDF2F8; padding: 2px 4px; border-radius: 4px;'
   );
   cache.clear();
+  if (typeof window !== 'undefined') {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      console.log(`%c[Cache Clear] 🧹 Wiped all persisted SWR entries from localStorage`, 'color: #EC4899; font-weight: bold;');
+    } catch (err) {
+      console.error("Failed to clear localStorage cache:", err);
+    }
+  }
 }
 
 /** Manually seed or update a cache entry and notify active React components. */
@@ -158,9 +236,21 @@ export function primeCache(key: string, value: unknown, ttlMs: number = DEFAULT_
     `%c[Cache Prime] 🌱 Primed key: "${key}" (expires in ${Math.round(ttlMs / 1000)}s)`,
     'color: #10B981; font-weight: bold; background: #E0F2FE; padding: 2px 4px; border-radius: 4px;'
   );
-  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  const entry = { value, expiresAt: Date.now() + ttlMs };
+  cache.set(key, entry);
+  saveToLocalStorage(key, entry);
   notify(key);
 }
+
+/** Synchronously get a value from the cache, even if it is stale, to support instant SWR renders. */
+export function getCachedSync<T>(key: string): T | null {
+  const existing = cache.get(key);
+  if (existing) {
+    return existing.value as T;
+  }
+  return null;
+}
+
 
 
 // ---------------------------------------------------------------------------
@@ -285,6 +375,8 @@ export const CACHE_KEYS = {
   INJECTIONS: 'admin:injections',
   PAYOUTS: 'admin:payouts',
   CLIENT_TASKS: 'admin:client_tasks',
+  LINE_PRESETS: 'admin:invoice_line_presets',
+  PAGE_PRESETS: 'admin:invoice_page_presets',
 } as const;
 
 export const getCachedClients = (): Promise<MockClient[]> =>
@@ -310,4 +402,10 @@ export const getCachedPayouts = (): Promise<MockPayout[]> =>
 
 export const getCachedClientTasks = (): Promise<any[]> =>
   getCached(CACHE_KEYS.CLIENT_TASKS, getClientTasks);
+
+export const getCachedLinePresets = (): Promise<any[]> =>
+  getCached(CACHE_KEYS.LINE_PRESETS, getInvoiceLinePresets as any);
+
+export const getCachedPagePresets = (): Promise<any[]> =>
+  getCached(CACHE_KEYS.PAGE_PRESETS, getInvoicePagePresets as any);
 

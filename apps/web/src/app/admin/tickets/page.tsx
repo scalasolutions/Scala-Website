@@ -32,6 +32,7 @@ import {
   CACHE_KEYS,
   getCachedClients,
   getCachedTickets,
+  getCachedSync,
 } from '@/lib/data-cache';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -99,9 +100,17 @@ export default function TicketsPage() {
     setMounted(true);
   }, []);
 
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [clients, setClients] = useState<MockClient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tickets, setTickets] = useState<any[]>(() => {
+    return getCachedSync<any[]>(CACHE_KEYS.TICKETS) || [];
+  });
+  const [clients, setClients] = useState<MockClient[]>(() => {
+    return getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS) || [];
+  });
+  const [loading, setLoading] = useState(() => {
+    const cachedTickets = getCachedSync<any[]>(CACHE_KEYS.TICKETS);
+    const cachedClients = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS);
+    return !(cachedTickets && cachedClients);
+  });
 
   const [search, setSearch] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);

@@ -57,6 +57,7 @@ import {
   getCachedInvoices,
   getCachedTickets,
   getCachedPartners,
+  getCachedSync,
   useAdminData
 } from '@/lib/data-cache';
 import { getSubscriptionRemainingMonths, generateStrongPassword, cn } from '@/lib/utils';
@@ -80,30 +81,80 @@ export default function ClientDetailPage() {
     setMounted(true);
   }, []);
 
-  const [client, setClient] = useState<MockClient | null>(null);
-  const [invoices, setInvoices] = useState<MockInvoice[]>([]);
-  const [tickets, setTickets] = useState<MockTicket[]>([]);
-  const [partners, setPartners] = useState<MockPartner[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [client, setClient] = useState<MockClient | null>(() => {
+    const allClients = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS);
+    return allClients?.find(c => c.id === id) || null;
+  });
+  const [invoices, setInvoices] = useState<MockInvoice[]>(() => {
+    const allInvoices = getCachedSync<any[]>(CACHE_KEYS.INVOICES);
+    return allInvoices ? allInvoices.filter(inv => inv.clientId === id) as MockInvoice[] : [];
+  });
+  const [tickets, setTickets] = useState<MockTicket[]>(() => {
+    const allTickets = getCachedSync<any[]>(CACHE_KEYS.TICKETS);
+    return allTickets ? allTickets.filter(t => t.clientId === id) as MockTicket[] : [];
+  });
+  const [partners, setPartners] = useState<MockPartner[]>(() => {
+    return getCachedSync<MockPartner[]>(CACHE_KEYS.PARTNERS) || [];
+  });
+  const [loading, setLoading] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return !cachedClient;
+  });
   const [isPending, startTransition] = useTransition();
 
   // Edit Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [websiteAddress, setWebsiteAddress] = useState('');
-  const [status, setStatus] = useState<'pending' | 'active' | 'inactive'>('pending');
-  const [subscriptionType, setSubscriptionType] = useState<'static' | 'dynamic' | ''>('');
-  const [subscriptionMonths, setSubscriptionMonths] = useState<number>(12);
-  const [subscriptionStartDate, setSubscriptionStartDate] = useState<string>('');
-  const [portalPassword, setPortalPassword] = useState('');
+  const [name, setName] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.name || '';
+  });
+  const [email, setEmail] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.email || '';
+  });
+  const [phone, setPhone] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.phone || '';
+  });
+  const [companyName, setCompanyName] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.companyName || '';
+  });
+  const [websiteAddress, setWebsiteAddress] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.websiteAddress || '';
+  });
+  const [status, setStatus] = useState<'pending' | 'active' | 'inactive'>(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return (cachedClient?.status as 'pending' | 'active' | 'inactive') || 'pending';
+  });
+  const [subscriptionType, setSubscriptionType] = useState<'static' | 'dynamic' | ''>(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return (cachedClient?.subscriptionType as 'static' | 'dynamic' | '') || '';
+  });
+  const [subscriptionMonths, setSubscriptionMonths] = useState<number>(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.subscriptionMonths || 12;
+  });
+  const [subscriptionStartDate, setSubscriptionStartDate] = useState<string>(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.subscriptionStartDate
+      ? new Date(cachedClient.subscriptionStartDate).toISOString().substring(0, 10)
+      : new Date().toISOString().substring(0, 10);
+  });
+  const [portalPassword, setPortalPassword] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.portalPassword || '';
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [modalShowPassword, setModalShowPassword] = useState(false);
   const [modalPasswordCopied, setModalPasswordCopied] = useState(false);
   const [modalEmailCopied, setModalEmailCopied] = useState(false);
-  const [sourcedBy, setSourcedBy] = useState('organic');
+  const [sourcedBy, setSourcedBy] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    const loadedSourcedBy = cachedClient?.sourcedBy || 'organic';
+    return loadedSourcedBy === 'fredrick' || loadedSourcedBy === 'nicholas' ? 'organic' : loadedSourcedBy;
+  });
 
   // Password Management States
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -116,9 +167,18 @@ export default function ClientDetailPage() {
 
   // SLA & T&C States
   const [agreementModalOpen, setAgreementModalOpen] = useState(false);
-  const [tcStatus, setTcStatus] = useState<'pending' | 'signed'>('pending');
-  const [tcCustomTerms, setTcCustomTerms] = useState('');
-  const [slaCustomTerms, setSlaCustomTerms] = useState('');
+  const [tcStatus, setTcStatus] = useState<'pending' | 'signed'>(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return (cachedClient?.tcStatus as 'pending' | 'signed') || 'pending';
+  });
+  const [tcCustomTerms, setTcCustomTerms] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.tcCustomTerms || '';
+  });
+  const [slaCustomTerms, setSlaCustomTerms] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.slaCustomTerms || '';
+  });
   const [agreementPreviewOpen, setAgreementPreviewOpen] = useState(false);
 
   // Client tasks state & queries
@@ -487,9 +547,18 @@ export default function ClientDetailPage() {
 
   // Operations & Maintenance States
   const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
-  const [envRotationInterval, setEnvRotationInterval] = useState(6);
-  const [stabilityCheckInterval, setStabilityCheckInterval] = useState(1);
-  const [expectationsCheckInterval, setExpectationsCheckInterval] = useState(3);
+  const [envRotationInterval, setEnvRotationInterval] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.envRotationInterval !== undefined ? cachedClient.envRotationInterval : 6;
+  });
+  const [stabilityCheckInterval, setStabilityCheckInterval] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.stabilityCheckInterval !== undefined ? cachedClient.stabilityCheckInterval : 1;
+  });
+  const [expectationsCheckInterval, setExpectationsCheckInterval] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.expectationsCheckInterval !== undefined ? cachedClient.expectationsCheckInterval : 3;
+  });
 
   // Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -501,6 +570,56 @@ export default function ClientDetailPage() {
   useEffect(() => {
     async function loadClientData() {
       if (!id) return;
+
+      // 1. Try to load from cache synchronously first to prevent loading flash
+      const allClientsCached = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS);
+      const cCached = allClientsCached?.find(client => client.id === id);
+      if (cCached) {
+        setClient(cCached);
+        
+        const allInvoicesCached = getCachedSync<any[]>(CACHE_KEYS.INVOICES) || [];
+        setInvoices(allInvoicesCached.filter((inv) => inv.clientId === id) as MockInvoice[]);
+        
+        const allTicketsCached = getCachedSync<any[]>(CACHE_KEYS.TICKETS) || [];
+        setTickets(allTicketsCached.filter((t) => t.clientId === id));
+        
+        const allPartnersCached = getCachedSync<MockPartner[]>(CACHE_KEYS.PARTNERS) || [];
+        setPartners(allPartnersCached);
+        
+        // Form states
+        setName(cCached.name);
+        setEmail(cCached.email);
+        setPhone(cCached.phone || '');
+        setCompanyName(cCached.companyName || '');
+        setWebsiteAddress(cCached.websiteAddress || '');
+        setStatus(cCached.status);
+        setSubscriptionType(cCached.subscriptionType || '');
+        setSubscriptionMonths(cCached.subscriptionMonths || 12);
+        setSubscriptionStartDate(
+          cCached.subscriptionStartDate
+            ? new Date(cCached.subscriptionStartDate).toISOString().substring(0, 10)
+            : new Date().toISOString().substring(0, 10)
+        );
+        setPortalPassword(cCached.portalPassword || '');
+        const loadedSourcedBy = cCached.sourcedBy || 'organic';
+        setSourcedBy(
+          loadedSourcedBy === 'fredrick' || loadedSourcedBy === 'nicholas'
+            ? 'organic'
+            : loadedSourcedBy
+        );
+        setTcStatus((cCached.tcStatus as 'pending' | 'signed') || 'pending');
+        setTcCustomTerms(cCached.tcCustomTerms || '');
+        setSlaCustomTerms(cCached.slaCustomTerms || '');
+        setEnvRotationInterval(cCached.envRotationInterval !== undefined ? cCached.envRotationInterval : 6);
+        setStabilityCheckInterval(cCached.stabilityCheckInterval !== undefined ? cCached.stabilityCheckInterval : 1);
+        setExpectationsCheckInterval(cCached.expectationsCheckInterval !== undefined ? cCached.expectationsCheckInterval : 3);
+        
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
+      // 2. Refresh from cache layer (Server Actions) in background
       try {
         const allClients = await getCachedClients();
         const c = allClients.find(client => client.id === id);
