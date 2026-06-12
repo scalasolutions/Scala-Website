@@ -160,6 +160,116 @@ export default function ClientDetailPage() {
   // Main Navigation Tab State
   const [activeMainTab, setActiveMainTab] = useState<'board' | 'maintenance' | 'hosting' | 'billing' | 'tickets'>('board');
 
+  // Form Refs & Error States for validation focus / anchoring
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+
+  const taskTitleInputRef = useRef<HTMLInputElement>(null);
+  const [taskTitleError, setTaskTitleError] = useState('');
+
+  // Dirty state checks to prevent accidental modal discard/close
+  const isEditModalDirty = () => {
+    if (!client) return false;
+    const clientStartDateStr = client.subscriptionStartDate
+      ? new Date(client.subscriptionStartDate).toISOString().split('T')[0]
+      : '';
+    const formStartDateStr = subscriptionStartDate
+      ? new Date(subscriptionStartDate).toISOString().split('T')[0]
+      : '';
+
+    return (
+      name !== (client.name || '') ||
+      email !== (client.email || '') ||
+      phone !== (client.phone || '') ||
+      companyName !== (client.companyName || '') ||
+      websiteAddress !== (client.websiteAddress || '') ||
+      status !== (client.status || 'pending') ||
+      subscriptionType !== (client.subscriptionType || '') ||
+      Number(subscriptionMonths) !== (client.subscriptionMonths || 12) ||
+      formStartDateStr !== clientStartDateStr ||
+      sourcedBy !== (client.sourcedBy || 'organic')
+    );
+  };
+
+  const isAgreementModalDirty = () => {
+    if (!client) return false;
+    return (
+      tcStatus !== (client.tcStatus || 'pending') ||
+      tcCustomTerms !== (client.tcCustomTerms || '') ||
+      slaCustomTerms !== (client.slaCustomTerms || '')
+    );
+  };
+
+  const isMaintenanceModalDirty = () => {
+    if (!client) return false;
+    return (
+      envRotationInterval !== (client.envRotationInterval || 6) ||
+      stabilityCheckInterval !== (client.stabilityCheckInterval || 6) ||
+      expectationsCheckInterval !== (client.expectationsCheckInterval || 12)
+    );
+  };
+
+  const isTaskModalDirty = () => {
+    if (editingTask) {
+      const originalTargetDateStr = editingTask.targetDate
+        ? new Date(editingTask.targetDate).toISOString().split('T')[0]
+        : '';
+      const formTargetDateStr = taskTargetDate
+        ? new Date(taskTargetDate).toISOString().split('T')[0]
+        : '';
+      return (
+        taskTitle !== (editingTask.title || '') ||
+        taskDescription !== (editingTask.description || '') ||
+        taskStatus !== (editingTask.status || 'to_prepare') ||
+        formTargetDateStr !== originalTargetDateStr
+      );
+    } else {
+      return (
+        taskTitle !== '' ||
+        taskDescription !== '' ||
+        taskStatus !== 'to_prepare' ||
+        taskTargetDate !== ''
+      );
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (isEditModalDirty()) {
+      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+      if (!confirmClose) return;
+    }
+    setNameError('');
+    setEmailError('');
+    setEditModalOpen(false);
+  };
+
+  const handleCancelAgreement = () => {
+    if (isAgreementModalDirty()) {
+      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+      if (!confirmClose) return;
+    }
+    setAgreementModalOpen(false);
+  };
+
+  const handleCancelMaintenance = () => {
+    if (isMaintenanceModalDirty()) {
+      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+      if (!confirmClose) return;
+    }
+    setMaintenanceModalOpen(false);
+  };
+
+  const handleCancelTask = () => {
+    if (isTaskModalDirty()) {
+      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+      if (!confirmClose) return;
+    }
+    setTaskTitleError('');
+    setTaskModalOpen(false);
+  };
+
   // Context Menu State for Kanban Tasks
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -291,7 +401,14 @@ export default function ClientDetailPage() {
 
   const handleSubmitTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskTitle) return;
+    setTaskTitleError('');
+
+    if (!taskTitle.trim()) {
+      setTaskTitleError('Task title is required');
+      taskTitleInputRef.current?.focus();
+      taskTitleInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -590,6 +707,27 @@ export default function ClientDetailPage() {
 
   const handleUpdateClient = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let hasError = false;
+    setNameError('');
+    setEmailError('');
+
+    if (!name.trim()) {
+      setNameError('Full name is required');
+      nameInputRef.current?.focus();
+      nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      hasError = true;
+    }
+    if (!email.trim()) {
+      setEmailError('Email is required');
+      if (!hasError) {
+        emailInputRef.current?.focus();
+        emailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      hasError = true;
+    }
+    if (hasError) return;
+
     startTransition(async () => {
       try {
         const updated = await updateClient(client.id, {
@@ -2043,7 +2181,7 @@ export default function ClientDetailPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
               className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setEditModalOpen(false)}
+              onClick={handleCancelEdit}
             />
 
             <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
@@ -2053,7 +2191,7 @@ export default function ClientDetailPage() {
                   description="Update client account details and subscription."
                   action={
                     <button
-                      onClick={() => setEditModalOpen(false)}
+                      onClick={handleCancelEdit}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
                       aria-label="Close"
                     >
@@ -2065,19 +2203,29 @@ export default function ClientDetailPage() {
                 <form onSubmit={handleUpdateClient} className="space-y-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Input
+                      ref={nameInputRef}
                       label="Full name *"
                       required
                       placeholder="e.g. Fredrick Yang"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (nameError) setNameError('');
+                      }}
+                      error={nameError || undefined}
                     />
                     <Input
+                      ref={emailInputRef}
                       label="Email *"
                       type="email"
                       required
                       placeholder="e.g. fredrick@anakweb.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (emailError) setEmailError('');
+                      }}
+                      error={emailError || undefined}
                     />
                   </div>
 
@@ -2211,7 +2359,7 @@ export default function ClientDetailPage() {
                       type="button"
                       variant="ghost"
                       size="md"
-                      onClick={() => setEditModalOpen(false)}
+                      onClick={handleCancelEdit}
                     >
                       Cancel
                     </Button>
@@ -2238,7 +2386,7 @@ export default function ClientDetailPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
               className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setAgreementModalOpen(false)}
+              onClick={handleCancelAgreement}
             />
 
             <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
@@ -2248,7 +2396,7 @@ export default function ClientDetailPage() {
                   description="Modify specific contractual agreements and signature sign-off."
                   action={
                     <button
-                      onClick={() => setAgreementModalOpen(false)}
+                      onClick={handleCancelAgreement}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
                       aria-label="Close"
                     >
@@ -2317,7 +2465,7 @@ export default function ClientDetailPage() {
                       type="button"
                       variant="ghost"
                       size="md"
-                      onClick={() => setAgreementModalOpen(false)}
+                      onClick={handleCancelAgreement}
                     >
                       Cancel
                     </Button>
@@ -2343,7 +2491,7 @@ export default function ClientDetailPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
               className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setMaintenanceModalOpen(false)}
+              onClick={handleCancelMaintenance}
             />
 
             <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
@@ -2353,7 +2501,7 @@ export default function ClientDetailPage() {
                   description="Set recurrence durations (in months) for standard operational checks."
                   action={
                     <button
-                      onClick={() => setMaintenanceModalOpen(false)}
+                      onClick={handleCancelMaintenance}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
                       aria-label="Close"
                     >
@@ -2395,7 +2543,7 @@ export default function ClientDetailPage() {
                       type="button"
                       variant="ghost"
                       size="md"
-                      onClick={() => setMaintenanceModalOpen(false)}
+                      onClick={handleCancelMaintenance}
                     >
                       Cancel
                     </Button>
@@ -2429,7 +2577,7 @@ export default function ClientDetailPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
               className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setTaskModalOpen(false)}
+              onClick={handleCancelTask}
             />
 
             <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
@@ -2439,7 +2587,7 @@ export default function ClientDetailPage() {
                   description={`Task/update follow-up for ${client.name}`}
                   action={
                     <button
-                      onClick={() => setTaskModalOpen(false)}
+                      onClick={handleCancelTask}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
                       aria-label="Close"
                     >
@@ -2450,11 +2598,16 @@ export default function ClientDetailPage() {
 
                 <form onSubmit={handleSubmitTask} className="space-y-5 mt-4">
                   <Input
+                    ref={taskTitleInputRef}
                     label="Task / Update Title *"
                     required
                     placeholder="e.g. Review environment variables"
                     value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
+                    onChange={(e) => {
+                      setTaskTitle(e.target.value);
+                      if (taskTitleError) setTaskTitleError('');
+                    }}
+                    error={taskTitleError || undefined}
                   />
 
                   <div>
@@ -2497,7 +2650,7 @@ export default function ClientDetailPage() {
                       type="button"
                       variant="ghost"
                       size="md"
-                      onClick={() => setTaskModalOpen(false)}
+                      onClick={handleCancelTask}
                     >
                       Cancel
                     </Button>

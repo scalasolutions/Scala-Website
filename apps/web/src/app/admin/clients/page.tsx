@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -127,6 +127,77 @@ export default function ClientsPage() {
   const [partnerReferralRate, setPartnerReferralRate] = useState<number>(10);
   const [partnerBankDetails, setPartnerBankDetails] = useState('');
 
+  // Form Refs & Error States for validation focus / anchoring
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+
+  const partnerNameInputRef = useRef<HTMLInputElement>(null);
+  const partnerEmailInputRef = useRef<HTMLInputElement>(null);
+  const [partnerNameError, setPartnerNameError] = useState('');
+  const [partnerEmailError, setPartnerEmailError] = useState('');
+
+  // Dirty state checks to prevent accidental modal discard/close
+  const isCreateClientDirty = () => {
+    return (
+      name !== '' ||
+      email !== '' ||
+      phone !== '' ||
+      companyName !== '' ||
+      websiteAddress !== '' ||
+      status !== 'pending' ||
+      subscriptionType !== '' ||
+      subscriptionMonths !== 12 ||
+      sourcedBy !== 'organic' ||
+      envRotationInterval !== 6 ||
+      stabilityCheckInterval !== 1 ||
+      expectationsCheckInterval !== 3
+    );
+  };
+
+  const isPartnerDirty = () => {
+    if (editingPartner) {
+      return (
+        partnerName !== (editingPartner.name || '') ||
+        partnerEmail !== (editingPartner.email || '') ||
+        partnerPhone !== (editingPartner.phone || '') ||
+        partnerCompanyName !== (editingPartner.companyName || '') ||
+        partnerReferralRate !== (editingPartner.referralRate || 10) ||
+        partnerBankDetails !== (editingPartner.bankDetails || '')
+      );
+    } else {
+      return (
+        partnerName !== '' ||
+        partnerEmail !== '' ||
+        partnerPhone !== '' ||
+        partnerCompanyName !== '' ||
+        partnerReferralRate !== 10 ||
+        partnerBankDetails !== ''
+      );
+    }
+  };
+
+  const handleCancelCreateClient = () => {
+    if (isCreateClientDirty()) {
+      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+      if (!confirmClose) return;
+    }
+    setNameError('');
+    setEmailError('');
+    setModalOpen(false);
+  };
+
+  const handleCancelPartner = () => {
+    if (isPartnerDirty()) {
+      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+      if (!confirmClose) return;
+    }
+    setPartnerNameError('');
+    setPartnerEmailError('');
+    setPartnerModalOpen(false);
+  };
+
   useEffect(() => {
     // Check if redirect query string contains new=true to auto-open modal
     if (typeof window !== 'undefined') {
@@ -164,7 +235,26 @@ export default function ClientsPage() {
 
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email) return;
+    
+    let hasError = false;
+    setNameError('');
+    setEmailError('');
+
+    if (!name.trim()) {
+      setNameError('Full name is required');
+      nameInputRef.current?.focus();
+      nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      hasError = true;
+    }
+    if (!email.trim()) {
+      setEmailError('Email is required');
+      if (!hasError) {
+        emailInputRef.current?.focus();
+        emailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      hasError = true;
+    }
+    if (hasError) return;
 
     startTransition(async () => {
       try {
@@ -248,7 +338,26 @@ export default function ClientsPage() {
 
   const handleCreatePartner = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!partnerName || !partnerEmail) return;
+    
+    let hasError = false;
+    setPartnerNameError('');
+    setPartnerEmailError('');
+
+    if (!partnerName.trim()) {
+      setPartnerNameError('Partner name is required');
+      partnerNameInputRef.current?.focus();
+      partnerNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      hasError = true;
+    }
+    if (!partnerEmail.trim()) {
+      setPartnerEmailError('Partner email is required');
+      if (!hasError) {
+        partnerEmailInputRef.current?.focus();
+        partnerEmailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      hasError = true;
+    }
+    if (hasError) return;
 
     startTransition(async () => {
       try {
@@ -943,7 +1052,7 @@ export default function ClientsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
               className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setModalOpen(false)}
+              onClick={handleCancelCreateClient}
             />
 
             <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
@@ -953,7 +1062,7 @@ export default function ClientsPage() {
                   description="Create a new client account and optional subscription."
                   action={
                     <button
-                      onClick={() => setModalOpen(false)}
+                      onClick={handleCancelCreateClient}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
                       aria-label="Close"
                     >
@@ -972,22 +1081,36 @@ export default function ClientsPage() {
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
+                        ref={nameInputRef}
                         label="Full name *"
                         required
                         placeholder="e.g. Fredrick Yang"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(e) => {
+                          setName(e.target.value);
+                          if (nameError) setNameError('');
+                        }}
+                        error={nameError || undefined}
                       />
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-muted-foreground">Email *</label>
                         <div className="relative flex items-center">
                           <input
+                            ref={emailInputRef}
                             type="email"
                             required
                             placeholder="e.g. fredrick@anakweb.com"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-background border border-border pl-3 pr-10 py-2 rounded-xl text-xs focus:outline-none focus:border-primary/50 text-foreground"
+                            onChange={(e) => {
+                              setEmail(e.target.value);
+                              if (emailError) setEmailError('');
+                            }}
+                            className={cn(
+                              "w-full bg-background border pl-3 pr-10 py-2 rounded-xl text-xs focus:outline-none text-foreground",
+                              emailError
+                                ? "border-red-500 focus:border-red-500"
+                                : "border-border focus:border-primary/50"
+                            )}
                           />
                           <button
                             type="button"
@@ -1195,7 +1318,7 @@ export default function ClientsPage() {
                       type="button"
                       variant="ghost"
                       size="md"
-                      onClick={() => setModalOpen(false)}
+                      onClick={handleCancelCreateClient}
                     >
                       Cancel
                     </Button>
@@ -1221,7 +1344,7 @@ export default function ClientsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
               className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setPartnerModalOpen(false)}
+              onClick={handleCancelPartner}
             />
 
             <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
@@ -1231,7 +1354,7 @@ export default function ClientsPage() {
                   description="External referrer details and commission rate."
                   action={
                     <button
-                      onClick={() => setPartnerModalOpen(false)}
+                      onClick={handleCancelPartner}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
                       aria-label="Close"
                     >
@@ -1243,19 +1366,29 @@ export default function ClientsPage() {
                 <form onSubmit={handleCreatePartner} className="space-y-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Input
+                      ref={partnerNameInputRef}
                       label="Name *"
                       required
                       placeholder="e.g. Alex Kim"
                       value={partnerName}
-                      onChange={(e) => setPartnerName(e.target.value)}
+                      onChange={(e) => {
+                        setPartnerName(e.target.value);
+                        if (partnerNameError) setPartnerNameError('');
+                      }}
+                      error={partnerNameError || undefined}
                     />
                     <Input
+                      ref={partnerEmailInputRef}
                       label="Email *"
                       type="email"
                       required
                       placeholder="e.g. alex@marketingventures.com"
                       value={partnerEmail}
-                      onChange={(e) => setPartnerEmail(e.target.value)}
+                      onChange={(e) => {
+                        setPartnerEmail(e.target.value);
+                        if (partnerEmailError) setPartnerEmailError('');
+                      }}
+                      error={partnerEmailError || undefined}
                     />
                   </div>
 
@@ -1297,7 +1430,7 @@ export default function ClientsPage() {
                       type="button"
                       variant="ghost"
                       size="md"
-                      onClick={() => setPartnerModalOpen(false)}
+                      onClick={handleCancelPartner}
                     >
                       Cancel
                     </Button>
