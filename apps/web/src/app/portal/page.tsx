@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { signOut } from 'next-auth/react';
 import { getSession } from 'next-auth/react';
 import { 
@@ -12,16 +12,18 @@ import {
   ShieldCheck, 
   Receipt, 
   Ticket, 
-  ChevronRight, 
   Eye, 
+  EyeOff,
   Plus, 
   Send, 
   MessageSquare,
   AlertCircle,
-  Loader2,
+  Loader2, 
   FileText,
   UserCheck,
-  X
+  X,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { 
   getClients, 
@@ -34,6 +36,94 @@ import {
 } from '@/lib/db/queries';
 import Link from 'next/link';
 
+// ─────────────────────────────────────────────
+// Toast notification system
+// ─────────────────────────────────────────────
+type ToastType = 'success' | 'error' | 'warning';
+interface Toast {
+  id: string;
+  type: ToastType;
+  message: string;
+}
+
+function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2.5 pointer-events-none">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-xl text-sm font-medium animate-fade-in-scale ${
+            t.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+              : t.type === 'warning'
+              ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+              : 'bg-red-500/10 border-red-500/20 text-red-400'
+          }`}
+        >
+          {t.type === 'success' ? <CheckCircle2 size={16} className="shrink-0" /> :
+           t.type === 'warning' ? <AlertTriangle size={16} className="shrink-0" /> :
+           <AlertCircle size={16} className="shrink-0" />}
+          <span>{t.message}</span>
+          <button
+            onClick={() => onDismiss(t.id)}
+            className="ml-2 opacity-60 hover:opacity-100 transition-opacity shrink-0 cursor-pointer"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Confirmation dialog (replaces browser confirm())
+// ─────────────────────────────────────────────
+interface ConfirmDialogProps {
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  theme: 'dark' | 'light';
+}
+
+function ConfirmDialog({ message, onConfirm, onCancel, theme }: ConfirmDialogProps) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className={`relative w-full max-w-xs border rounded-2xl p-5 shadow-2xl backdrop-blur-xl text-left z-10 animate-fade-in-scale ${
+        theme === 'dark' ? 'bg-[#11131E]/95 border-white/10' : 'bg-white border-slate-200'
+      }`}>
+        <div className="flex items-start gap-3 mb-4">
+          <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-sm font-semibold leading-relaxed">{message}</p>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border cursor-pointer transition-all ${
+              theme === 'dark'
+                ? 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
+                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+            }`}
+          >
+            Keep editing
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-red-500/80 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider cursor-pointer transition-all"
+          >
+            Discard
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Main Portal Page
+// ─────────────────────────────────────────────
 export default function ClientPortal() {
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [session, setSession] = useState<any>(null);
@@ -56,14 +146,49 @@ export default function ClientPortal() {
   const [newTicketCategory, setNewTicketCategory] = useState<'billing' | 'technical' | 'general'>('technical');
   const [newTicketPriority, setNewTicketPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
+  const [ticketTitleError, setTicketTitleError] = useState<string>('');
+  const [ticketDescError, setTicketDescError] = useState<string>('');
+
   // Password change state
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState<boolean>(false);
   const [newPortalPassword, setNewPortalPassword] = useState<string>('');
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
   const [isSavingPassword, setIsSavingPassword] = useState<boolean>(false);
+  const [passwordError, setPasswordError] = useState<string>('');
 
+  // Confirmation dialogs
+  const [ticketConfirmDiscard, setTicketConfirmDiscard] = useState<boolean>(false);
+  const [passwordConfirmDiscard, setPasswordConfirmDiscard] = useState<boolean>(false);
+
+  // Toast notifications
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Field refs for scroll-to-error anchoring
+  const ticketTitleRef = useRef<HTMLInputElement>(null);
+  const ticketDescRef = useRef<HTMLTextAreaElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize theme
+  // Toast helpers
+  const addToast = useCallback((type: ToastType, message: string) => {
+    const id = crypto.randomUUID();
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Check if ticket modal has unsaved content
+  const ticketModalHasContent = newTicketTitle.trim() !== '' || newTicketDesc.trim() !== '';
+
+  // Check if password modal has content
+  const passwordModalHasContent = newPortalPassword.trim() !== '';
+
+  // ── Theme initialization ──
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
@@ -91,7 +216,7 @@ export default function ClientPortal() {
     }
   };
 
-  // Load client details, invoices, and tickets
+  // ── Load portal data ──
   const loadPortalData = async () => {
     try {
       const sess = await getSession();
@@ -127,7 +252,7 @@ export default function ClientPortal() {
     loadPortalData();
   }, []);
 
-  // Poll for new messages every 8 seconds
+  // ── Poll for new messages every 8 seconds ──
   useEffect(() => {
     if (!selectedTicketId) return;
 
@@ -136,7 +261,6 @@ export default function ClientPortal() {
         const details = await getTicketDetails(selectedTicketId);
         if (details) {
           setActiveTicket(details);
-          // Sort messages ascending by date for a chat interface
           const sorted = [...(details.messages || [])].sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
@@ -152,11 +276,12 @@ export default function ClientPortal() {
     return () => clearInterval(interval);
   }, [selectedTicketId]);
 
-  // Scroll to bottom of chat
+  // ── Scroll to bottom of chat ──
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [ticketMessages]);
 
+  // ── Send a message in a ticket thread ──
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedTicketId || !client) return;
@@ -171,7 +296,6 @@ export default function ClientPortal() {
       });
       setNewMessage('');
       
-      // Instantly refresh messages
       const details = await getTicketDetails(selectedTicketId);
       if (details) {
         const sorted = [...(details.messages || [])].sort(
@@ -181,14 +305,40 @@ export default function ClientPortal() {
       }
     } catch (err) {
       console.error("Failed to post response ticket message:", err);
+      addToast('error', 'Failed to send message. Please try again.');
     } finally {
       setSendingMessage(false);
     }
   };
 
+  // ── Create a new ticket ──
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTicketTitle.trim() || !newTicketDesc.trim() || !client) return;
+
+    // Client-side validation with field anchoring
+    let hasError = false;
+
+    if (!newTicketTitle.trim()) {
+      setTicketTitleError('Please enter a ticket subject.');
+      ticketTitleRef.current?.focus();
+      ticketTitleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      hasError = true;
+    } else {
+      setTicketTitleError('');
+    }
+
+    if (!newTicketDesc.trim()) {
+      setTicketDescError('Please describe your issue.');
+      if (!hasError) {
+        ticketDescRef.current?.focus();
+        ticketDescRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      hasError = true;
+    } else {
+      setTicketDescError('');
+    }
+
+    if (hasError || !client) return;
 
     setCreatingTicket(true);
     try {
@@ -204,8 +354,8 @@ export default function ClientPortal() {
       setNewTicketTitle('');
       setNewTicketDesc('');
       setIsModalOpen(false);
+      addToast('success', 'Support ticket created successfully!');
       
-      // Reload tickets list and select the new ticket
       const allTickets = await getTickets();
       const clientTickets = allTickets.filter(t => t.clientId === client.id);
       setTickets(clientTickets);
@@ -214,14 +364,29 @@ export default function ClientPortal() {
       }
     } catch (err) {
       console.error("Failed to submit support ticket request:", err);
+      addToast('error', 'Failed to create ticket. Please try again.');
     } finally {
       setCreatingTicket(false);
     }
   };
 
+  // ── Change portal password ──
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPortalPassword.trim() || !client) return;
+
+    if (!newPortalPassword.trim()) {
+      setPasswordError('Please enter a new password.');
+      passwordRef.current?.focus();
+      return;
+    }
+    if (newPortalPassword.trim().length < 6) {
+      setPasswordError('Password must be at least 6 characters.');
+      passwordRef.current?.focus();
+      return;
+    }
+    setPasswordError('');
+
+    if (!client) return;
 
     setIsSavingPassword(true);
     try {
@@ -233,14 +398,67 @@ export default function ClientPortal() {
         setClient(updated);
         setIsPasswordModalOpen(false);
         setNewPortalPassword('');
-        alert('Password changed successfully!');
+        setShowNewPassword(false);
+        addToast('success', 'Password changed successfully! Use your new password on next login.');
       }
     } catch (err) {
       console.error('Failed to change password:', err);
-      alert('Failed to change password. Please try again.');
+      addToast('error', 'Failed to change password. Please try again.');
     } finally {
       setIsSavingPassword(false);
     }
+  };
+
+  // ── Backdrop click handlers with confirmation ──
+  const handleTicketBackdropClick = () => {
+    if (ticketModalHasContent) {
+      setTicketConfirmDiscard(true);
+    } else {
+      setIsModalOpen(false);
+    }
+  };
+
+  const handlePasswordBackdropClick = () => {
+    if (passwordModalHasContent) {
+      setPasswordConfirmDiscard(true);
+    } else {
+      setIsPasswordModalOpen(false);
+      setPasswordError('');
+    }
+  };
+
+  const handleCloseTicketModal = () => {
+    if (ticketModalHasContent) {
+      setTicketConfirmDiscard(true);
+    } else {
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleClosePasswordModal = () => {
+    if (passwordModalHasContent) {
+      setPasswordConfirmDiscard(true);
+    } else {
+      setIsPasswordModalOpen(false);
+      setPasswordError('');
+    }
+  };
+
+  const discardTicketModal = () => {
+    setTicketConfirmDiscard(false);
+    setIsModalOpen(false);
+    setNewTicketTitle('');
+    setNewTicketDesc('');
+    setTicketTitleError('');
+    setTicketDescError('');
+  };
+
+  const discardPasswordModal = () => {
+    setPasswordConfirmDiscard(false);
+    setIsPasswordModalOpen(false);
+    setNewPortalPassword('');
+    setPasswordError('');
+    setShowNewPassword(false);
   };
 
   const formatDate = (dateInput: any) => {
@@ -276,7 +494,29 @@ export default function ClientPortal() {
     <div className={`min-h-screen w-full transition-colors duration-300 pb-12 ${
       theme === 'dark' ? 'bg-[#090A0F] text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
-      {/* Top Banner Glassmorphism Header */}
+
+      {/* ── TOAST NOTIFICATIONS ── */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* ── CONFIRMATION DIALOGS ── */}
+      {ticketConfirmDiscard && (
+        <ConfirmDialog
+          message="You have unsaved ticket content. Are you sure you want to discard it?"
+          onConfirm={discardTicketModal}
+          onCancel={() => setTicketConfirmDiscard(false)}
+          theme={theme}
+        />
+      )}
+      {passwordConfirmDiscard && (
+        <ConfirmDialog
+          message="You have an unsaved password. Are you sure you want to discard it?"
+          onConfirm={discardPasswordModal}
+          onCancel={() => setPasswordConfirmDiscard(false)}
+          theme={theme}
+        />
+      )}
+
+      {/* ── TOP HEADER ── */}
       <header className={`sticky top-0 z-40 border-b backdrop-blur-md transition-all duration-300 ${
         theme === 'dark' 
           ? 'bg-[#11131E]/70 border-white/5' 
@@ -346,14 +586,14 @@ export default function ClientPortal() {
         </div>
       </header>
 
-      {/* Main Grid Workspace */}
+      {/* ── MAIN GRID ── */}
       <main className="max-w-7xl mx-auto px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10 animate-fade-in-scale">
         
-        {/* Decorative ambiance elements */}
+        {/* Decorative ambiance */}
         <div className="absolute top-20 right-10 w-96 h-96 rounded-full bg-primary/4 blur-[130px] pointer-events-none -z-10"></div>
         <div className="absolute bottom-20 left-10 w-96 h-96 rounded-full bg-blue-500/3 blur-[130px] pointer-events-none -z-10"></div>
 
-        {/* LEFT COLUMN: Subscription Info + Ticketing Hub (7/12 cols) */}
+        {/* LEFT COLUMN: SLA + Ticketing */}
         <div className="lg:col-span-7 flex flex-col gap-8">
           
           {/* SLA & Subscription Details Card */}
@@ -407,7 +647,7 @@ export default function ClientPortal() {
               </div>
             </div>
 
-            {/* SLA Bullet details */}
+            {/* SLA bullet details */}
             <div className={`p-4 rounded-xl text-xs space-y-2 border ${
               theme === 'dark' ? 'bg-[#151824]/20 border-white/5 text-slate-400' : 'bg-slate-50/50 border-slate-200 text-slate-600'
             }`}>
@@ -451,7 +691,7 @@ export default function ClientPortal() {
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 flex-1 items-stretch">
               
-              {/* Ticket selector list column (5 cols) */}
+              {/* Ticket selector list */}
               <div className="md:col-span-5 flex flex-col gap-2.5 overflow-y-auto max-h-[420px] pr-1.5 border-r border-sidebar-border/10">
                 {tickets.length > 0 ? (
                   tickets.map((t) => (
@@ -472,7 +712,7 @@ export default function ClientPortal() {
                         <span className="text-[9px] font-black uppercase tracking-wider bg-muted/40 px-1.5 py-0.5 rounded border border-border/20 text-muted-foreground truncate max-w-[80px]">
                           {t.category}
                         </span>
-                        <span className={`text-[8px] font-black uppercase px-1 py-0.25 rounded ${
+                        <span className={`text-[8px] font-black uppercase px-1 rounded ${
                           t.status === 'open'
                             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                             : t.status === 'in_progress'
@@ -508,66 +748,87 @@ export default function ClientPortal() {
                 )}
               </div>
 
-              {/* Message thread details column (7 cols) */}
+              {/* Message thread column */}
               <div className="md:col-span-7 flex flex-col border border-border/20 rounded-xl overflow-hidden min-h-[380px]">
                 {selectedTicketId && activeTicket ? (
                   <>
                     {/* Chat Header */}
-                    <div className="px-4 py-3 bg-muted/20 border-b border-border/30 flex justify-between items-center">
-                      <div className="min-w-0">
+                    <div className="px-4 py-3 bg-muted/20 border-b border-border/30 flex justify-between items-start gap-3">
+                      <div className="min-w-0 flex-1">
                         <h4 className="text-xs font-bold truncate text-foreground">{activeTicket.title}</h4>
-                        <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{activeTicket.description}</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-1">{activeTicket.description}</p>
                       </div>
-                      <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
-                        activeTicket.priority === 'urgent' || activeTicket.priority === 'high'
-                          ? 'bg-red-500/10 text-red-400 border border-red-500/25'
-                          : 'bg-muted/40 text-muted-foreground'
-                      }`}>
-                        {activeTicket.priority}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Ticket Status Badge */}
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 ${
+                          activeTicket.status === 'open'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : activeTicket.status === 'in_progress'
+                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                              : activeTicket.status === 'resolved'
+                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                        }`}>
+                          <span className="w-1 h-1 rounded-full bg-current" />
+                          {activeTicket.status === 'in_progress' ? 'In Progress' : activeTicket.status}
+                        </span>
+                        {/* Priority Badge */}
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                          activeTicket.priority === 'urgent' || activeTicket.priority === 'high'
+                            ? 'bg-red-500/10 text-red-400 border-red-500/25'
+                            : 'bg-muted/40 text-muted-foreground border-border/20'
+                        }`}>
+                          {activeTicket.priority}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Chat Messages stream */}
+                    {/* Chat messages */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[260px] bg-muted/5">
                       
-                      {/* Original description message */}
-                      <div className="flex gap-2 text-left">
-                        <div className="w-6 h-6 rounded-full bg-primary/25 text-primary flex items-center justify-center font-black text-[9px] border border-primary/20 shrink-0">
-                          {client?.name ? client.name[0] : 'C'}
-                        </div>
+                      {/* Original ticket description — client always on right */}
+                      <div className="flex gap-2 justify-end">
                         <div className={`p-3 rounded-xl max-w-[85%] text-xs leading-relaxed ${
-                          theme === 'dark' ? 'bg-[#151824]/50 text-slate-300' : 'bg-slate-100 text-slate-800'
+                          theme === 'dark'
+                            ? 'bg-[#CEF84E]/10 border border-[#CEF84E]/15 text-[#CEF84E]'
+                            : 'bg-[#CEF84E]/30 border border-[#CEF84E]/60 text-slate-900'
                         }`}>
-                          <p className="font-extrabold text-[9px] opacity-40 mb-1">TICKET INITIATION — {client?.name}</p>
+                          <p className="font-extrabold text-[9px] opacity-50 mb-1 uppercase text-right">TICKET INITIATION — {client?.name}</p>
                           <p className="whitespace-pre-wrap">{activeTicket.description}</p>
                           <span className="block text-[8px] opacity-50 mt-1.5 text-right">{formatDate(activeTicket.createdAt)}</span>
                         </div>
+                        <div className="w-6 h-6 rounded-full bg-[#CEF84E]/25 text-primary flex items-center justify-center font-black text-[9px] border border-primary/20 shrink-0">
+                          {client?.name ? client.name[0].toUpperCase() : 'C'}
+                        </div>
                       </div>
 
-                      {/* Conversation thread */}
+                      {/* Conversation thread — client on RIGHT, admin on LEFT */}
                       {ticketMessages.map((msg) => {
                         const isAdmin = msg.senderType === 'admin';
                         return (
                           <div 
                             key={msg.id} 
-                            className={`flex gap-2 text-left ${isAdmin ? 'justify-end' : 'justify-start'}`}
+                            className={`flex gap-2 ${isAdmin ? 'justify-start' : 'justify-end'}`}
                           >
-                            {!isAdmin && (
-                              <div className="w-6 h-6 rounded-full bg-primary/25 text-primary flex items-center justify-center font-black text-[9px] border border-primary/20 shrink-0">
-                                {client?.name ? client.name[0] : 'C'}
+                            {/* Admin avatar — LEFT side */}
+                            {isAdmin && (
+                              <div className="w-6 h-6 rounded-full bg-muted/60 text-muted-foreground flex items-center justify-center font-black text-[9px] border border-border/30 shrink-0">
+                                S
                               </div>
                             )}
 
                             <div className={`p-3 rounded-xl max-w-[85%] text-xs leading-relaxed ${
                               isAdmin
                                 ? theme === 'dark'
-                                  ? 'bg-[#CEF84E]/10 border border-[#CEF84E]/15 text-[#CEF84E]'
-                                  : 'bg-[#CEF84E]/30 border border-[#CEF84E] text-slate-900'
+                                  ? 'bg-[#151824]/50 border border-white/5 text-slate-300'
+                                  : 'bg-slate-100 border border-slate-200 text-slate-800'
                                 : theme === 'dark'
-                                  ? 'bg-[#151824]/50 text-slate-300'
-                                  : 'bg-slate-100 text-slate-800'
+                                  ? 'bg-[#CEF84E]/10 border border-[#CEF84E]/15 text-[#CEF84E]'
+                                  : 'bg-[#CEF84E]/30 border border-[#CEF84E]/60 text-slate-900'
                             }`}>
-                              <p className="font-extrabold text-[9px] opacity-40 mb-1 uppercase">
+                              <p className={`font-extrabold text-[9px] opacity-50 mb-1 uppercase ${
+                                isAdmin ? 'text-left' : 'text-right'
+                              }`}>
                                 {isAdmin ? 'Scala Engineering Core' : client?.name}
                               </p>
                               <p className="whitespace-pre-wrap">{msg.message}</p>
@@ -576,9 +837,10 @@ export default function ClientPortal() {
                               </span>
                             </div>
 
-                            {isAdmin && (
+                            {/* Client avatar — RIGHT side */}
+                            {!isAdmin && (
                               <div className="w-6 h-6 rounded-full bg-[#CEF84E]/25 text-primary flex items-center justify-center font-black text-[9px] border border-primary/20 shrink-0">
-                                S
+                                {client?.name ? client.name[0].toUpperCase() : 'C'}
                               </div>
                             )}
                           </div>
@@ -587,7 +849,7 @@ export default function ClientPortal() {
                       <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Chat Input form */}
+                    {/* Chat Input */}
                     <form onSubmit={handleSendMessage} className="p-2 bg-muted/20 border-t border-border/30 flex gap-2">
                       <input
                         type="text"
@@ -617,9 +879,13 @@ export default function ClientPortal() {
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-muted/5">
                     <MessageSquare size={28} className="text-muted-foreground opacity-30 mb-2" />
-                    <h5 className="text-xs font-bold text-muted-foreground">Select a Support Thread</h5>
+                    <h5 className="text-xs font-bold text-muted-foreground">
+                      {tickets.length > 0 ? 'Select a Support Thread' : 'No Active Threads'}
+                    </h5>
                     <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                      Select a ticket from the left panel to open your active message session.
+                      {tickets.length > 0
+                        ? 'Select a ticket from the left panel to open your active message session.'
+                        : 'Raise a new ticket using the button above to get started.'}
                     </p>
                   </div>
                 )}
@@ -630,7 +896,7 @@ export default function ClientPortal() {
 
         </div>
 
-        {/* RIGHT COLUMN: Billing & Invoices catalog (5/12 cols) */}
+        {/* RIGHT COLUMN: Billing & Invoices */}
         <div className="lg:col-span-5 flex flex-col">
           
           <section className={`border rounded-2xl p-6 relative flex flex-col min-h-[500px] transition-all duration-300 ${
@@ -685,7 +951,7 @@ export default function ClientPortal() {
                       </div>
                     </div>
 
-                    {/* Action buttons */}
+                    {/* Action */}
                     <div className="flex items-center gap-2 pt-2 border-t border-sidebar-border/10 w-full mt-1">
                       <Link
                         href={`/portal/invoices/${inv.id}`}
@@ -719,43 +985,65 @@ export default function ClientPortal() {
 
       </main>
 
-      {/* MODAL: CREATE SUPPORT TICKET */}
+      {/* ── MODAL: CREATE SUPPORT TICKET ── */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop mask */}
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+            onClick={handleTicketBackdropClick}
+          />
 
-          {/* Modal Container */}
+          {/* Modal */}
           <div className={`relative w-full max-w-md border rounded-2xl p-6 shadow-2xl backdrop-blur-xl animate-fade-in-scale text-left z-10 transition-all duration-300 ${
             theme === 'dark' ? 'bg-[#11131E]/95 border-white/5' : 'bg-white border-slate-200 shadow-slate-200/50'
           }`}>
-            <h3 className="text-base font-black tracking-tight mb-4">Raise Secure Support Ticket</h3>
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black tracking-tight">Raise Secure Support Ticket</h3>
+              <button
+                type="button"
+                onClick={handleCloseTicketModal}
+                disabled={creatingTicket}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted/50 cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            </div>
             
-            <form onSubmit={handleCreateTicket} className="space-y-4">
+            <form onSubmit={handleCreateTicket} className="space-y-4" noValidate>
+              {/* Ticket Title */}
               <div>
-                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 transition-colors duration-300 ${
+                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 ${
                   theme === 'dark' ? 'text-muted-foreground' : 'text-slate-500'
                 }`}>
-                  Ticket Subject / Title
+                  Ticket Subject / Title <span className="text-red-400">*</span>
                 </label>
                 <input
+                  ref={ticketTitleRef}
                   type="text"
-                  required
                   placeholder="e.g. Memory leak on CMS dashboard"
                   value={newTicketTitle}
-                  onChange={(e) => setNewTicketTitle(e.target.value)}
+                  onChange={(e) => { setNewTicketTitle(e.target.value); if (e.target.value) setTicketTitleError(''); }}
                   disabled={creatingTicket}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none transition-all ${
-                    theme === 'dark'
-                      ? 'bg-muted/20 border border-white/5 text-white focus:border-primary/45'
-                      : 'bg-slate-100/50 border border-slate-200 text-slate-900 focus:border-primary/60'
+                    ticketTitleError
+                      ? 'border border-red-400 bg-red-500/5'
+                      : theme === 'dark'
+                        ? 'bg-muted/20 border border-white/5 text-white focus:border-primary/45'
+                        : 'bg-slate-100/50 border border-slate-200 text-slate-900 focus:border-primary/60'
                   }`}
                 />
+                {ticketTitleError && (
+                  <p className="text-[10px] text-red-400 mt-1 flex items-center gap-1">
+                    <AlertCircle size={10} /> {ticketTitleError}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 transition-colors duration-300 ${
+                  <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 ${
                     theme === 'dark' ? 'text-muted-foreground' : 'text-slate-500'
                   }`}>
                     Category
@@ -777,7 +1065,7 @@ export default function ClientPortal() {
                 </div>
 
                 <div>
-                  <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 transition-colors duration-300 ${
+                  <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 ${
                     theme === 'dark' ? 'text-muted-foreground' : 'text-slate-500'
                   }`}>
                     Priority
@@ -800,31 +1088,39 @@ export default function ClientPortal() {
                 </div>
               </div>
 
+              {/* Description */}
               <div>
-                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 transition-colors duration-300 ${
+                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 ${
                   theme === 'dark' ? 'text-muted-foreground' : 'text-slate-500'
                 }`}>
-                  Describe Your Issue
+                  Describe Your Issue <span className="text-red-400">*</span>
                 </label>
                 <textarea
-                  required
+                  ref={ticketDescRef}
                   rows={4}
                   placeholder="Provide precise details, steps to reproduce, or billing inquiries..."
                   value={newTicketDesc}
-                  onChange={(e) => setNewTicketDesc(e.target.value)}
+                  onChange={(e) => { setNewTicketDesc(e.target.value); if (e.target.value) setTicketDescError(''); }}
                   disabled={creatingTicket}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none transition-all leading-relaxed ${
-                    theme === 'dark'
-                      ? 'bg-muted/20 border border-white/5 text-white focus:border-primary/45'
-                      : 'bg-slate-100/50 border border-slate-200 text-slate-900 focus:border-primary/60'
+                    ticketDescError
+                      ? 'border border-red-400 bg-red-500/5'
+                      : theme === 'dark'
+                        ? 'bg-muted/20 border border-white/5 text-white focus:border-primary/45'
+                        : 'bg-slate-100/50 border border-slate-200 text-slate-900 focus:border-primary/60'
                   }`}
                 />
+                {ticketDescError && (
+                  <p className="text-[10px] text-red-400 mt-1 flex items-center gap-1">
+                    <AlertCircle size={10} /> {ticketDescError}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3 justify-end pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseTicketModal}
                   disabled={creatingTicket}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border cursor-pointer active-press transition-all ${
                     theme === 'dark'
@@ -854,13 +1150,16 @@ export default function ClientPortal() {
         </div>
       )}
 
-      {/* MODAL: CHANGE PORTAL PASSWORD */}
+      {/* ── MODAL: CHANGE PORTAL PASSWORD ── */}
       {isPasswordModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          {/* Backdrop mask */}
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setIsPasswordModalOpen(false)}></div>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+            onClick={handlePasswordBackdropClick}
+          />
 
-          {/* Modal Container */}
+          {/* Modal */}
           <div className={`relative w-full max-w-sm border rounded-2xl p-6 shadow-2xl backdrop-blur-xl animate-fade-in-scale text-left z-10 transition-all duration-300 ${
             theme === 'dark' ? 'bg-[#11131E]/95 border-white/5' : 'bg-white border-slate-200 shadow-slate-200/50'
           }`}>
@@ -868,39 +1167,58 @@ export default function ClientPortal() {
               <h3 className="text-base font-black tracking-tight">Change Portal Password</h3>
               <button 
                 type="button" 
-                onClick={() => setIsPasswordModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted/50"
+                onClick={handleClosePasswordModal}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted/50 cursor-pointer"
               >
                 <X size={15} />
               </button>
             </div>
             
-            <form onSubmit={handleChangePassword} className="space-y-4">
+            <form onSubmit={handleChangePassword} className="space-y-4" noValidate>
               <div>
-                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 transition-colors duration-300 ${
+                <label className={`block text-[9px] font-bold uppercase tracking-wider mb-1.5 ${
                   theme === 'dark' ? 'text-muted-foreground' : 'text-slate-500'
                 }`}>
-                  New Password
+                  New Password <span className="text-red-400">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Enter secure new password"
-                  value={newPortalPassword}
-                  onChange={(e) => setNewPortalPassword(e.target.value)}
-                  disabled={isSavingPassword}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono focus:outline-none transition-all ${
-                    theme === 'dark'
-                      ? 'bg-muted/20 border border-white/5 text-white focus:border-primary/45'
-                      : 'bg-slate-100/50 border border-slate-200 text-slate-900 focus:border-primary/60'
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    ref={passwordRef}
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Enter new secure password"
+                    value={newPortalPassword}
+                    onChange={(e) => { setNewPortalPassword(e.target.value); if (e.target.value) setPasswordError(''); }}
+                    disabled={isSavingPassword}
+                    className={`w-full px-3.5 py-2.5 pr-10 rounded-xl text-xs font-mono focus:outline-none transition-all ${
+                      passwordError
+                        ? 'border border-red-400 bg-red-500/5'
+                        : theme === 'dark'
+                          ? 'bg-muted/20 border border-white/5 text-white focus:border-primary/45'
+                          : 'bg-slate-100/50 border border-slate-200 text-slate-900 focus:border-primary/60'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    tabIndex={-1}
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showNewPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
+                {passwordError && (
+                  <p className="text-[10px] text-red-400 mt-1 flex items-center gap-1">
+                    <AlertCircle size={10} /> {passwordError}
+                  </p>
+                )}
+                <p className="text-[9px] text-muted-foreground mt-1.5">Minimum 6 characters. You will use this password on your next login.</p>
               </div>
 
               <div className="flex gap-3 justify-end pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsPasswordModalOpen(false)}
+                  onClick={handleClosePasswordModal}
                   disabled={isSavingPassword}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border cursor-pointer active-press transition-all ${
                     theme === 'dark'
@@ -929,9 +1247,6 @@ export default function ClientPortal() {
           </div>
         </div>
       )}
-      
-      {/* Existing Ticket modal close */}
-      <div className="hidden" />
 
     </div>
   );
