@@ -30,6 +30,14 @@ export default function ClientInvoicePreviewPage() {
   });
   const [session, setSession] = useState<any>(null);
   const [error, setError] = useState<string>('');
+  const [isSubdomain, setIsSubdomain] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      setIsSubdomain(host.startsWith('clients.') || host === 'clients.localhost');
+    }
+  }, []);
 
   useEffect(() => {
     async function loadInvoiceData() {
@@ -79,7 +87,7 @@ export default function ClientInvoicePreviewPage() {
           <h3 className="text-base font-black tracking-tight mb-2">Workspace Document Alert</h3>
           <p className="text-xs text-slate-400 leading-relaxed mb-6">{error}</p>
           <Link
-            href="/portal"
+            href={isSubdomain ? '/' : '/portal'}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-xs font-bold uppercase tracking-wider transition-all duration-200 active-press cursor-pointer text-slate-200 hover:text-white"
           >
             <ArrowLeft size={14} />
@@ -99,7 +107,7 @@ export default function ClientInvoicePreviewPage() {
       <InvoicePreview
         invoice={invoice}
         clients={clients}
-        onClose={() => router.push('/portal')}
+        onClose={() => router.push(isSubdomain ? '/' : '/portal')}
       />
     </div>
   );

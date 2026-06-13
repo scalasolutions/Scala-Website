@@ -98,6 +98,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
+  const [isSubdomain, setIsSubdomain] = useState(false);
+
+  const getLinkHref = (href: string) => {
+    if (isSubdomain) {
+      return href.replace('/admin', '') || '/';
+    }
+    return href;
+  };
+
+  const isActive = (itemHref: string) => {
+    if (isSubdomain) {
+      const cleanItemHref = itemHref.replace('/admin', '') || '/';
+      return cleanItemHref === '/' ? pathname === '/' : pathname.startsWith(cleanItemHref);
+    }
+    return pathname.startsWith(itemHref);
+  };
 
   // Notifications, Profile, & Cache State
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -214,6 +230,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [clientsData, invoicesData, ticketsData]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      setIsSubdomain(host.startsWith('admin.') || host === 'admin.localhost');
+    }
     const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
     if (savedTheme) {
       setTheme(savedTheme);
@@ -288,7 +308,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     tickets: 'Support Tickets'
   };
   const segments = pathname.split('/').filter(Boolean);
-  const pathSegments = segments.slice(1).length > 0 ? segments.slice(1) : ['dashboard'];
+  const pathSegments = isSubdomain
+    ? (segments.length > 0 ? segments : ['dashboard'])
+    : (segments.slice(1).length > 0 ? segments.slice(1) : ['dashboard']);
 
   if (initializing) {
     return (
@@ -358,10 +380,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {navigation.map((item) => (
             <SidebarItem
               key={item.href}
-              href={item.href}
+              href={getLinkHref(item.href)}
               icon={item.icon}
               label={item.label}
-              active={pathname.startsWith(item.href)}
+              active={isActive(item.href)}
               collapsed={sidebarCollapsed}
             />
           ))}
@@ -439,10 +461,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {navigation.map((item) => (
                 <div key={item.href} onClick={() => setMobileSidebarOpen(false)}>
                   <SidebarItem
-                    href={item.href}
+                    href={getLinkHref(item.href)}
                     icon={item.icon}
                     label={item.label}
-                    active={pathname.startsWith(item.href)}
+                    active={isActive(item.href)}
                   />
                 </div>
               ))}
@@ -493,7 +515,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* Quick Context Path */}
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Link href="/admin/dashboard" className="hover:text-foreground transition-colors">
+              <Link href={getLinkHref("/admin/dashboard")} className="hover:text-foreground transition-colors">
                 Scala solutions
               </Link>
               {pathSegments.map((segment, index) => {
@@ -506,7 +528,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     isClientName = true;
                   }
                 }
-                const href = '/admin/' + pathSegments.slice(0, index + 1).join('/');
+                const href = isSubdomain 
+                  ? '/' + pathSegments.slice(0, index + 1).join('/')
+                  : '/admin/' + pathSegments.slice(0, index + 1).join('/');
                 const isLast = index === pathSegments.length - 1;
 
                 return (
@@ -672,7 +696,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   {/* Actions */}
                   <div className="p-1">
                     <Link
-                      href="/admin/dashboard"
+                      href={getLinkHref("/admin/dashboard")}
                       onClick={() => setProfileOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                     >
@@ -680,7 +704,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       Dashboard
                     </Link>
                     <Link
-                      href="/admin/tickets"
+                      href={getLinkHref("/admin/tickets")}
                       onClick={() => setProfileOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                     >

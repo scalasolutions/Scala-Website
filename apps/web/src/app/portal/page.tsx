@@ -125,6 +125,7 @@ function ConfirmDialog({ message, onConfirm, onCancel, theme }: ConfirmDialogPro
 // ─────────────────────────────────────────────
 export default function ClientPortal() {
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
+  const [isSubdomain, setIsSubdomain] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [client, setClient] = useState<any>(() => {
     const cached = getCachedSync<any>('portal:overview');
@@ -206,6 +207,8 @@ export default function ClientPortal() {
   // ── Theme initialization ──
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      setIsSubdomain(host.startsWith('clients.') || host === 'clients.localhost');
       const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
       if (savedTheme) {
         setTheme(savedTheme);
@@ -971,7 +974,7 @@ export default function ClientPortal() {
                     {/* Action */}
                     <div className="flex items-center gap-2 pt-2 border-t border-sidebar-border/10 w-full mt-1">
                       <Link
-                        href={`/portal/invoices/${inv.id}`}
+                        href={isSubdomain ? `/invoices/${inv.id}` : `/portal/invoices/${inv.id}`}
                         target="_blank"
                         className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-200 active-press cursor-pointer ${
                           theme === 'dark'
