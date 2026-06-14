@@ -36,6 +36,10 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { ClientAgreementPreview } from '../components/ClientAgreementPreview';
+import { DeleteClientModal } from '../components/DeleteClientModal';
+import { MaintenanceIntervalsModal } from '../components/MaintenanceIntervalsModal';
+import { AgreementTermsModal } from '../components/AgreementTermsModal';
+import { TaskFormModal } from '../components/TaskFormModal';
 import {
   updateClient,
   deleteClient,
@@ -2218,84 +2222,18 @@ export default function ClientDetailPage() {
       </Card>
 
       {/* --- DELETE CONFIRMATION MODAL --- */}
-      {mounted &&
-        deleteModalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setDeleteModalOpen(false)}
-            />
-
-            <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-              <div className="p-6">
-                <div className="flex items-start gap-3 pb-4 mb-4 border-b border-border">
-                  <div className="shrink-0 w-9 h-9 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center">
-                    <AlertTriangle size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-semibold tracking-tight text-foreground">
-                      Delete client account
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      This action cannot be undone.
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-sm text-muted-foreground leading-relaxed mb-5">
-                  Are you sure you want to delete{' '}
-                  <span className="font-medium text-foreground">{client.name}</span>?
-                  Portal credentials, active SLAs, all invoices, billing history, and
-                  support tickets will be permanently removed.
-                </p>
-
-                <form onSubmit={handleDeleteClient} className="space-y-4">
-                  <Input
-                    label={`Type the client's name (${client.name}) to confirm`}
-                    required
-                    placeholder={client.name}
-                    value={deleteConfirmNameInput}
-                    onChange={(e) => setDeleteConfirmNameInput(e.target.value)}
-                  />
-
-                  <Input
-                    label="Type CONFIRM to authorize deletion"
-                    required
-                    placeholder="CONFIRM"
-                    value={deleteConfirmInput}
-                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
-                    className="font-mono uppercase tracking-wider text-center"
-                  />
-
-                  <div className="flex gap-2 justify-end pt-4 border-t border-border">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="md"
-                      onClick={() => setDeleteModalOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="danger"
-                      size="md"
-                      disabled={
-                        deleteConfirmInput !== 'CONFIRM' ||
-                        deleteConfirmNameInput !== client.name ||
-                        isDeleting
-                      }
-                    >
-                      {isDeleting ? 'Deleting…' : 'Delete permanently'}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {mounted && deleteModalOpen && (
+        <DeleteClientModal
+          clientName={client.name}
+          confirmName={deleteConfirmNameInput}
+          onConfirmNameChange={setDeleteConfirmNameInput}
+          confirmText={deleteConfirmInput}
+          onConfirmTextChange={setDeleteConfirmInput}
+          isDeleting={isDeleting}
+          onCancel={() => setDeleteModalOpen(false)}
+          onSubmit={handleDeleteClient}
+        />
+      )}
 
       {/* --- EDIT CLIENT MODAL --- */}
       {mounted &&
@@ -2595,187 +2533,32 @@ export default function ClientDetailPage() {
         )}
 
       {/* --- SLA & T&C CUSTOMIZATION MODAL --- */}
-      {mounted &&
-        agreementModalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={handleCancelAgreement}
-            />
-
-            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-              <div className="p-6 sm:p-8">
-                <SectionHeading
-                  title="Customize SLA & T&C"
-                  description="Modify specific contractual agreements and signature sign-off."
-                  action={
-                    <button
-                      onClick={handleCancelAgreement}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <X size={16} />
-                    </button>
-                  }
-                />
-
-                <form onSubmit={handleSaveAgreementTerms} className="space-y-5">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-                      Signature status
-                    </label>
-                    <div className="flex gap-2">
-                      {(['pending', 'signed'] as const).map((stat) => (
-                        <button
-                          key={stat}
-                          type="button"
-                          onClick={() => setTcStatus(stat)}
-                          className={`flex-1 px-3 py-2.5 rounded-lg border text-xs font-semibold capitalize transition-all cursor-pointer ${
-                            tcStatus === stat
-                              ? 'border-primary bg-primary text-primary-foreground font-extrabold'
-                              : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          {stat === 'signed' ? '✓ Signed & Executed' : 'Awaiting Signature'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                        Custom Clauses & Riders
-                      </p>
-
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs text-muted-foreground mb-1 block">Special Terms & Conditions</label>
-                          <textarea
-                            placeholder="Add specific terms, data requirements, or liability modifications..."
-                            value={tcCustomTerms}
-                            onChange={(e) => setTcCustomTerms(e.target.value)}
-                            rows={3}
-                            className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground mb-1 block">Custom SLA Adjustments</label>
-                          <textarea
-                            placeholder="Add specific support response times, uptime targets, or escalation chains..."
-                            value={slaCustomTerms}
-                            onChange={(e) => setSlaCustomTerms(e.target.value)}
-                            rows={3}
-                            className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 justify-end pt-4 border-t border-border">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="md"
-                      onClick={handleCancelAgreement}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                    >
-                      Save Agreements
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {mounted && agreementModalOpen && (
+        <AgreementTermsModal
+          tcStatus={tcStatus}
+          onTcStatusChange={setTcStatus}
+          tcCustomTerms={tcCustomTerms}
+          onTcCustomTermsChange={setTcCustomTerms}
+          slaCustomTerms={slaCustomTerms}
+          onSlaCustomTermsChange={setSlaCustomTerms}
+          onCancel={handleCancelAgreement}
+          onSubmit={handleSaveAgreementTerms}
+        />
+      )}
 
       {/* --- CONFIGURE INTERVALS MODAL --- */}
-      {mounted &&
-        maintenanceModalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={handleCancelMaintenance}
-            />
-
-            <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-              <div className="p-6">
-                <SectionHeading
-                  title="Configure Maintenance Intervals"
-                  description="Set recurrence durations (in months) for standard operational checks."
-                  action={
-                    <button
-                      onClick={handleCancelMaintenance}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <X size={16} />
-                    </button>
-                  }
-                />
-
-                <form onSubmit={handleSaveIntervals} className="space-y-4 mt-3">
-                  <Input
-                    label="Environment Variables Rotation (Months)"
-                    type="number"
-                    min="1"
-                    required
-                    value={envRotationInterval}
-                    onChange={(e) => setEnvRotationInterval(Number(e.target.value))}
-                  />
-
-                  <Input
-                    label="Stability & Security Check (Months)"
-                    type="number"
-                    min="1"
-                    required
-                    value={stabilityCheckInterval}
-                    onChange={(e) => setStabilityCheckInterval(Number(e.target.value))}
-                  />
-
-                  <Input
-                    label="Expectations & Review (Months)"
-                    type="number"
-                    min="1"
-                    required
-                    value={expectationsCheckInterval}
-                    onChange={(e) => setExpectationsCheckInterval(Number(e.target.value))}
-                  />
-
-                  <div className="flex gap-2 justify-end pt-4 border-t border-border">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="md"
-                      onClick={handleCancelMaintenance}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                    >
-                      Save Intervals
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {mounted && maintenanceModalOpen && (
+        <MaintenanceIntervalsModal
+          envRotationInterval={envRotationInterval}
+          onEnvRotationChange={setEnvRotationInterval}
+          stabilityCheckInterval={stabilityCheckInterval}
+          onStabilityCheckChange={setStabilityCheckInterval}
+          expectationsCheckInterval={expectationsCheckInterval}
+          onExpectationsCheckChange={setExpectationsCheckInterval}
+          onCancel={handleCancelMaintenance}
+          onSubmit={handleSaveIntervals}
+        />
+      )}
 
       {/* --- SLA / T&C AGREEMENT PREVIEW OVERLAY --- */}
       {agreementPreviewOpen && (
@@ -2786,111 +2569,28 @@ export default function ClientDetailPage() {
       )}
 
       {/* --- TASK CREATION/EDIT MODAL --- */}
-      {mounted &&
-        taskModalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={handleCancelTask}
-            />
-
-            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-              <div className="p-6 sm:p-8 text-left">
-                <SectionHeading
-                  title={editingTask ? 'Edit Task Details' : 'Create Client Task'}
-                  description={`Task/update follow-up for ${client.name}`}
-                  action={
-                    <button
-                      onClick={handleCancelTask}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <X size={16} />
-                    </button>
-                  }
-                />
-
-                <form onSubmit={handleSubmitTask} className="space-y-5 mt-4">
-                  <Input
-                    ref={taskTitleInputRef}
-                    label="Task / Update Title *"
-                    required
-                    placeholder="e.g. Review environment variables"
-                    value={taskTitle}
-                    onChange={(e) => {
-                      setTaskTitle(e.target.value);
-                      if (taskTitleError) setTaskTitleError('');
-                    }}
-                    error={taskTitleError || undefined}
-                  />
-
-                  <div>
-                    <label className="block text-xs font-semibold text-foreground mb-2">
-                      Description
-                    </label>
-                    <Textarea
-                      placeholder="Add details, notes, or guidelines..."
-                      rows={3}
-                      value={taskDescription}
-                      onChange={(e) => setTaskDescription(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-xs font-semibold text-foreground mb-2">
-                        Status / Column
-                      </label>
-                      <Select
-                        value={taskStatus}
-                        onChange={(e) => setTaskStatus(e.target.value as any)}
-                      >
-                        <option value="to_prepare">To Prepare</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="achieved">Achieved</option>
-                      </Select>
-                    </div>
-
-                    <Input
-                      label="Target Date / Due Date"
-                      type="date"
-                      value={taskTargetDate}
-                      onChange={(e) => setTaskTargetDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex gap-2 justify-end pt-4 border-t border-border mt-6">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="md"
-                      onClick={handleCancelTask}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      disabled={isPending}
-                    >
-                      {isPending ? (
-                        <>
-                          <Loader2 className="animate-spin mr-1.5" size={14} />
-                          Saving...
-                        </>
-                      ) : (
-                        editingTask ? 'Save Changes' : 'Create Task'
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {mounted && taskModalOpen && (
+        <TaskFormModal
+          isEditing={!!editingTask}
+          clientName={client.name}
+          titleInputRef={taskTitleInputRef}
+          title={taskTitle}
+          onTitleChange={(value) => {
+            setTaskTitle(value);
+            if (taskTitleError) setTaskTitleError('');
+          }}
+          titleError={taskTitleError}
+          description={taskDescription}
+          onDescriptionChange={setTaskDescription}
+          status={taskStatus}
+          onStatusChange={setTaskStatus}
+          targetDate={taskTargetDate}
+          onTargetDateChange={setTaskTargetDate}
+          isSaving={isPending}
+          onCancel={handleCancelTask}
+          onSubmit={handleSubmitTask}
+        />
+      )}
 
       {/* --- TASK CARD CONTEXT MENU --- */}
       {mounted && contextMenu && createPortal(
