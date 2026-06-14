@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { RotateCcw, Check } from 'lucide-react';
 import { MockInvoice, updateInvoice, syncInvoicePayoutAction } from '@/lib/db/queries';
 import { formatCurrencyIDR } from './invoice-types';
+import { formatInputNumberIDR } from '@/lib/utils';
 import Select from '@/components/ui/Select';
 import Input from '@/components/ui/Input';
 
@@ -41,13 +42,6 @@ export function RevertPaymentModal({
       setIsRevertingStatus(false);
     }
   }, [isOpen, invoice]);
-
-  const formatInputNumberIDR = (val: number | string): string => {
-    if (val === undefined || val === null || val === '') return '';
-    const num = String(val).replace(/[^0-9]/g, '');
-    if (!num) return '';
-    return new Intl.NumberFormat('id-ID').format(Number(num));
-  };
 
   const handleRevertStatus = async () => {
     setIsRevertingStatus(true);

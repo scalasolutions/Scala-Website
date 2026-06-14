@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { MockInvoice, uploadReceiptAction, syncInvoicePayoutAction, updateInvoiceStatus } from '@/lib/db/queries';
 import { formatCurrencyIDR } from './invoice-types';
+import { formatInputNumberIDR } from '@/lib/utils';
 import { performActualOCR, extractAmountFromFilename } from './ocr-utils';
 
 interface RecordPaymentModalProps {
@@ -50,13 +51,6 @@ export function RecordPaymentModal({
       setUploadingReceipt(false);
     }
   }, [isOpen, invoice]);
-
-  const formatInputNumberIDR = (val: number | string): string => {
-    if (val === undefined || val === null || val === '') return '';
-    const num = String(val).replace(/[^0-9]/g, '');
-    if (!num) return '';
-    return new Intl.NumberFormat('id-ID').format(Number(num));
-  };
 
   const handleCompressAndSetFile = (file: File) => {
     if (!file) return;

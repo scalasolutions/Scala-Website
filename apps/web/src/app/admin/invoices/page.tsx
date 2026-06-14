@@ -61,7 +61,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import SectionHeading from '@/components/ui/SectionHeading';
 import FilterBar, { FilterOption } from '@/components/ui/FilterBar';
 import ActionMenu, { ActionMenuItem } from '@/components/ui/ActionMenu';
-import { cn, TABLE_ROW_HOVER } from '@/lib/utils';
+import { cn, TABLE_ROW_HOVER, formatInputNumberIDR } from '@/lib/utils';
 
 type InvoiceStatusFilter = 'all' | 'draft' | 'issued' | 'partially_paid' | 'past_due' | 'paid';
 type EffectiveStatus = MockInvoice['status'];
@@ -135,13 +135,6 @@ const parsePastedItems = (text: string): InvoiceLineItem[] => {
 
 // ── Page component ────────────────────────────────────────────
 export default function InvoicesPage() {
-  const formatInputNumberIDR = (val: number | string): string => {
-    if (val === undefined || val === null || val === '') return '';
-    const num = String(val).replace(/[^0-9]/g, '');
-    if (!num) return '';
-    return new Intl.NumberFormat('id-ID').format(Number(num));
-  };
-
   const getPageTitle = (key: string): string => {
     const titlePreset = allPagePresets.find(
       (p) => p.pageKey === key && p.sectionKey === 'page_title'

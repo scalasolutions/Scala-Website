@@ -60,7 +60,7 @@ import {
   getCachedSync,
   useAdminData
 } from '@/lib/data-cache';
-import { getSubscriptionRemainingMonths, generateStrongPassword, cn } from '@/lib/utils';
+import { getSubscriptionRemainingMonths, generateStrongPassword, formatCurrencyIDR, isTaskUrgent, cn } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -528,23 +528,6 @@ export default function ClientDetailPage() {
     }
   };
 
-  const isTaskUrgent = (task: any) => {
-    if (task.status === 'achieved') return false;
-
-    const now = new Date();
-    if (task.targetDate) {
-      const dueDate = new Date(task.targetDate);
-      if (dueDate < now) return true;
-    }
-
-    const updatedDate = new Date(task.updatedAt || task.createdAt);
-    const timeDiff = now.getTime() - updatedDate.getTime();
-    const daysDiff = timeDiff / (1000 * 3600 * 24);
-    if (daysDiff > 7) return true;
-
-    return false;
-  };
-
   // Operations & Maintenance States
   const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
   const [envRotationInterval, setEnvRotationInterval] = useState(() => {
@@ -818,14 +801,6 @@ export default function ClientDetailPage() {
       day: 'numeric',
     });
   }
-
-  const formatCurrencyIDR = (val: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
 
   const generateSuggestedEmail = (company: string, clientName: string) => {
     const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim();

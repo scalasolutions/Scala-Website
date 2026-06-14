@@ -37,7 +37,7 @@ import {
   CACHE_KEYS,
   invalidateCache
 } from '@/lib/data-cache';
-import { cn } from '@/lib/utils';
+import { cn, isTaskUrgent } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -239,24 +239,6 @@ export default function ClientBoardPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  // Urgency check function
-  const isTaskUrgent = (task: any) => {
-    if (task.status === 'achieved') return false;
-
-    const now = new Date();
-    if (task.targetDate) {
-      const dueDate = new Date(task.targetDate);
-      if (dueDate < now) return true;
-    }
-
-    const updatedDate = new Date(task.updatedAt || task.createdAt);
-    const timeDiff = now.getTime() - updatedDate.getTime();
-    const daysDiff = timeDiff / (1000 * 3600 * 24);
-    if (daysDiff > 7) return true;
-
-    return false;
-  };
 
   // Get status column styling
   const getColumnHeaderBg = (status: TaskStatus) => {

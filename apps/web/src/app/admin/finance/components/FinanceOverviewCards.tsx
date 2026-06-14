@@ -3,6 +3,10 @@
 import React from 'react';
 import { Coins, TrendingUp, Landmark, ShieldAlert } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
+import { formatCurrencyIDR } from '@/lib/utils';
+
+// Re-exported so finance components can keep importing it from here.
+export { formatCurrencyIDR };
 
 interface FinanceOverviewCardsProps {
   treasury: number;
@@ -10,10 +14,6 @@ interface FinanceOverviewCardsProps {
   totalInjected: number;
   awaitingCollection: number;
 }
-
-export const formatCurrencyIDR = (val: number): string => {
-  return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(val);
-};
 
 export const FinanceOverviewCards: React.FC<FinanceOverviewCardsProps> = ({
   treasury,

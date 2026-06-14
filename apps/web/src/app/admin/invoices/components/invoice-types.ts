@@ -1,5 +1,9 @@
 // Shared types and utilities for the invoice feature
 
+// Re-exported from the shared utils module so invoice components can keep
+// importing it from here.
+export { formatCurrencyIDR } from '@/lib/utils';
+
 export interface InvoiceLineItem {
   name: string;
   description?: string;
@@ -23,15 +27,6 @@ export const getClientRefCode = (name: string, invoiceNum: string): string => {
   const numStr = match ? match[0] : '01';
   const numVal = parseInt(numStr, 10);
   return `${initials}-${String(numVal).padStart(2, '0')}`;
-};
-
-// Formats a number as Indonesian Rupiah currency string
-export const formatCurrencyIDR = (val: number): string => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(val);
 };
 
 // Formats a date as DD/MM/YYYY

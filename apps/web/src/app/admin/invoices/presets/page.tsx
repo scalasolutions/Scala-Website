@@ -51,7 +51,7 @@ import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import EmptyState from '@/components/ui/EmptyState';
 import ActionMenu from '@/components/ui/ActionMenu';
-import { cn, TABLE_ROW_HOVER } from '@/lib/utils';
+import { cn, TABLE_ROW_HOVER, formatInputNumberIDR as formatNumberIDR, parseNumberInputIDR as parseNumber } from '@/lib/utils';
 
 export default function InvoicesPresetsPage() {
   const [mounted, setMounted] = useState(false);
@@ -105,18 +105,6 @@ export default function InvoicesPresetsPage() {
   const editorRef = useRef<HTMLDivElement>(null);
 
   // IDR Currency Formatter helper
-  const formatNumberIDR = (val: number | string): string => {
-    if (val === undefined || val === null || val === '') return '';
-    const num = String(val).replace(/[^0-9]/g, '');
-    if (!num) return '';
-    return new Intl.NumberFormat('id-ID').format(Number(num));
-  };
-
-  const parseNumber = (val: string): number => {
-    const rawVal = val.replace(/[^0-9]/g, '');
-    return rawVal ? Number(rawVal) : 0;
-  };
-
   // Bootstrap Page
   useEffect(() => {
     async function loadData() {

@@ -34,6 +34,7 @@ import {
 } from '@/lib/db/queries';
 import Link from 'next/link';
 import { clearAllCache, getCachedSync, primeCache } from '@/lib/data-cache';
+import { formatCurrencyIDR as formatCurrency } from '@/lib/utils';
 
 // ─────────────────────────────────────────────
 // Toast notification system
@@ -285,7 +286,11 @@ export default function ClientPortal() {
     };
 
     fetchTicketData();
-    const interval = setInterval(fetchTicketData, 8000);
+    // Skip polls while the tab is backgrounded to avoid wasted requests.
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchTicketData();
+    }, 8000);
     return () => clearInterval(interval);
   }, [selectedTicketId]);
 
@@ -486,14 +491,6 @@ export default function ClientPortal() {
       month: 'short',
       day: 'numeric'
     });
-  };
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(val);
   };
 
   if (loading) {

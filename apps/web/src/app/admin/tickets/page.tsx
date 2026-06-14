@@ -194,9 +194,12 @@ export default function TicketsPage() {
 
     loadThread();
 
-    // Automatically check for new messages every 5 seconds
-    const interval = setInterval(() => loadThread(true), 5000);
-    
+    // Poll for new messages every 5s, skipping while the tab is backgrounded.
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadThread(true);
+    }, 5000);
+
     return () => clearInterval(interval);
   }, [selectedTicketId]);
 

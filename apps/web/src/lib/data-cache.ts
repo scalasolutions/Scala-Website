@@ -2,7 +2,7 @@
  * data-cache.ts
  * ---------------------------------------------------------------------------
  * A lightweight, client-side, TTL-based in-memory cache for admin data fetches
- * upgraded with Stale-While-Revalidate (SWR) and Pub/Sub mechanics for React.
+ * with Stale-While-Revalidate (SWR) and Pub/Sub mechanics for React.
  *
  * Goals:
  *  • Prevent duplicate network requests when multiple components on the same
@@ -12,12 +12,12 @@
  *    same Promise.
  *  • Allow mutations (create/update/delete) to invalidate specific keys so the
  *    next read always gets fresh data.
- *  • Provide a custom hook useAdminData() that offers instant rendering via
- *    synchronous cache lookup, background updates (SWR), and cross-component syncing.
+ *  • Provide a hook useAdminData() that offers instant rendering via a
+ *    synchronous cache lookup, background updates (SWR), and cross-component sync.
  */
 
 import { useState, useEffect } from 'react';
-import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout, MockClientTask, MockInvoiceLinePreset, MockInvoicePagePreset } from './db/queries';
+import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout } from './db/queries';
 import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts, getClientTasks, getInvoiceLinePresets, getInvoicePagePresets } from './db/queries';
 
 interface CacheEntry<T> {
@@ -31,6 +31,13 @@ const cache = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
 
 const DEFAULT_TTL_MS = 30_000; // 30 seconds
+const LOCAL_STORAGE_KEY_PREFIX = 'scala_cache:';
+
+// Verbose cache tracing — opt in via NEXT_PUBLIC_CACHE_DEBUG=1. Off in production.
+const DEBUG = process.env.NEXT_PUBLIC_CACHE_DEBUG === '1';
+const trace = DEBUG
+  ? (...args: unknown[]) => console.log('[cache]', ...args)
+  : () => {};
 
 // ---------------------------------------------------------------------------
 // Pub/Sub Subscription Manager
@@ -38,20 +45,78 @@ const DEFAULT_TTL_MS = 30_000; // 30 seconds
 const listeners = new Map<string, Set<() => void>>();
 
 export function subscribe(key: string, callback: () => void): () => void {
-  if (!listeners.has(key)) {
-    listeners.set(key, new Set());
+  let set = listeners.get(key);
+  if (!set) {
+    set = new Set();
+    listeners.set(key, set);
   }
-  listeners.get(key)!.add(callback);
+  set.add(callback);
   return () => {
-    listeners.get(key)?.delete(callback);
-    if (listeners.get(key)?.size === 0) {
-      listeners.delete(key);
-    }
+    const current = listeners.get(key);
+    if (!current) return;
+    current.delete(callback);
+    if (current.size === 0) listeners.delete(key);
   };
 }
 
 export function notify(key: string): void {
   listeners.get(key)?.forEach((cb) => cb());
+}
+
+// ---------------------------------------------------------------------------
+// localStorage persistence
+// ---------------------------------------------------------------------------
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d*)?(?:Z|[-+]\d{2}:?\d{2})?$/;
+
+function jsonReviver(_key: string, value: unknown) {
+  if (typeof value === 'string' && ISO_DATE_RE.test(value)) {
+    return new Date(value);
+  }
+  return value;
+}
+
+function saveToLocalStorage(key: string, entry: CacheEntry<unknown>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + key, JSON.stringify(entry));
+  } catch (err) {
+    console.error(`Failed to persist cache key "${key}":`, err);
+  }
+}
+
+function readFromLocalStorage(key: string): CacheEntry<unknown> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_PREFIX + key);
+    return raw ? (JSON.parse(raw, jsonReviver) as CacheEntry<unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function initializeCacheFromLocalStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    let restored = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const fullKey = localStorage.key(i);
+      if (!fullKey || !fullKey.startsWith(LOCAL_STORAGE_KEY_PREFIX)) continue;
+      const entry = readFromLocalStorage(fullKey.slice(LOCAL_STORAGE_KEY_PREFIX.length));
+      if (entry) {
+        cache.set(fullKey.slice(LOCAL_STORAGE_KEY_PREFIX.length), entry);
+        restored++;
+      }
+    }
+    if (restored > 0) trace(`restored ${restored} entries from localStorage`);
+  } catch (err) {
+    console.error('Failed to restore cache from localStorage:', err);
+  }
+}
+
+// Bootstrap cache from localStorage if running in the browser
+if (typeof window !== 'undefined') {
+  initializeCacheFromLocalStorage();
 }
 
 // ---------------------------------------------------------------------------
@@ -68,55 +133,30 @@ export async function getCached<T>(
   ttlMs: number = DEFAULT_TTL_MS
 ): Promise<T> {
   const now = Date.now();
-  const startTime = performance.now();
 
-  // Return cached value if still fresh
   const existing = cache.get(key);
   if (existing && existing.expiresAt > now) {
-    console.log(
-      `%c[Cache Hit] 🎯 Key: "${key}" (Fresh; expires in ${Math.round((existing.expiresAt - now) / 1000)}s)`,
-      'color: #10B981; font-weight: bold; background: #ECFDF5; padding: 2px 4px; border-radius: 4px;'
-    );
+    trace(`hit "${key}" (fresh ${Math.round((existing.expiresAt - now) / 1000)}s)`);
     return existing.value as T;
   }
 
-  // Return in-flight promise if one is already running for this key
-  if (inFlight.has(key)) {
-    console.log(
-      `%c[In-Flight Deduplication] 🤝 Key: "${key}" (Reusing active DB request...)`,
-      'color: #3B82F6; font-weight: bold; background: #EFF6FF; padding: 2px 4px; border-radius: 4px;'
-    );
-    return inFlight.get(key) as Promise<T>;
+  const pending = inFlight.get(key);
+  if (pending) {
+    trace(`dedup "${key}" (reusing in-flight request)`);
+    return pending as Promise<T>;
   }
 
-  console.log(
-    `%c[Cache Miss/Stale] ⚡ Key: "${key}" - Fetching fresh ledger data from database...`,
-    'color: #F59E0B; font-weight: bold; background: #FFFBEB; padding: 2px 4px; border-radius: 4px;'
-  );
-
-  // Launch new fetch and register it as in-flight
+  trace(`miss "${key}" (fetching)`);
   const promise = fetcher()
     .then((value) => {
-      const duration = performance.now() - startTime;
-      console.log(
-        `%c[Fetch Completed] ✅ Key: "${key}" | Duration: ${duration.toFixed(2)}ms (Successfully saved in cache)`,
-        'color: #10B981; font-weight: bold; text-decoration: underline; background: #ECFDF5; padding: 2px 4px; border-radius: 4px;'
-      );
       const entry = { value, expiresAt: Date.now() + ttlMs };
       cache.set(key, entry);
       saveToLocalStorage(key, entry);
       inFlight.delete(key);
-      // Notify active hooks that fresh data has arrived
       notify(key);
       return value;
     })
     .catch((err) => {
-      const duration = performance.now() - startTime;
-      console.error(
-        `%c[Fetch Failed] ❌ Key: "${key}" | Duration: ${duration.toFixed(2)}ms`,
-        'color: #EF4444; font-weight: bold; background: #FEF2F2; padding: 2px 4px; border-radius: 4px;',
-        err
-      );
       inFlight.delete(key);
       throw err;
     });
@@ -125,133 +165,58 @@ export async function getCached<T>(
   return promise;
 }
 
-const LOCAL_STORAGE_KEY_PREFIX = 'scala_cache:';
-
-function jsonReviver(key: string, value: any) {
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d*)?(?:Z|[-+]\d{2}:?\d{2})?$/.test(value)) {
-    return new Date(value);
-  }
-  return value;
-}
-
-function saveToLocalStorage(key: string, entry: CacheEntry<unknown>) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + key, JSON.stringify(entry));
-  } catch (err) {
-    console.error(`Failed to save key "${key}" to localStorage:`, err);
-  }
-}
-
-export function initializeCacheFromLocalStorage() {
-  if (typeof window === 'undefined') return;
-  try {
-    let restoredCount = 0;
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-        const cacheKey = key.slice(LOCAL_STORAGE_KEY_PREFIX.length);
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          const entry = JSON.parse(raw, jsonReviver);
-          cache.set(cacheKey, entry);
-          restoredCount++;
-        }
-      }
-    }
-    if (restoredCount > 0) {
-      console.log(`%c[Cache Restore] 🎒 Restored ${restoredCount} entries from localStorage`, 'color: #3B82F6; font-weight: bold; background: #EFF6FF; padding: 2px 4px; border-radius: 4px;');
-    }
-  } catch (err) {
-    console.error("Failed to restore cache from localStorage:", err);
-  }
-}
-
-// Automatically bootstrap cache from localStorage if running in browser
-if (typeof window !== 'undefined') {
-  initializeCacheFromLocalStorage();
-}
-
 /**
  * Immediately invalidate one or more cache keys.
  * Call this after any mutation (create/update/delete) so the next read
  * always fetches fresh data and notifies active subscribers to sync.
+ *
+ * Entries are marked stale (expiresAt = 0) rather than deleted so reader hooks
+ * can still render the last known value instantly while revalidating.
  */
 export function invalidateCache(...keys: string[]): void {
   for (const key of keys) {
-    console.log(
-      `%c[Cache Invalidation] 🧹 Invalidated key: "${key}"`,
-      'color: #EC4899; font-weight: bold; background: #FDF2F8; padding: 2px 4px; border-radius: 4px;'
-    );
-    const existing = cache.get(key);
-    if (existing) {
-      existing.expiresAt = 0; // Mark as stale instead of deleting so reader hooks can still render it instantly
-      saveToLocalStorage(key, existing);
-    } else {
-      if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem(LOCAL_STORAGE_KEY_PREFIX + key);
-          if (raw) {
-            const entry = JSON.parse(raw, jsonReviver);
-            entry.expiresAt = 0;
-            saveToLocalStorage(key, entry);
-          }
-        } catch (err) {
-          console.error("Failed to invalidate key in localStorage:", err);
-        }
-      }
+    trace(`invalidate "${key}"`);
+    const entry = cache.get(key) ?? readFromLocalStorage(key);
+    if (entry) {
+      entry.expiresAt = 0;
+      cache.set(key, entry);
+      saveToLocalStorage(key, entry);
     }
-    // Notify all active hooks subscribed to this key to automatically re-fetch
     notify(key);
   }
 }
 
 /** Invalidate everything (e.g. after a bulk operation or sign-out). */
 export function clearAllCache(): void {
-  console.log(
-    `%c[Cache Clear] 🧽 Cleared all entries in the corporate ledger cache`,
-    'color: #EC4899; font-weight: bold; background: #FDF2F8; padding: 2px 4px; border-radius: 4px;'
-  );
+  trace('clear all');
   cache.clear();
-  if (typeof window !== 'undefined') {
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-          keysToRemove.push(k);
-        }
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      console.log(`%c[Cache Clear] 🧹 Wiped all persisted SWR entries from localStorage`, 'color: #EC4899; font-weight: bold;');
-    } catch (err) {
-      console.error("Failed to clear localStorage cache:", err);
+  if (typeof window === 'undefined') return;
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(LOCAL_STORAGE_KEY_PREFIX)) toRemove.push(k);
     }
+    toRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (err) {
+    console.error('Failed to clear localStorage cache:', err);
   }
 }
 
 /** Manually seed or update a cache entry and notify active React components. */
 export function primeCache(key: string, value: unknown, ttlMs: number = DEFAULT_TTL_MS): void {
-  console.log(
-    `%c[Cache Prime] 🌱 Primed key: "${key}" (expires in ${Math.round(ttlMs / 1000)}s)`,
-    'color: #10B981; font-weight: bold; background: #E0F2FE; padding: 2px 4px; border-radius: 4px;'
-  );
+  trace(`prime "${key}"`);
   const entry = { value, expiresAt: Date.now() + ttlMs };
   cache.set(key, entry);
   saveToLocalStorage(key, entry);
   notify(key);
 }
 
-/** Synchronously get a value from the cache, even if it is stale, to support instant SWR renders. */
+/** Synchronously read a value from the cache, even if stale, for instant SWR renders. */
 export function getCachedSync<T>(key: string): T | null {
   const existing = cache.get(key);
-  if (existing) {
-    return existing.value as T;
-  }
-  return null;
+  return existing ? (existing.value as T) : null;
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Custom React Hook for SWR & Pub/Sub
@@ -264,65 +229,44 @@ export function useAdminData<T>(
   const enabled = options?.enabled !== false && key !== null;
   const actualKey = key ?? '';
 
-  // Synchronous cache lookup on init prevents loading state flash if data is available
+  // Synchronous cache lookup on init prevents a loading flash when data exists.
   const [data, setData] = useState<T | null>(() => {
     if (!enabled) return null;
-    const existing = cache.get(actualKey);
-    if (existing) {
-      return existing.value as T;
-    }
-    return null;
+    return (cache.get(actualKey)?.value as T) ?? null;
   });
 
-  // Check if current cache entry is fresh
-  const isFresh = () => {
-    if (!enabled) return false;
-    const existing = cache.get(actualKey);
-    return !!(existing && existing.expiresAt > Date.now());
-  };
-
-  // Only set loading to true if there is absolutely no existing data in cache
-  const [loading, setLoading] = useState(() => {
-    if (!enabled) return false;
-    const existing = cache.get(actualKey);
-    return !existing;
-  });
+  // Only show loading when there is no existing data at all.
+  const [loading, setLoading] = useState(() => enabled && !cache.has(actualKey));
 
   useEffect(() => {
     if (!enabled) return;
     let active = true;
 
+    const isFresh = () => {
+      const existing = cache.get(actualKey);
+      return !!(existing && existing.expiresAt > Date.now());
+    };
+
     async function load(forceRefresh = false) {
       if (!forceRefresh && isFresh()) {
-        console.log(`%c[SWR Hook] 🟢 "${actualKey}" (Cache is fresh, skipping background query)`, 'color: #10B981;');
         if (active) setLoading(false);
         return;
       }
-
       try {
-        const existing = cache.get(actualKey);
-        // Only trigger loading visual overlay if we don't have any cached data to show AND no active state data
-        if (active && !existing && !data) {
-          console.log(`%c[SWR Hook] 🔴 "${actualKey}" - Initial Load: No cached data. Rendering loading skeletons...`, 'color: #EF4444; font-weight: bold;');
-          setLoading(true);
-        } else if (active && existing) {
-          console.log(`%c[SWR Hook] 🟣 "${actualKey}" - Stale-While-Revalidate: Instant cache render. Triggering silent background query...`, 'color: #8B5CF6; font-weight: bold;');
-        }
-        
+        if (active && !cache.has(actualKey) && !data) setLoading(true);
         const val = await getCached(actualKey, fetcher, options?.ttl);
         if (active) {
           setData(val);
           setLoading(false);
         }
       } catch (err) {
-        console.error(`useAdminData loading error for key ${actualKey}:`, err);
+        console.error(`useAdminData load error for "${actualKey}":`, err);
         if (active) setLoading(false);
       }
     }
 
     load();
 
-    // Subscribe to cache changes/invalidations
     const unsubscribe = subscribe(actualKey, () => {
       if (!active) return;
       const existing = cache.get(actualKey);
@@ -330,7 +274,6 @@ export function useAdminData<T>(
         setData(existing.value as T);
         setLoading(false);
       } else {
-        console.log(`%c[SWR Hook] 🔄 "${actualKey}" Cache Invalidated or Stale! Triggering instant re-fetch.`, 'color: #EC4899;');
         load(true);
       }
     });
@@ -341,7 +284,7 @@ export function useAdminData<T>(
     };
   }, [actualKey, fetcher, options?.ttl, enabled]);
 
-  // Trigger cache invalidation or optimistic manual updates
+  // Invalidate, or apply an optimistic value immediately.
   const mutate = async (optimisticData?: T) => {
     if (!enabled) return;
     if (optimisticData !== undefined) {
@@ -408,4 +351,3 @@ export const getCachedLinePresets = (): Promise<any[]> =>
 
 export const getCachedPagePresets = (): Promise<any[]> =>
   getCached(CACHE_KEYS.PAGE_PRESETS, getInvoicePagePresets as any);
-

@@ -37,6 +37,60 @@ export function getSubscriptionRemainingMonths(client: SubscriptionClient) {
   return Math.max(0, remaining);
 }
 
+// Format a number as Indonesian Rupiah currency, e.g. "Rp 1.500.000".
+export function formatCurrencyIDR(val: number): string {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(val);
+}
+
+// Format a value for an Indonesian amount input field: strips non-digits and
+// applies thousands grouping, e.g. "1.500.000". Returns '' for empty input.
+export function formatInputNumberIDR(val: number | string): string {
+  if (val === undefined || val === null || val === '') return '';
+  const num = String(val).replace(/[^0-9]/g, '');
+  if (!num) return '';
+  return new Intl.NumberFormat('id-ID').format(Number(num));
+}
+
+// Parse a grouped/formatted amount string back into a number, e.g. "1.500.000" -> 1500000.
+// Returns 0 for empty or non-numeric input.
+export function parseNumberInputIDR(val: string): number {
+  const digits = val.replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : 0;
+}
+
+// Invoice statuses that represent money still owed (issued, overdue, or partly paid).
+export const OUTSTANDING_INVOICE_STATUSES = ['issued', 'past_due', 'partially_paid'] as const;
+
+// Whether an invoice still has an outstanding balance to collect.
+export function isOutstandingInvoice(invoice: { status: string }): boolean {
+  return (OUTSTANDING_INVOICE_STATUSES as readonly string[]).includes(invoice.status);
+}
+
+// A task is "urgent" if it is past its target date or has gone untouched for
+// more than a week (and is not already achieved).
+export function isTaskUrgent(task: {
+  status?: string;
+  targetDate?: Date | string | null;
+  updatedAt?: Date | string | null;
+  createdAt?: Date | string | null;
+}): boolean {
+  if (task.status === 'achieved') return false;
+
+  const now = new Date();
+  if (task.targetDate) {
+    const dueDate = new Date(task.targetDate);
+    if (dueDate < now) return true;
+  }
+
+  const updatedDate = new Date(task.updatedAt || task.createdAt || now);
+  const daysDiff = (now.getTime() - updatedDate.getTime()) / (1000 * 3600 * 24);
+  return daysDiff > 7;
+}
+
 // Generate a strong random password containing lowercase, uppercase, numbers, and symbols
 export function generateStrongPassword() {
   const lowercase = 'abcdefghijklmnopqrstuvwxyz';

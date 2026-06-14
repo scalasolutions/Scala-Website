@@ -48,7 +48,7 @@ import {
   CACHE_KEYS,
   useAdminData,
 } from '@/lib/data-cache';
-import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER, generateStrongPassword } from '@/lib/utils';
+import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER, generateStrongPassword, isOutstandingInvoice } from '@/lib/utils';
 import { formatCurrencyIDR } from '@/app/admin/invoices/components/invoice-types';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
@@ -621,9 +621,7 @@ export default function ClientsPage() {
 
                   // Calculate outstanding invoices
                   const clientInvoices = invoices.filter(inv => inv.clientId === client.id);
-                  const hasOutstanding = clientInvoices.some(inv => 
-                    inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid'
-                  );
+                  const hasOutstanding = clientInvoices.some(isOutstandingInvoice);
 
                   // Calculate if any maintenance task is overdue
                   const isMaintenanceOverdue = (() => {
@@ -752,7 +750,7 @@ export default function ClientsPage() {
                                       <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
                                     </div>
                                     <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
-                                      {clientInvoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').map(inv => (
+                                      {clientInvoices.filter(isOutstandingInvoice).map(inv => (
                                         <div key={inv.id} className="flex justify-between items-center gap-2">
                                           <span className="text-zinc-400 truncate">{inv.invoiceNumber}</span>
                                           <span className="text-zinc-100 shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>

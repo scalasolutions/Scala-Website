@@ -5,21 +5,14 @@ import { X, ArrowUpRight, ArrowDownRight, CreditCard, AlertTriangle, Loader2 } f
 import { createPortal } from 'react-dom';
 import { createExpense, createCapitalInjection, createPayout, uploadReceiptAction } from '@/lib/db/queries';
 import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
+import { formatInputNumberIDR, parseNumberInputIDR } from '@/lib/utils';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import SectionHeading from '@/components/ui/SectionHeading';
 
-// Format dynamic currency entry formatting helper
-export const formatNumberInputIDR = (val: number | string): string => {
-  if (val === undefined || val === null || val === '') return '';
-  const num = String(val).replace(/[^0-9]/g, '');
-  if (!num) return '';
-  return new Intl.NumberFormat('id-ID').format(Number(num));
-};
-
-export const parseNumberInputIDR = (formattedVal: string): number => {
-  return Number(formattedVal.replace(/[^0-9]/g, ''));
-};
+// Aliased to the shared helpers under the legacy names used within this feature.
+export const formatNumberInputIDR = formatInputNumberIDR;
+export { parseNumberInputIDR };
 
 // Shared select className so the modals stay consistent without inventing a new primitive.
 const selectClass =

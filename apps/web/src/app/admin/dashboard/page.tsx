@@ -29,7 +29,7 @@ import {
   useAdminData,
   CACHE_KEYS,
 } from '@/lib/data-cache';
-import { getSubscriptionRemainingMonths } from '@/lib/utils';
+import { getSubscriptionRemainingMonths, formatCurrencyIDR, isTaskUrgent, isOutstandingInvoice } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import StatCard from '@/components/ui/StatCard';
@@ -116,7 +116,7 @@ export default function DashboardHome() {
 
   // Total Outstanding Invoices (issued + past_due + partially_paid)
   const outstandingInvoicesTotal = invoices
-    .filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid')
+    .filter(isOutstandingInvoice)
     .reduce((sum, inv) => sum + (inv.total - (inv.amountPaid || 0)), 0);
 
   // Unresolved support tickets
@@ -128,31 +128,6 @@ export default function DashboardHome() {
     const remaining = getSubscriptionRemainingMonths(c);
     return remaining !== null && remaining < 3;
   });
-
-  const formatCurrencyIDR = (val: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0
-    }).format(val);
-  };
-
-  const isTaskUrgent = (task: any) => {
-    if (task.status === 'achieved') return false;
-
-    const now = new Date();
-    if (task.targetDate) {
-      const dueDate = new Date(task.targetDate);
-      if (dueDate < now) return true;
-    }
-
-    const updatedDate = new Date(task.updatedAt || task.createdAt);
-    const timeDiff = now.getTime() - updatedDate.getTime();
-    const daysDiff = timeDiff / (1000 * 3600 * 24);
-    if (daysDiff > 7) return true;
-
-    return false;
-  };
 
   const urgentTasks = tasks.filter(isTaskUrgent);
 
@@ -182,7 +157,7 @@ export default function DashboardHome() {
   });
 
   const openTickets = tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').slice(0, 3);
-  const outstandingInvoices = invoices.filter(inv => inv.status === 'issued' || inv.status === 'past_due' || inv.status === 'partially_paid').slice(0, 4);
+  const outstandingInvoices = invoices.filter(isOutstandingInvoice).slice(0, 4);
 
   return (
     <div className="space-y-8 animate-fade-up">
