@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server';
 export default auth((req) => {
   const hostname = req.headers.get('host') || '';
   const host = hostname.split(':')[0]; // Remove port if any
+  const port = hostname.includes(':') ? `:${hostname.split(':').slice(1).join(':')}` : '';
+  const localAdminHost = `admin.localhost${port}`;
+  const localClientsHost = `clients.localhost${port}`;
   
   const isLoggedIn = !!req.auth;
   const role = (req.auth?.user as any)?.role as 'admin' | 'client' | undefined;
@@ -17,30 +20,34 @@ export default auth((req) => {
   // 1. Handle main domain redirects to subdomains
   if (!isAdminSubdomain && !isClientsSubdomain) {
     if (pathname.startsWith('/admin')) {
-      const targetPath = pathname.replace('/admin', '') || '/';
+      const targetPath = pathname === '/admin' ? '/dashboard' : pathname.replace('/admin', '') || '/dashboard';
       const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectHost = host.includes('localhost') ? 'admin.localhost:3000' : 'admin.scalasolutions.id';
+      const redirectHost = host.includes('localhost') ? localAdminHost : 'admin.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}${targetPath}${req.nextUrl.search}`, req.url), 308);
     }
     
     if (pathname.startsWith('/portal')) {
       const targetPath = pathname.replace('/portal', '') || '/';
       const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectHost = host.includes('localhost') ? 'clients.localhost:3000' : 'clients.scalasolutions.id';
+      const redirectHost = host.includes('localhost') ? localClientsHost : 'clients.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}${targetPath}${req.nextUrl.search}`, req.url), 308);
     }
     
     if (pathname.startsWith('/client-portal')) {
       const targetPath = pathname.replace('/client-portal', '') || '/';
       const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectHost = host.includes('localhost') ? 'clients.localhost:3000' : 'clients.scalasolutions.id';
+      const redirectHost = host.includes('localhost') ? localClientsHost : 'clients.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}${targetPath}${req.nextUrl.search}`, req.url), 308);
     }
   }
 
   // 2. Handle Subdomain clean URL redirection (e.g. admin.scalasolutions.id/admin/dashboard -> admin.scalasolutions.id/dashboard)
+  if (isAdminSubdomain && pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard' + req.nextUrl.search, req.url), 308);
+  }
+
   if (isAdminSubdomain && pathname.startsWith('/admin')) {
-    const cleanPath = pathname.replace('/admin', '') || '/';
+    const cleanPath = pathname === '/admin' ? '/dashboard' : pathname.replace('/admin', '') || '/dashboard';
     return NextResponse.redirect(new URL(cleanPath + req.nextUrl.search, req.url), 308);
   }
 
@@ -68,7 +75,7 @@ export default auth((req) => {
     }
     if (role !== 'admin') {
       const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectHost = host.includes('localhost') ? 'clients.localhost:3000' : 'clients.scalasolutions.id';
+      const redirectHost = host.includes('localhost') ? localClientsHost : 'clients.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}`, req.url));
     }
   }
@@ -80,7 +87,7 @@ export default auth((req) => {
     }
     if (role !== 'client') {
       const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectHost = host.includes('localhost') ? 'admin.localhost:3000' : 'admin.scalasolutions.id';
+      const redirectHost = host.includes('localhost') ? localAdminHost : 'admin.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}`, req.url));
     }
   }
@@ -89,12 +96,12 @@ export default auth((req) => {
   if (isAuthPage && isLoggedIn) {
     if (role === 'admin') {
       const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectHost = host.includes('localhost') ? 'admin.localhost:3000' : 'admin.scalasolutions.id';
+      const redirectHost = host.includes('localhost') ? localAdminHost : 'admin.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}`, req.url));
     }
     if (role === 'client') {
       const protocol = host.includes('localhost') ? 'http' : 'https';
-      const redirectHost = host.includes('localhost') ? 'clients.localhost:3000' : 'clients.scalasolutions.id';
+      const redirectHost = host.includes('localhost') ? localClientsHost : 'clients.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}`, req.url));
     }
   }
