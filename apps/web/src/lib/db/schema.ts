@@ -168,10 +168,23 @@ export const quotations = pgTable('quotations', {
   status: quotationStatusEnum('status').notNull().default('draft'),
   itemsJson: text('items_json').notNull(), // JSON string for line items
   includedPagesJson: text('included_pages_json'), // JSON list of included page preset keys
+  sectionsJson: text('sections_json'), // structured rich-proposal sections (see ProposalSections)
+  proposalTemplateId: uuid('proposal_template_id'), // optional source template
   sentAt: timestamp('sent_at'),
   validUntil: timestamp('valid_until'),
   convertedInvoiceId: uuid('converted_invoice_id'),
   notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 9c. Proposal Templates Table — reusable rich-proposal configurations
+export const proposalTemplates = pgTable('proposal_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  clientType: text('client_type'),
+  sectionsJson: text('sections_json'), // default ProposalSections payload
+  defaultPaymentModel: text('default_payment_model'), // 'A' | 'B' | 'C'
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -257,4 +270,6 @@ export type ClientTask = typeof clientTasks.$inferSelect;
 export type NewClientTask = typeof clientTasks.$inferInsert;
 export type Quotation = typeof quotations.$inferSelect;
 export type NewQuotation = typeof quotations.$inferInsert;
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+export type NewProposalTemplate = typeof proposalTemplates.$inferInsert;
 

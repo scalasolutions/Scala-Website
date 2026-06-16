@@ -24,6 +24,7 @@ import {
   LogOut,
   Coins,
   ClipboardList,
+  LayoutTemplate,
   Loader2
 } from 'lucide-react';
 import {
@@ -292,6 +293,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/clients', icon: <Users size={18} />, label: 'Clients' },
     { href: '/admin/invoices', icon: <Receipt size={18} />, label: 'Invoices' },
     { href: '/admin/quotations', icon: <FileText size={18} />, label: 'Quotations' },
+    { href: '/admin/presets', icon: <LayoutTemplate size={18} />, label: 'Presets' },
     { href: '/admin/finance', icon: <Coins size={18} />, label: 'Finance' },
     {
       href: '/admin/tickets',

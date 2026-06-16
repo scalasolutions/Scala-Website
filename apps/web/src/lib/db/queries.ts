@@ -129,6 +129,8 @@ export interface MockQuotation {
   status: 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'converted';
   itemsJson: string;
   includedPagesJson?: string | null;
+  sectionsJson?: string | null;
+  proposalTemplateId?: string | null;
   sentAt: Date | null;
   validUntil: Date | null;
   convertedInvoiceId?: string | null;
@@ -662,6 +664,8 @@ export async function createQuotation(data: schema.NewQuotation) {
     status: data.status || 'draft',
     itemsJson: data.itemsJson,
     includedPagesJson: data.includedPagesJson || null,
+    sectionsJson: data.sectionsJson || null,
+    proposalTemplateId: data.proposalTemplateId || null,
     sentAt: data.sentAt ? new Date(data.sentAt) : null,
     validUntil: data.validUntil ? new Date(data.validUntil) : null,
     convertedInvoiceId: data.convertedInvoiceId || null,
@@ -716,6 +720,94 @@ export async function deleteQuotation(id: string) {
   if (idx !== -1) {
     const deleted = mockQuotations[idx];
     mockQuotations = mockQuotations.filter(q => q.id !== id);
+    return deleted;
+  }
+  return null;
+}
+
+// --- PROPOSAL TEMPLATE QUERIES ---
+export interface MockProposalTemplate {
+  id: string;
+  name: string;
+  clientType: string | null;
+  sectionsJson: string | null;
+  defaultPaymentModel: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+let mockProposalTemplates: MockProposalTemplate[] = [];
+
+export async function getProposalTemplates() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.proposalTemplates.findMany({
+        orderBy: [desc(schema.proposalTemplates.createdAt)],
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockProposalTemplates].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function createProposalTemplate(data: schema.NewProposalTemplate) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.proposalTemplates).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newTemplate: MockProposalTemplate = {
+    id: crypto.randomUUID(),
+    name: data.name,
+    clientType: data.clientType || null,
+    sectionsJson: data.sectionsJson || null,
+    defaultPaymentModel: data.defaultPaymentModel || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockProposalTemplates.push(newTemplate);
+  return newTemplate;
+}
+
+export async function updateProposalTemplate(id: string, data: Partial<schema.NewProposalTemplate>) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.update(schema.proposalTemplates)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.proposalTemplates.id, id))
+        .returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Update failed, running mock update: ", e);
+    }
+  }
+  const idx = mockProposalTemplates.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    mockProposalTemplates[idx] = { ...mockProposalTemplates[idx], ...data, updatedAt: new Date() } as MockProposalTemplate;
+    return mockProposalTemplates[idx];
+  }
+  return null;
+}
+
+export async function deleteProposalTemplate(id: string) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.delete(schema.proposalTemplates)
+        .where(eq(schema.proposalTemplates.id, id))
+        .returning();
+      return results[0] || null;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  const idx = mockProposalTemplates.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    const deleted = mockProposalTemplates[idx];
+    mockProposalTemplates = mockProposalTemplates.filter(t => t.id !== id);
     return deleted;
   }
   return null;

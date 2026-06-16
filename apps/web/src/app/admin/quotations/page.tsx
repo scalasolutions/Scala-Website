@@ -15,6 +15,7 @@ import {
   Loader2,
   Pencil,
   ArrowRight,
+  ScrollText,
 } from 'lucide-react';
 import {
   createQuotation,
@@ -41,6 +42,8 @@ import {
 } from '@/lib/data-cache';
 import { InvoiceLineItem, formatCurrencyIDR } from '../invoices/components/invoice-types';
 import { InvoicePreview } from '../invoices/components/InvoicePreview';
+import { QuotationPreview } from './components/QuotationPreview';
+import { ProposalSections, EMPTY_PROPOSAL_SECTIONS, parseProposalSections } from '@/lib/proposal-types';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -145,6 +148,7 @@ export default function QuotationsPage() {
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'none'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([{ name: '', description: '', price: 0, quantity: 1 }]);
+  const [proposalSections, setProposalSections] = useState<ProposalSections>({ ...EMPTY_PROPOSAL_SECTIONS });
   const [pasteText, setPasteText] = useState('');
   const [presetSearch, setPresetSearch] = useState('');
   const [formError, setFormError] = useState('');
@@ -188,6 +192,7 @@ export default function QuotationsPage() {
     setDiscountType('none');
     setDiscountValue(0);
     setLineItems([{ name: '', description: '', price: 0, quantity: 1 }]);
+    setProposalSections({ ...EMPTY_PROPOSAL_SECTIONS });
     setPasteText('');
     setIncludedPages(DEFAULT_INCLUDED_PAGES);
     setFormError('');
@@ -205,6 +210,7 @@ export default function QuotationsPage() {
     setDiscountValue(q.discountValue || 0);
     setLineItems(JSON.parse(q.itemsJson) || [{ name: '', description: '', price: 0, quantity: 1 }]);
     setIncludedPages(q.includedPagesJson ? JSON.parse(q.includedPagesJson) : DEFAULT_INCLUDED_PAGES);
+    setProposalSections(parseProposalSections(q.sectionsJson));
     setFormError('');
     setModalOpen(true);
   };
@@ -235,6 +241,7 @@ export default function QuotationsPage() {
       status: quotationStatus,
       itemsJson: JSON.stringify(lineItems.filter(i => i.name.trim())),
       includedPagesJson: JSON.stringify(includedPages),
+      sectionsJson: JSON.stringify(proposalSections),
       validUntil: validUntil ? new Date(validUntil) : null,
       notes: notes.trim() || null,
     };
@@ -474,6 +481,13 @@ export default function QuotationsPage() {
                             >
                               <Eye size={15} />
                             </button>
+                            <a
+                              href={`/admin/clients/${q.clientId}`}
+                              className="p-1.5 rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer inline-flex"
+                              title="Generate SLA (open client agreement)"
+                            >
+                              <ScrollText size={15} />
+                            </a>
                             {q.status !== 'converted' && (
                               <button
                                 onClick={() => openEditModal(q)}
@@ -620,6 +634,69 @@ export default function QuotationsPage() {
                   onChange={e => setNotes(e.target.value)}
                   placeholder="Optional cover note for the quotation..."
                   rows={3}
+                />
+              </div>
+
+              {/* Proposal Content (rich multi-page proposal) */}
+              <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Proposal Content
+                </p>
+                <p className="text-[11px] text-muted-foreground -mt-1.5 leading-relaxed">
+                  Fills the multi-page proposal preview. Leave blank to auto-derive packages from the line items. Hosting & payment terms come from the client's SLA settings.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={proposalSections.title || ''}
+                    onChange={e => setProposalSections(s => ({ ...s, title: e.target.value }))}
+                    placeholder="Proposal title (e.g. Custom E-Commerce Website)"
+                    className="bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                  />
+                  <input
+                    type="text"
+                    value={proposalSections.subtitle || ''}
+                    onChange={e => setProposalSections(s => ({ ...s, subtitle: e.target.value }))}
+                    placeholder="Short subtitle / descriptor"
+                    className="bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                  />
+                </div>
+                <Textarea
+                  value={proposalSections.businessNeed || ''}
+                  onChange={e => setProposalSections(s => ({ ...s, businessNeed: e.target.value }))}
+                  placeholder="Project overview / business need..."
+                  rows={3}
+                />
+                <Textarea
+                  value={(proposalSections.requirements || []).join('\n')}
+                  onChange={e => setProposalSections(s => ({ ...s, requirements: e.target.value.split('\n').map(x => x.trim()).filter(Boolean) }))}
+                  placeholder="Main requirements — one per line"
+                  rows={3}
+                />
+                <input
+                  type="text"
+                  value={proposalSections.timeline || ''}
+                  onChange={e => setProposalSections(s => ({ ...s, timeline: e.target.value }))}
+                  placeholder="Estimated timeline (e.g. Approximately 6–8 weeks)"
+                  className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                />
+                <Textarea
+                  value={(proposalSections.clientProvides || []).join('\n')}
+                  onChange={e => setProposalSections(s => ({ ...s, clientProvides: e.target.value.split('\n').map(x => x.trim()).filter(Boolean) }))}
+                  placeholder="What the client provides — one per line"
+                  rows={2}
+                />
+                <Textarea
+                  value={proposalSections.scopeTerms || ''}
+                  onChange={e => setProposalSections(s => ({ ...s, scopeTerms: e.target.value }))}
+                  placeholder="Scope & terms (revisions, deployment, third-party fees)..."
+                  rows={2}
+                />
+                <Textarea
+                  value={proposalSections.recommendation || ''}
+                  onChange={e => setProposalSections(s => ({ ...s, recommendation: e.target.value }))}
+                  placeholder="Closing recommendation (optional)..."
+                  rows={2}
                 />
               </div>
 
@@ -870,13 +947,12 @@ export default function QuotationsPage() {
       )}
 
       {/* ── PREVIEW OVERLAY ── */}
-      {previewQuotation && mounted && createPortal(
-        <InvoicePreview
-          invoice={buildPreviewInvoice(previewQuotation) as any}
-          clients={clients as any}
+      {previewQuotation && mounted && (
+        <QuotationPreview
+          quotation={previewQuotation}
+          client={clients.find(c => c.id === previewQuotation.clientId) as any}
           onClose={() => setPreviewQuotation(null)}
-        />,
-        document.body
+        />
       )}
     </main>
   );
