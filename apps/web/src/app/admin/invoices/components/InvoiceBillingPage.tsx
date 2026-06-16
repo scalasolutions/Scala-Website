@@ -1,6 +1,7 @@
 import React from 'react';
 import { InvoicePageHeader, InvoicePageFooter } from './InvoicePageHeader';
 import { InvoiceLineItem, formatCurrencyIDR, formatDateClean } from './invoice-types';
+import { getPaymentModel } from '@/lib/onboarding-terms';
 
 interface InvoiceBillingPageProps {
   companyName: string;
@@ -23,6 +24,12 @@ interface InvoiceBillingPageProps {
   receivedBy?: 'company' | 'fredrick' | 'nicholas';
   invoiceSubtotal?: number;
   isDpCollection?: boolean;
+  // Hosting arrangement (kept consistent with the SLA) + due date
+  hostingFreeLaunch?: boolean;
+  hostingMonthlyFee?: number | null;
+  hostingPlanLabel?: string | null;
+  dueDate?: Date | string | null;
+  paymentModel?: string | null;
 }
 
 const renderBankDetailsTable = (bank: 'BCA' | 'BNI', amount: number) => {
@@ -86,7 +93,25 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   receivedBy = 'company',
   invoiceSubtotal,
   isDpCollection = false,
+  hostingFreeLaunch = false,
+  hostingMonthlyFee,
+  hostingPlanLabel,
+  dueDate,
+  paymentModel,
 }) => {
+  const paymentTermsText = (() => {
+    const model = getPaymentModel(paymentModel);
+    const stages = model.stages.map((s) => `${s.percent}% ${s.stage.toLowerCase()} (${s.trigger.toLowerCase()})`).join('; ');
+    return `${stages}. Work may be paused if payment is not received by the due date.`;
+  })();
+  const formattedDueDate = dueDate
+    ? new Date(dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null;
+  const hostingNote = hostingFreeLaunch
+    ? 'Hosting & maintenance are not charged at project start. During the early-launch period they are provided without monthly charge while traffic and infrastructure usage remain within normal operating levels; billing begins only when higher usage requires additional resources, with prior notice. See the SLA for full hosting & overage terms.'
+    : hostingMonthlyFee
+    ? `Hosting & maintenance (${hostingPlanLabel || 'Standard plan'}) are billed as a monthly service of ${formatCurrencyIDR(hostingMonthlyFee)}/month, beginning after launch. See the SLA for full hosting & overage terms.`
+    : 'Hosting & maintenance are billed separately after launch, per the Service Level Agreement (SLA).';
   const subtotal = invoiceSubtotal !== undefined ? invoiceSubtotal : lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let discountAmount = 0;
   if (discountType === 'percentage' && discountValue) {
@@ -598,9 +623,21 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
               If you have any issues, you can contact our <strong style={{ fontWeight: 700 }}>Finance Team (+62818815037)</strong>.
             </div>
 
+            {/* Payment terms & due date */}
+            {status !== 'paid' && status !== 'written_off' && (
+              <div style={{ fontSize: 11.5, color: '#475569', textAlign: 'center', marginTop: 16, lineHeight: 1.6, fontWeight: 500 }}>
+                <strong style={{ fontWeight: 700, color: '#1e293b' }}>Payment Terms:</strong> {paymentTermsText}
+                {formattedDueDate && (
+                  <>
+                    {' '}<strong style={{ fontWeight: 700, color: '#1e293b' }}>Due Date:</strong> {formattedDueDate} (within 14 calendar days of issuance).
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Footnotes */}
             <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: 12 }}>
-              * Hosting &amp; maintenance subscriptions are billed annually in advance. Monthly fee equivalent shown for reference only.
+              * {hostingNote}
             </div>
           </div>
         )}

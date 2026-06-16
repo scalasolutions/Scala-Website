@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import SectionHeading from '@/components/ui/SectionHeading';
+import { PAYMENT_MODELS, PaymentModelKey } from '@/lib/onboarding-terms';
 
 interface AgreementTermsModalProps {
   tcStatus: 'pending' | 'signed';
@@ -26,6 +27,8 @@ interface AgreementTermsModalProps {
   onHostingFreeLaunchChange: (value: boolean) => void;
   hostingOverageNotes: string;
   onHostingOverageNotesChange: (value: string) => void;
+  paymentModel: string;
+  onPaymentModelChange: (value: string) => void;
   onCancel: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }
@@ -54,6 +57,8 @@ export function AgreementTermsModal({
   onHostingFreeLaunchChange,
   hostingOverageNotes,
   onHostingOverageNotesChange,
+  paymentModel,
+  onPaymentModelChange,
   onCancel,
   onSubmit,
 }: AgreementTermsModalProps) {
@@ -101,6 +106,34 @@ export function AgreementTermsModal({
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                Payment model
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.keys(PAYMENT_MODELS) as PaymentModelKey[]).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => onPaymentModelChange(k)}
+                    title={PAYMENT_MODELS[k].bestFor}
+                    className={`px-2 py-2 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer text-center ${
+                      paymentModel === k
+                        ? 'border-primary bg-primary text-primary-foreground font-extrabold'
+                        : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {PAYMENT_MODELS[k].name.split('(')[0].trim()}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
+                {(PAYMENT_MODELS[(paymentModel as PaymentModelKey)] || PAYMENT_MODELS.A).stages
+                  .map((s) => `${s.percent}% ${s.stage}`)
+                  .join(' · ')} — {(PAYMENT_MODELS[(paymentModel as PaymentModelKey)] || PAYMENT_MODELS.A).bestFor}
+              </p>
             </div>
 
             <div className="space-y-4">

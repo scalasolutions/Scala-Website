@@ -208,6 +208,10 @@ export default function ClientDetailPage() {
     const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
     return cachedClient?.hostingOverageNotes || '';
   });
+  const [paymentModel, setPaymentModel] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.paymentModel || 'A';
+  });
   const [agreementPreviewOpen, setAgreementPreviewOpen] = useState(false);
 
   // Client tasks state & queries
@@ -628,6 +632,7 @@ export default function ClientDetailPage() {
         setHostingSupportOverageRate(cCached.hostingSupportOverageRate != null ? String(cCached.hostingSupportOverageRate) : '');
         setHostingFreeLaunch(cCached.hostingFreeLaunch || false);
         setHostingOverageNotes(cCached.hostingOverageNotes || '');
+        setPaymentModel(cCached.paymentModel || 'A');
         setEnvRotationInterval(cCached.envRotationInterval !== undefined ? cCached.envRotationInterval : 6);
         setStabilityCheckInterval(cCached.stabilityCheckInterval !== undefined ? cCached.stabilityCheckInterval : 1);
         setExpectationsCheckInterval(cCached.expectationsCheckInterval !== undefined ? cCached.expectationsCheckInterval : 3);
@@ -690,6 +695,7 @@ export default function ClientDetailPage() {
         setHostingSupportOverageRate(c.hostingSupportOverageRate != null ? String(c.hostingSupportOverageRate) : '');
         setHostingFreeLaunch(c.hostingFreeLaunch || false);
         setHostingOverageNotes(c.hostingOverageNotes || '');
+        setPaymentModel(c.paymentModel || 'A');
         setEnvRotationInterval(c.envRotationInterval !== undefined ? c.envRotationInterval : 6);
         setStabilityCheckInterval(c.stabilityCheckInterval !== undefined ? c.stabilityCheckInterval : 1);
         setExpectationsCheckInterval(c.expectationsCheckInterval !== undefined ? c.expectationsCheckInterval : 3);
@@ -1109,6 +1115,7 @@ export default function ClientDetailPage() {
         hostingSupportOverageRate: hostingSupportOverageRate.trim() ? Number(hostingSupportOverageRate) : null,
         hostingFreeLaunch: hostingFreeLaunch,
         hostingOverageNotes: hostingOverageNotes.trim() || null,
+        paymentModel: paymentModel || null,
       });
       if (updated) {
         setClient(updated as MockClient);
@@ -1550,6 +1557,7 @@ export default function ClientDetailPage() {
                     setHostingSupportOverageRate(client.hostingSupportOverageRate != null ? String(client.hostingSupportOverageRate) : '');
                     setHostingFreeLaunch(client.hostingFreeLaunch || false);
                     setHostingOverageNotes(client.hostingOverageNotes || '');
+                    setPaymentModel(client.paymentModel || 'A');
                     setAgreementModalOpen(true);
                   }}
                   className="w-full text-center flex justify-center items-center"
@@ -2602,6 +2610,8 @@ export default function ClientDetailPage() {
           onHostingFreeLaunchChange={setHostingFreeLaunch}
           hostingOverageNotes={hostingOverageNotes}
           onHostingOverageNotesChange={setHostingOverageNotes}
+          paymentModel={paymentModel}
+          onPaymentModelChange={setPaymentModel}
           onCancel={handleCancelAgreement}
           onSubmit={handleSaveAgreementTerms}
         />

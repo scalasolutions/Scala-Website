@@ -42,6 +42,7 @@ export interface MockClient {
   hostingSupportOverageRate: number | null;
   hostingFreeLaunch: boolean;
   hostingOverageNotes: string | null;
+  paymentModel: string | null;
   envRotationInterval: number;
   envRotationLastAt: Date | null;
   stabilityCheckInterval: number;
@@ -215,6 +216,7 @@ export async function createClient(data: schema.NewClient) {
     hostingSupportOverageRate: data.hostingSupportOverageRate !== undefined && data.hostingSupportOverageRate !== null ? Number(data.hostingSupportOverageRate) : null,
     hostingFreeLaunch: data.hostingFreeLaunch || false,
     hostingOverageNotes: data.hostingOverageNotes || null,
+    paymentModel: data.paymentModel || null,
     envRotationInterval: data.envRotationInterval !== undefined ? Number(data.envRotationInterval) : 6,
     envRotationLastAt: data.envRotationLastAt ? new Date(data.envRotationLastAt) : new Date(),
     stabilityCheckInterval: data.stabilityCheckInterval !== undefined ? Number(data.stabilityCheckInterval) : 1,

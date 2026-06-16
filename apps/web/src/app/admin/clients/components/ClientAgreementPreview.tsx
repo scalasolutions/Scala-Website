@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { MockClient } from '@/lib/db/queries';
 import ScalaLogo from '@/components/ui/ScalaLogo';
+import { getPaymentModel } from '@/lib/onboarding-terms';
 
 // ── Layout constants ─────────────────────────────────────────
 const PAGE_W = 800;
@@ -319,6 +320,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
     n != null ? `Rp ${n.toLocaleString('id-ID')}` : null;
   const hostingFee = fmtRp(client.hostingMonthlyFee);
   const supportOverageRate = fmtRp(client.hostingSupportOverageRate);
+  const paymentModel = getPaymentModel(client.paymentModel);
 
   if (!mounted) return null;
 
@@ -529,6 +531,9 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">2. Billing, Payments & Service Suspension</h3>
                   <p>
                     The Client shall pay Scala Solutions all recurring subscription fees and development costs as itemized in the invoices. All payments are strictly net-14 from the date of invoice issuance. Invoices unpaid after fourteen (14) calendar days will result in immediate suspension of all services (including hosting, Client Portal access, support, and custom applications). A reactivation fee of IDR 1,500,000 / $100 USD will apply to resume services. Overdue accounts forfeit all rights to SLA guarantees and uptime credits.
+                  </p>
+                  <p className="mt-1">
+                    Project fees follow the <span className="font-semibold text-zinc-900">{paymentModel.name}</span> schedule: {paymentModel.stages.map((s) => `${s.percent}% ${s.stage.toLowerCase()} (${s.trigger.toLowerCase()})`).join('; ')}.{paymentModel.note ? ` ${paymentModel.note}` : ''}
                   </p>
                 </div>
 

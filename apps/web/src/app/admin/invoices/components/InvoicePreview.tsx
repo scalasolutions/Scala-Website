@@ -749,6 +749,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   showPayments={chunk.showPayments}
                   receivedBy={invoice.receivedBy}
                   isDpCollection={previewIsDpCollection}
+                  hostingFreeLaunch={client?.hostingFreeLaunch}
+                  hostingMonthlyFee={client?.hostingMonthlyFee}
+                  hostingPlanLabel={client?.hostingPlanLabel}
+                  dueDate={invoice.dueDate}
+                  paymentModel={client?.paymentModel}
                 />
               );
             } else if (page.key === 'cover') {
