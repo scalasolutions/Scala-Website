@@ -469,6 +469,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
     if (key === 'tc1') return 'T&C Page 1';
     if (key === 'tc2') return 'T&C Page 2';
+    if (key === 'sla') return 'Service Level Agreement (SLA)';
     if (key.startsWith('custom_')) {
       return key.replace('custom_', '').replace(/_/g, ' ');
     }
@@ -768,6 +769,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 <InvoiceTCPage1
                   {...sharedProps}
                   htmlContent={page.content}
+                  title={getPageTitle(page.key)}
                 />
               );
             } else if (page.key === 'tc2') {
@@ -782,6 +784,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 <InvoiceTCPage1
                   {...sharedProps}
                   htmlContent={page.content}
+                  title={getPageTitle(page.key)}
                 />
               );
             }

@@ -44,6 +44,8 @@ import {
 } from '@/lib/data-cache';
 import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
+import QuotationsTabContent from './components/QuotationsTabContent';
+import PresetsTabContent from './components/PresetsTabContent';
 import { RecordPaymentModal } from './components/RecordPaymentModal';
 import { RevertPaymentModal } from './components/RevertPaymentModal';
 import { DeleteInvoiceModal } from './components/DeleteInvoiceModal';
@@ -181,6 +183,7 @@ export default function InvoicesPage() {
 
   const [clientFilterId, setClientFilterId] = useState('');
   const [editingInvoice, setEditingInvoice] = useState<MockInvoice | null>(null);
+  const [activeMainTab, setActiveMainTab] = useState<'invoices' | 'quotations' | 'presets'>('quotations');
 
   // Delete confirmation modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -401,6 +404,10 @@ export default function InvoicesPage() {
       if (targetClient) {
         setSelectedClientId(targetClient);
         setClientFilterId(targetClient);
+      }
+      const tab = params.get('tab');
+      if (tab === 'quotations' || tab === 'presets') {
+        setActiveMainTab(tab);
       }
     }
 
@@ -805,36 +812,62 @@ export default function InvoicesPage() {
         />
       ) : (
         <>
-          {/* ── Page header ── */}
-          <PageHeader
-            title="Invoices"
-            description="Review receivables, generate client invoices, and track payments."
+          {/* ── Main Tab Bar ── */}
+          <div className="flex border-b border-border pb-1 gap-6 mb-6">
+            <button
+              onClick={() => setActiveMainTab('quotations')}
+              className={cn(
+                "pb-2 text-sm font-bold tracking-tight transition-all relative cursor-pointer focus:outline-none",
+                activeMainTab === 'quotations' ? "text-foreground border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Quotations
+            </button>
+            <button
+              onClick={() => setActiveMainTab('invoices')}
+              className={cn(
+                "pb-2 text-sm font-bold tracking-tight transition-all relative cursor-pointer focus:outline-none",
+                activeMainTab === 'invoices' ? "text-foreground border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Invoices
+            </button>
+            <button
+              onClick={() => setActiveMainTab('presets')}
+              className={cn(
+                "pb-2 text-sm font-bold tracking-tight transition-all relative cursor-pointer focus:outline-none",
+                activeMainTab === 'presets' ? "text-foreground border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Presets
+            </button>
+          </div>
+
+          {activeMainTab === 'quotations' ? (
+            <QuotationsTabContent />
+          ) : activeMainTab === 'presets' ? (
+            <PresetsTabContent />
+          ) : (
+            <>
+              {/* ── Page header ── */}
+              <PageHeader
+                title="Invoices"
+                description="Review receivables, generate client invoices, and track payments."
             actions={
-              <>
-                <Link href="/admin/invoices/presets" title="Invoice presets">
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    leftIcon={<Sliders size={16} />}
-                  >
-                    Presets
-                  </Button>
-                </Link>
-                <Button
-                  variant="primary"
-                  size="md"
-                  leftIcon={<Plus size={16} />}
-                  onClick={() => {
-                    const activeKeys = allPagePresets
-                      .filter((p) => p.sectionKey === 'full_page_html')
-                      .map((p) => p.pageKey);
-                    setIncludedPages(['cover', ...activeKeys]);
-                    setModalOpen(true);
-                  }}
-                >
-                  New Invoice
-                </Button>
-              </>
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<Plus size={16} />}
+                onClick={() => {
+                  const activeKeys = allPagePresets
+                    .filter((p) => p.sectionKey === 'full_page_html')
+                    .map((p) => p.pageKey);
+                  setIncludedPages(['cover', ...activeKeys]);
+                  setModalOpen(true);
+                }}
+              >
+                New Invoice
+              </Button>
             }
           />
 
@@ -2160,6 +2193,8 @@ export default function InvoicesPage() {
           )}
         </>
       )}
+    </>
+  )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ interface InvoiceTCPage1Props {
   totalPages: number;
   htmlContent?: string;
   websiteAddress?: string | null;
+  title?: string;
 }
 
 // Reusable T&C block: bold section title + children body
@@ -75,6 +76,7 @@ export const InvoiceTCPage1: React.FC<InvoiceTCPage1Props> = ({
   totalPages,
   htmlContent,
   websiteAddress,
+  title,
 }) => {
   return (
     <div className="invoice-print-page" style={pageStyle}>
@@ -88,7 +90,7 @@ export const InvoiceTCPage1: React.FC<InvoiceTCPage1Props> = ({
       <div style={{ marginTop: 18, paddingBottom: '70px' }}>
         {/* Main T&C heading — only appears on page 2 */}
         <div style={{ fontSize: 16, fontWeight: 700, color: '#111111', marginBottom: 14 }}>
-          Terms and Conditions
+          {title || 'Terms and Conditions'}
         </div>
 
         {htmlContent ? (

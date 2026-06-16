@@ -286,14 +286,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       document.documentElement.classList.remove('dark');
     }
   };
-
   const navigation = [
     { href: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-    { href: '/admin/board', icon: <ClipboardList size={18} />, label: 'Client Board' },
+    { href: '/admin/board', icon: <ClipboardList size={18} />, label: 'Projects' },
     { href: '/admin/clients', icon: <Users size={18} />, label: 'Clients' },
     { href: '/admin/invoices', icon: <Receipt size={18} />, label: 'Invoices' },
-    { href: '/admin/quotations', icon: <FileText size={18} />, label: 'Quotations' },
-    { href: '/admin/presets', icon: <LayoutTemplate size={18} />, label: 'Presets' },
     { href: '/admin/finance', icon: <Coins size={18} />, label: 'Finance' },
     {
       href: '/admin/tickets',
@@ -305,13 +302,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Breadcrumb segments
   const segmentLabels: Record<string, string> = {
     dashboard: 'Dashboard',
-    board: 'Client Board',
+    board: 'Projects',
     clients: 'Clients',
     invoices: 'Invoices',
-    quotations: 'Quotations',
     finance: 'Finance',
     tickets: 'Support Tickets'
   };
+
   const segments = pathname.split('/').filter(Boolean);
   const pathSegments = isSubdomain
     ? (segments.length > 0 ? segments : ['dashboard'])
