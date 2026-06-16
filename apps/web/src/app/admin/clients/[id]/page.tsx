@@ -183,6 +183,31 @@ export default function ClientDetailPage() {
     const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
     return cachedClient?.slaCustomTerms || '';
   });
+  // Hosting & overage disclosure fields (string-backed for form inputs)
+  const [hostingPlanLabel, setHostingPlanLabel] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.hostingPlanLabel || '';
+  });
+  const [hostingMonthlyFee, setHostingMonthlyFee] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.hostingMonthlyFee != null ? String(cachedClient.hostingMonthlyFee) : '';
+  });
+  const [hostingIncludedHours, setHostingIncludedHours] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.hostingIncludedHours != null ? String(cachedClient.hostingIncludedHours) : '';
+  });
+  const [hostingSupportOverageRate, setHostingSupportOverageRate] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.hostingSupportOverageRate != null ? String(cachedClient.hostingSupportOverageRate) : '';
+  });
+  const [hostingFreeLaunch, setHostingFreeLaunch] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.hostingFreeLaunch || false;
+  });
+  const [hostingOverageNotes, setHostingOverageNotes] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.hostingOverageNotes || '';
+  });
   const [agreementPreviewOpen, setAgreementPreviewOpen] = useState(false);
 
   // Client tasks state & queries
@@ -597,6 +622,12 @@ export default function ClientDetailPage() {
         setTcStatus((cCached.tcStatus as 'pending' | 'signed') || 'pending');
         setTcCustomTerms(cCached.tcCustomTerms || '');
         setSlaCustomTerms(cCached.slaCustomTerms || '');
+        setHostingPlanLabel(cCached.hostingPlanLabel || '');
+        setHostingMonthlyFee(cCached.hostingMonthlyFee != null ? String(cCached.hostingMonthlyFee) : '');
+        setHostingIncludedHours(cCached.hostingIncludedHours != null ? String(cCached.hostingIncludedHours) : '');
+        setHostingSupportOverageRate(cCached.hostingSupportOverageRate != null ? String(cCached.hostingSupportOverageRate) : '');
+        setHostingFreeLaunch(cCached.hostingFreeLaunch || false);
+        setHostingOverageNotes(cCached.hostingOverageNotes || '');
         setEnvRotationInterval(cCached.envRotationInterval !== undefined ? cCached.envRotationInterval : 6);
         setStabilityCheckInterval(cCached.stabilityCheckInterval !== undefined ? cCached.stabilityCheckInterval : 1);
         setExpectationsCheckInterval(cCached.expectationsCheckInterval !== undefined ? cCached.expectationsCheckInterval : 3);
@@ -653,6 +684,12 @@ export default function ClientDetailPage() {
         setTcStatus((c.tcStatus as 'pending' | 'signed') || 'pending');
         setTcCustomTerms(c.tcCustomTerms || '');
         setSlaCustomTerms(c.slaCustomTerms || '');
+        setHostingPlanLabel(c.hostingPlanLabel || '');
+        setHostingMonthlyFee(c.hostingMonthlyFee != null ? String(c.hostingMonthlyFee) : '');
+        setHostingIncludedHours(c.hostingIncludedHours != null ? String(c.hostingIncludedHours) : '');
+        setHostingSupportOverageRate(c.hostingSupportOverageRate != null ? String(c.hostingSupportOverageRate) : '');
+        setHostingFreeLaunch(c.hostingFreeLaunch || false);
+        setHostingOverageNotes(c.hostingOverageNotes || '');
         setEnvRotationInterval(c.envRotationInterval !== undefined ? c.envRotationInterval : 6);
         setStabilityCheckInterval(c.stabilityCheckInterval !== undefined ? c.stabilityCheckInterval : 1);
         setExpectationsCheckInterval(c.expectationsCheckInterval !== undefined ? c.expectationsCheckInterval : 3);
@@ -1066,6 +1103,12 @@ export default function ClientDetailPage() {
         tcSignedAt: tcStatus === 'signed' ? new Date() : null,
         tcCustomTerms: tcCustomTerms || null,
         slaCustomTerms: slaCustomTerms || null,
+        hostingPlanLabel: hostingPlanLabel.trim() || null,
+        hostingMonthlyFee: hostingMonthlyFee.trim() ? Number(hostingMonthlyFee) : null,
+        hostingIncludedHours: hostingIncludedHours.trim() ? Number(hostingIncludedHours) : null,
+        hostingSupportOverageRate: hostingSupportOverageRate.trim() ? Number(hostingSupportOverageRate) : null,
+        hostingFreeLaunch: hostingFreeLaunch,
+        hostingOverageNotes: hostingOverageNotes.trim() || null,
       });
       if (updated) {
         setClient(updated as MockClient);
@@ -1501,6 +1544,12 @@ export default function ClientDetailPage() {
                     setTcStatus((client.tcStatus as 'pending' | 'signed') || 'pending');
                     setTcCustomTerms(client.tcCustomTerms || '');
                     setSlaCustomTerms(client.slaCustomTerms || '');
+                    setHostingPlanLabel(client.hostingPlanLabel || '');
+                    setHostingMonthlyFee(client.hostingMonthlyFee != null ? String(client.hostingMonthlyFee) : '');
+                    setHostingIncludedHours(client.hostingIncludedHours != null ? String(client.hostingIncludedHours) : '');
+                    setHostingSupportOverageRate(client.hostingSupportOverageRate != null ? String(client.hostingSupportOverageRate) : '');
+                    setHostingFreeLaunch(client.hostingFreeLaunch || false);
+                    setHostingOverageNotes(client.hostingOverageNotes || '');
                     setAgreementModalOpen(true);
                   }}
                   className="w-full text-center flex justify-center items-center"
@@ -2541,6 +2590,18 @@ export default function ClientDetailPage() {
           onTcCustomTermsChange={setTcCustomTerms}
           slaCustomTerms={slaCustomTerms}
           onSlaCustomTermsChange={setSlaCustomTerms}
+          hostingPlanLabel={hostingPlanLabel}
+          onHostingPlanLabelChange={setHostingPlanLabel}
+          hostingMonthlyFee={hostingMonthlyFee}
+          onHostingMonthlyFeeChange={setHostingMonthlyFee}
+          hostingIncludedHours={hostingIncludedHours}
+          onHostingIncludedHoursChange={setHostingIncludedHours}
+          hostingSupportOverageRate={hostingSupportOverageRate}
+          onHostingSupportOverageRateChange={setHostingSupportOverageRate}
+          hostingFreeLaunch={hostingFreeLaunch}
+          onHostingFreeLaunchChange={setHostingFreeLaunch}
+          hostingOverageNotes={hostingOverageNotes}
+          onHostingOverageNotesChange={setHostingOverageNotes}
           onCancel={handleCancelAgreement}
           onSubmit={handleSaveAgreementTerms}
         />

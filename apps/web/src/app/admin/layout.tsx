@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Users,
   Receipt,
+  FileText,
   Ticket,
   Bell,
   Menu,
@@ -290,6 +291,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/board', icon: <ClipboardList size={18} />, label: 'Client Board' },
     { href: '/admin/clients', icon: <Users size={18} />, label: 'Clients' },
     { href: '/admin/invoices', icon: <Receipt size={18} />, label: 'Invoices' },
+    { href: '/admin/quotations', icon: <FileText size={18} />, label: 'Quotations' },
     { href: '/admin/finance', icon: <Coins size={18} />, label: 'Finance' },
     {
       href: '/admin/tickets',
@@ -304,6 +306,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     board: 'Client Board',
     clients: 'Clients',
     invoices: 'Invoices',
+    quotations: 'Quotations',
     finance: 'Finance',
     tickets: 'Support Tickets'
   };

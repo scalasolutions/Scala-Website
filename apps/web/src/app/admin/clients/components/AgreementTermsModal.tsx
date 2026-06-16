@@ -13,6 +13,19 @@ interface AgreementTermsModalProps {
   onTcCustomTermsChange: (value: string) => void;
   slaCustomTerms: string;
   onSlaCustomTermsChange: (value: string) => void;
+  // Hosting & overage disclosure (rendered in the SLA)
+  hostingPlanLabel: string;
+  onHostingPlanLabelChange: (value: string) => void;
+  hostingMonthlyFee: string;
+  onHostingMonthlyFeeChange: (value: string) => void;
+  hostingIncludedHours: string;
+  onHostingIncludedHoursChange: (value: string) => void;
+  hostingSupportOverageRate: string;
+  onHostingSupportOverageRateChange: (value: string) => void;
+  hostingFreeLaunch: boolean;
+  onHostingFreeLaunchChange: (value: boolean) => void;
+  hostingOverageNotes: string;
+  onHostingOverageNotesChange: (value: string) => void;
   onCancel: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }
@@ -29,6 +42,18 @@ export function AgreementTermsModal({
   onTcCustomTermsChange,
   slaCustomTerms,
   onSlaCustomTermsChange,
+  hostingPlanLabel,
+  onHostingPlanLabelChange,
+  hostingMonthlyFee,
+  onHostingMonthlyFeeChange,
+  hostingIncludedHours,
+  onHostingIncludedHoursChange,
+  hostingSupportOverageRate,
+  onHostingSupportOverageRateChange,
+  hostingFreeLaunch,
+  onHostingFreeLaunchChange,
+  hostingOverageNotes,
+  onHostingOverageNotesChange,
   onCancel,
   onSubmit,
 }: AgreementTermsModalProps) {
@@ -79,6 +104,87 @@ export function AgreementTermsModal({
             </div>
 
             <div className="space-y-4">
+              <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Hosting & Overage Disclosure
+                </p>
+                <p className="text-[11px] text-muted-foreground -mt-2 leading-relaxed">
+                  Printed in the SLA so the hosting plan and overage terms match the quotation and invoice.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Hosting plan label</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Standard E-Commerce Hosting & Maintenance"
+                      value={hostingPlanLabel}
+                      onChange={(e) => onHostingPlanLabelChange(e.target.value)}
+                      className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Monthly fee (Rp)</label>
+                      <input
+                        type="number"
+                        placeholder="450000"
+                        value={hostingMonthlyFee}
+                        onChange={(e) => onHostingMonthlyFeeChange(e.target.value)}
+                        className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Included hrs/mo</label>
+                      <input
+                        type="number"
+                        placeholder="4"
+                        value={hostingIncludedHours}
+                        onChange={(e) => onHostingIncludedHoursChange(e.target.value)}
+                        className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Overage Rp/hr</label>
+                      <input
+                        type="number"
+                        placeholder="150000"
+                        value={hostingSupportOverageRate}
+                        onChange={(e) => onHostingSupportOverageRateChange(e.target.value)}
+                        className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onHostingFreeLaunchChange(!hostingFreeLaunch)}
+                    className={`w-full px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer text-left flex items-center justify-between ${
+                      hostingFreeLaunch
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>Free hosting during early-launch period</span>
+                    <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded ${hostingFreeLaunch ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                      {hostingFreeLaunch ? 'On' : 'Off'}
+                    </span>
+                  </button>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Infrastructure overage notes</label>
+                    <textarea
+                      placeholder="Infra overage pricing / triggers (RAM, CPU, storage, bandwidth, abuse handling)..."
+                      value={hostingOverageNotes}
+                      onChange={(e) => onHostingOverageNotesChange(e.target.value)}
+                      rows={3}
+                      className="w-full bg-background border border-border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                   Custom Clauses & Riders

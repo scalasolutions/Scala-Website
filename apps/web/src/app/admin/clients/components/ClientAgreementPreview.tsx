@@ -179,7 +179,10 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const effectiveScale = zoomPercent / 100;
-  const numPages = client.tcCustomTerms ? 3 : 2;
+  // T&C page + optional Additional-T&C page + 2 SLA-schedule pages
+  const numPages = client.tcCustomTerms ? 4 : 3;
+  const slaPageAIndex = client.tcCustomTerms ? 2 : 1;
+  const slaPageBIndex = client.tcCustomTerms ? 3 : 2;
   if (pageRefs.current.length > numPages) {
     pageRefs.current = pageRefs.current.slice(0, numPages);
   }
@@ -310,6 +313,12 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
         minute: '2-digit'
       })
     : null;
+
+  // Hosting & overage disclosure (rendered in the SLA Schedule)
+  const fmtRp = (n?: number | null) =>
+    n != null ? `Rp ${n.toLocaleString('id-ID')}` : null;
+  const hostingFee = fmtRp(client.hostingMonthlyFee);
+  const supportOverageRate = fmtRp(client.hostingSupportOverageRate);
 
   if (!mounted) return null;
 
@@ -509,7 +518,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                 <div>
                   <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">1. Scope of Work, Revisions & Delivery Acceptance</h3>
                   <p>
-                    Scala Solutions provides services, deliverables, and infrastructure management as itemized in the client's Invoice or Statement of Work (SOW), currently configured as <span className="font-semibold capitalize text-zinc-900">{client.subscriptionType || 'No Active Plan'} Hosting</span> with a service quota of <span className="font-semibold text-zinc-900">{client.subscriptionMonths || 12} Months</span> starting from the subscription start date. Any included revision cycles are strictly limited to those explicitly itemized in the Invoice or SOW. If no revision cycles are explicitly listed, the Client is entitled to a maximum of one (1) round of minor cosmetic revisions within five (5) business days of delivery. All further revisions, late feedback, or functional modifications are outside the original scope and will be billed separately at Scala Solutions' standard hourly rate.
+                    Scala Solutions provides services, deliverables, and infrastructure management as itemized in the client's Invoice or Statement of Work (SOW), currently configured as <span className="font-semibold capitalize text-zinc-900">{client.hostingPlanLabel || `${client.subscriptionType || 'No Active Plan'} Hosting`}</span> with a service quota of <span className="font-semibold text-zinc-900">{client.subscriptionMonths || 12} Months</span> starting from the subscription start date. Any included revision cycles are strictly limited to those explicitly itemized in the Invoice or SOW. If no revision cycles are explicitly listed, the Client is entitled to a maximum of one (1) round of minor cosmetic revisions within five (5) business days of delivery. All further revisions, late feedback, or functional modifications are outside the original scope and will be billed separately at Scala Solutions' standard hourly rate.
                   </p>
                   <p className="mt-1">
                     All deliverables or milestones are deemed accepted five (5) business days after delivery unless the Client submits detailed written feedback. Payment milestones are triggered automatically upon acceptance.
@@ -544,6 +553,13 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">5. Governing Law &amp; Dispute Resolution</h3>
                   <p>
                     This Services Agreement is governed and construed in accordance with the laws of the Republic of Indonesia. Both parties submit to the exclusive jurisdiction of the court chambers located in Jakarta for any legal actions arising under this contract.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">6. Order of Precedence</h3>
+                  <p>
+                    In the event of any inconsistency between the Quotation, Invoice, and this Agreement, the following order of priority applies: (1) this signed SLA / Service Agreement; (2) the latest issued Invoice; (3) the latest accepted Quotation; (4) prior discussions, chats, calls, or informal messages.
                   </p>
                 </div>
 
@@ -597,9 +613,9 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
             )}
 
             {/* ────────────────────────────────────────────────────────── */}
-            {/* PAGE 2: SLA AGREEMENT & SIGNATURES                        */}
+            {/* SLA SCHEDULE — PAGE A: UPTIME + HOSTING & OVERAGES         */}
             {/* ────────────────────────────────────────────────────────── */}
-            <div ref={el => { pageRefs.current[client.tcCustomTerms ? 2 : 1] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
+            <div ref={el => { pageRefs.current[slaPageAIndex] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
               {/* Mini Header */}
               <div className="flex justify-between items-center border-b border-zinc-200 pb-2.5 mb-5 text-[10px] font-bold text-zinc-400">
                 <span>SCALA SOLUTIONS &bull; SLA SCHEDULE</span>
@@ -608,7 +624,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               {/* Title */}
               <div className="mb-4">
                 <h2 className="text-xl font-extrabold text-zinc-950 uppercase tracking-tight">Service Level Agreement (SLA)</h2>
-                <p className="text-[11px] text-zinc-500 mt-1">This Schedule outlines network availability targets, support tickets resolution times, and the signature sign-off.</p>
+                <p className="text-[11px] text-zinc-500 mt-1">This Schedule outlines network availability targets, hosting and overage terms, support resolution times, and the signature sign-off.</p>
               </div>
 
               {/* SLA Details */}
@@ -624,13 +640,80 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                   <p className="mt-1">
                     Uptime targets exclude scheduled maintenance windows (announced 24 hours in advance), Force Majeure events, client-side domain/DNS configuration failures, third-party API or upstream service outages, or periods where the client account is in payment default.
                   </p>
-                  <p className="mt-1.5 text-[10px] text-zinc-600 leading-relaxed border-l-2 border-zinc-300 pl-2">
-                    <strong className="text-zinc-950">Resource Limits &amp; Traffic Spikes:</strong> Hosting plans include standard resource allocations. In the event of an extraordinary traffic spike or high server load, Scala Solutions will deploy optimal caching and routing strategies to maximize performance and actively reduce data transfer overhead, minimizing potential overage fees. However, if cumulative resource consumption exceeds standard plan allocations, excess overage costs will be billed to the Client to ensure uninterrupted network availability.
-                  </p>
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">2. Technical Support Response Tiers & Scope Boundaries</h3>
+                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">2. Hosting, Maintenance &amp; Overages</h3>
+
+                  {/* Plan summary — data-driven from the client's accepted quotation */}
+                  {(client.hostingPlanLabel || hostingFee || client.hostingIncludedHours != null) && (
+                    <div className="grid grid-cols-3 gap-2 my-2 text-[10px]">
+                      <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-2">
+                        <span className="block text-[8px] uppercase tracking-wider text-zinc-400 font-extrabold mb-0.5">Plan</span>
+                        <span className="font-bold text-zinc-900 leading-tight">{client.hostingPlanLabel || 'Standard Hosting & Maintenance'}</span>
+                      </div>
+                      <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-2">
+                        <span className="block text-[8px] uppercase tracking-wider text-zinc-400 font-extrabold mb-0.5">Monthly Fee</span>
+                        <span className="font-bold text-zinc-900">{hostingFee || '—'}<span className="text-zinc-400 font-medium"> / mo</span></span>
+                      </div>
+                      <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-2">
+                        <span className="block text-[8px] uppercase tracking-wider text-zinc-400 font-extrabold mb-0.5">Included Support</span>
+                        <span className="font-bold text-zinc-900">{client.hostingIncludedHours != null ? `${client.hostingIncludedHours} hrs` : '—'}<span className="text-zinc-400 font-medium"> / mo</span></span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Free early-launch arrangement */}
+                  {client.hostingFreeLaunch && (
+                    <p className="mt-1.5 text-[10px] text-emerald-800 leading-relaxed bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+                      <strong className="text-emerald-900">Early-launch arrangement:</strong> Scala may provide hosting and maintenance free of charge during the early-launch period while usage stays within normal operating levels (normal visitor traffic, normal admin usage, normal uploads, and no abnormal infrastructure load). Billing may begin when any of the following occurs: sustained higher memory or CPU usage, increased database activity, campaign-driven traffic, abnormal bot/crawler traffic, storage growth, increased checkout/order activity, or any usage requiring additional paid infrastructure. Scala notifies the Client before billing begins, except in urgent cases requiring immediate action to prevent downtime or abnormal cost.
+                    </p>
+                  )}
+
+                  {/* Support-labor overage */}
+                  <p className="mt-1.5">
+                    <strong className="text-zinc-950">Support-labour overage.</strong> Work beyond the included monthly support hours{client.hostingIncludedHours != null ? ` (${client.hostingIncludedHours} hrs/month)` : ''} is billed at {supportOverageRate ? <span className="font-semibold text-zinc-900">{supportOverageRate} / hour</span> : 'Scala’s standard hourly rate'}. Unused hours do not roll over; larger requests are quoted separately.
+                  </p>
+
+                  {/* Infrastructure overage — disclosed openly, notify-first */}
+                  <p className="mt-1.5">
+                    <strong className="text-zinc-950">Infrastructure overage.</strong> Hosting includes standard resource allocations (CPU, memory, storage and bandwidth typical for the selected plan). Scala first applies caching and routing optimisation to minimise overage. If cumulative usage exceeds the standard allocation, infrastructure overage charges apply.{client.hostingOverageNotes ? '' : ' Overage rates are disclosed before any charge is applied.'}
+                  </p>
+                  {client.hostingOverageNotes && (
+                    <p className="mt-1 text-[10px] text-zinc-700 leading-relaxed whitespace-pre-wrap border-l-2 border-zinc-300 pl-2">
+                      {client.hostingOverageNotes}
+                    </p>
+                  )}
+                  <p className="mt-1.5 text-[10px] text-zinc-600 leading-relaxed border-l-2 border-amber-300 pl-2">
+                    <strong className="text-zinc-950">Notify-first billing.</strong> No infrastructure overage is billed without prior written notice. For non-urgent overages, Client approval is obtained before billing. In urgent cases requiring immediate action to prevent downtime or abnormal cost, Scala may act first and notify the Client promptly after. If the same overage continues for two consecutive billing periods, Scala may move the Client to the next suitable hosting tier from the following billing cycle.
+                  </p>
+                  <p className="mt-1.5 text-[10px] text-zinc-500 italic">
+                    Scala is not responsible for absorbing infrastructure costs caused by abnormal traffic, bot or DDoS-like activity, client campaigns, excessive uploads, third-party API behaviour, code changes by non-Scala parties, or usage beyond the selected hosting tier.
+                  </p>
+                </div>
+              </div>
+
+              {/* Page Footer */}
+              <div className="absolute bottom-16 left-16 right-16 flex justify-between items-center text-[10px] text-zinc-400 font-bold border-t border-zinc-100 pt-3">
+                <span>Scala Services Agreement</span>
+                <span>Page {slaPageAIndex + 1} of {numPages}</span>
+              </div>
+            </div>
+
+            {/* ────────────────────────────────────────────────────────── */}
+            {/* SLA SCHEDULE — PAGE B: SUPPORT, CREDITS & SIGNATURES       */}
+            {/* ────────────────────────────────────────────────────────── */}
+            <div ref={el => { pageRefs.current[slaPageBIndex] = el; }} className="agreement-print-page" style={PAGE_STYLE}>
+              {/* Mini Header */}
+              <div className="flex justify-between items-center border-b border-zinc-200 pb-2.5 mb-5 text-[10px] font-bold text-zinc-400">
+                <span>SCALA SOLUTIONS &bull; SLA SCHEDULE</span>
+                <span>Service Level Agreement (continued)</span>
+              </div>
+
+              {/* SLA Details (continued) */}
+              <div className="space-y-3 text-[11px] text-zinc-800 leading-relaxed font-medium mb-5">
+                <div>
+                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">3. Technical Support Response Tiers & Scope Boundaries</h3>
                   <p>
                     Scala Support handles tickets with a priority-tiered response target clock as below:
                   </p>
@@ -666,7 +749,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">3. Uptime Guarantees &amp; Service Credits</h3>
+                  <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">4. Uptime Guarantees &amp; Service Credits</h3>
                   <p>
                     If the hosting services experience cumulative downtime in any calendar month exceeding the thresholds below (excluding Section 1 exceptions), the Client is entitled to receive a Service Credit offset against their next monthly hosting invoice:
                   </p>
@@ -681,7 +764,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
 
                 {client.slaCustomTerms && (
                   <div>
-                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">4. Custom SLA Commitments</h3>
+                    <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider text-primary">5. Custom SLA Commitments</h3>
                     <p className="italic text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 mt-1 leading-relaxed">
                       {client.slaCustomTerms}
                     </p>
@@ -692,7 +775,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               {/* Sign-Off Authorization */}
               <div className="border-t border-zinc-200 pt-4 mt-5">
                 <h3 className="font-bold text-zinc-950 text-xs mb-1 uppercase tracking-wider">
-                  {client.slaCustomTerms ? '5.' : '4.'} Execution &amp; Authorization
+                  {client.slaCustomTerms ? '6.' : '5.'} Execution &amp; Authorization
                 </h3>
                 <p className="text-[10px] text-zinc-500 leading-relaxed mb-8">
                   By signing below, or by authorization signature status verified in the Scala Solutions Admin Console, both the Contractor (Scala Solutions) and the Client (Entity listed) agree to be legally bound by this Services Agreement and Uptime SLA.
@@ -768,7 +851,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
               {/* Page Footer */}
               <div className="absolute bottom-16 left-16 right-16 flex justify-between items-center text-[10px] text-zinc-400 font-bold border-t border-zinc-100 pt-3">
                 <span>Scala Services Agreement</span>
-                <span>Page {client.tcCustomTerms ? 3 : 2} of {numPages}</span>
+                <span>Page {slaPageBIndex + 1} of {numPages}</span>
               </div>
             </div>
 

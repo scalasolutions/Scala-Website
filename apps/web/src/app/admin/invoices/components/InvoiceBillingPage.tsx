@@ -278,6 +278,29 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
               This invoice is only for services offered by Scala Solutions. API fees and other expenses are not included.
             </div>
 
+            {/* SLA Acceptance Notice — only shown on unpaid invoices */}
+            {status !== 'paid' && status !== 'written_off' && (
+              <div
+                style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderLeft: '4px solid #f59e0b',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  marginBottom: 20,
+                  maxWidth: 660,
+                  width: '100%',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  ⚡ Important — SLA & Terms Acceptance
+                </div>
+                <div style={{ fontSize: 12, color: '#78350f', lineHeight: 1.6 }}>
+                  By remitting the Down Payment (DP) for this invoice, the client acknowledges that they have read, understood, and agree to be bound by the Service Level Agreement (SLA) and all Terms & Conditions set out in this document. The DP payment constitutes acceptance of all terms herein.
+                </div>
+              </div>
+            )}
+
             {/* PAID STATE: Green Badge Card */}
             {status === 'paid' && (
               <div
@@ -571,13 +594,13 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
             })()}
 
             {/* Contact Support Note */}
-            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center', marginTop: 20, marginBottom: -10, fontWeight: 500 }}>
+            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center', marginTop: 20, marginBottom: 10, fontWeight: 500 }}>
               If you have any issues, you can contact our <strong style={{ fontWeight: 700 }}>Finance Team (+62818815037)</strong>.
             </div>
 
             {/* Footnotes */}
-            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: 24 }}>
-              * Hosting & maintenance subscriptions are billed in advance on an annual basis.
+            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: 12 }}>
+              * Hosting &amp; maintenance subscriptions are billed annually in advance. Monthly fee equivalent shown for reference only.
             </div>
           </div>
         )}

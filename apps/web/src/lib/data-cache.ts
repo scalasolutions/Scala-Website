@@ -17,8 +17,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout } from './db/queries';
-import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts, getClientTasks, getInvoiceLinePresets, getInvoicePagePresets } from './db/queries';
+import type { MockClient, MockInvoice, MockPartner, MockExpense, MockCapitalInjection, MockPayout, MockQuotation } from './db/queries';
+import { getClients, getInvoices, getTickets, getPartners, getExpenses, getCapitalInjections, getPayouts, getClientTasks, getInvoiceLinePresets, getInvoicePagePresets, getQuotations } from './db/queries';
 
 interface CacheEntry<T> {
   value: T;
@@ -320,6 +320,7 @@ export const CACHE_KEYS = {
   CLIENT_TASKS: 'admin:client_tasks',
   LINE_PRESETS: 'admin:invoice_line_presets',
   PAGE_PRESETS: 'admin:invoice_page_presets',
+  QUOTATIONS: 'admin:quotations',
 } as const;
 
 export const getCachedClients = (): Promise<MockClient[]> =>
@@ -351,3 +352,6 @@ export const getCachedLinePresets = (): Promise<any[]> =>
 
 export const getCachedPagePresets = (): Promise<any[]> =>
   getCached(CACHE_KEYS.PAGE_PRESETS, getInvoicePagePresets as any);
+
+export const getCachedQuotations = (): Promise<(MockQuotation & { client?: MockClient })[]> =>
+  getCached(CACHE_KEYS.QUOTATIONS, getQuotations as () => Promise<(MockQuotation & { client?: MockClient })[]>);

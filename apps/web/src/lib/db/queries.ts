@@ -36,6 +36,12 @@ export interface MockClient {
   tcSignedAt: Date | null;
   tcCustomTerms: string | null;
   slaCustomTerms: string | null;
+  hostingPlanLabel: string | null;
+  hostingMonthlyFee: number | null;
+  hostingIncludedHours: number | null;
+  hostingSupportOverageRate: number | null;
+  hostingFreeLaunch: boolean;
+  hostingOverageNotes: string | null;
   envRotationInterval: number;
   envRotationLastAt: Date | null;
   stabilityCheckInterval: number;
@@ -109,6 +115,26 @@ let mockClients: MockClient[] = [];
 let mockInvoices: MockInvoice[] = [];
 let mockTickets: MockTicket[] = [];
 let mockTicketMessages: MockTicketMessage[] = [];
+let mockQuotations: MockQuotation[] = [];
+
+export interface MockQuotation {
+  id: string;
+  clientId: string;
+  quotationNumber: string;
+  subtotal: number;
+  total: number;
+  discountType: 'percentage' | 'fixed' | null;
+  discountValue: number;
+  status: 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'converted';
+  itemsJson: string;
+  includedPagesJson?: string | null;
+  sentAt: Date | null;
+  validUntil: Date | null;
+  convertedInvoiceId?: string | null;
+  notes?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface MockClientTask {
   id: string;
@@ -183,6 +209,12 @@ export async function createClient(data: schema.NewClient) {
     tcSignedAt: data.tcSignedAt ? new Date(data.tcSignedAt) : null,
     tcCustomTerms: data.tcCustomTerms || null,
     slaCustomTerms: data.slaCustomTerms || null,
+    hostingPlanLabel: data.hostingPlanLabel || null,
+    hostingMonthlyFee: data.hostingMonthlyFee !== undefined && data.hostingMonthlyFee !== null ? Number(data.hostingMonthlyFee) : null,
+    hostingIncludedHours: data.hostingIncludedHours !== undefined && data.hostingIncludedHours !== null ? Number(data.hostingIncludedHours) : null,
+    hostingSupportOverageRate: data.hostingSupportOverageRate !== undefined && data.hostingSupportOverageRate !== null ? Number(data.hostingSupportOverageRate) : null,
+    hostingFreeLaunch: data.hostingFreeLaunch || false,
+    hostingOverageNotes: data.hostingOverageNotes || null,
     envRotationInterval: data.envRotationInterval !== undefined ? Number(data.envRotationInterval) : 6,
     envRotationLastAt: data.envRotationLastAt ? new Date(data.envRotationLastAt) : new Date(),
     stabilityCheckInterval: data.stabilityCheckInterval !== undefined ? Number(data.stabilityCheckInterval) : 1,
@@ -215,6 +247,9 @@ export async function updateClient(id: string, data: Partial<schema.NewClient>) 
       ...data,
       subscriptionStartDate: data.subscriptionStartDate ? new Date(data.subscriptionStartDate) : mockClients[idx].subscriptionStartDate,
       subscriptionMonths: data.subscriptionMonths !== undefined && data.subscriptionMonths !== null ? Number(data.subscriptionMonths) : mockClients[idx].subscriptionMonths,
+      hostingMonthlyFee: data.hostingMonthlyFee !== undefined ? (data.hostingMonthlyFee !== null ? Number(data.hostingMonthlyFee) : null) : mockClients[idx].hostingMonthlyFee,
+      hostingIncludedHours: data.hostingIncludedHours !== undefined ? (data.hostingIncludedHours !== null ? Number(data.hostingIncludedHours) : null) : mockClients[idx].hostingIncludedHours,
+      hostingSupportOverageRate: data.hostingSupportOverageRate !== undefined ? (data.hostingSupportOverageRate !== null ? Number(data.hostingSupportOverageRate) : null) : mockClients[idx].hostingSupportOverageRate,
       portalPassword: data.portalPassword !== undefined ? data.portalPassword : mockClients[idx].portalPassword,
       portalPasswordIsPrivate: data.portalPasswordIsPrivate !== undefined ? data.portalPasswordIsPrivate : mockClients[idx].portalPasswordIsPrivate,
       sourcedBy: data.sourcedBy !== undefined ? data.sourcedBy : mockClients[idx].sourcedBy,
@@ -267,6 +302,7 @@ export async function deleteClient(id: string) {
   }
   mockClientTasks = mockClientTasks.filter(t => t.clientId !== id);
   mockInvoices = mockInvoices.filter(inv => inv.clientId !== id);
+  mockQuotations = mockQuotations.filter(q => q.clientId !== id);
   mockTickets = mockTickets.filter(t => t.clientId !== id);
   mockClients = mockClients.filter(c => c.id !== id);
   return true;
@@ -579,6 +615,105 @@ export async function deleteInvoice(id: string) {
   if (idx !== -1) {
     const deleted = mockInvoices[idx];
     mockInvoices = mockInvoices.filter(inv => inv.id !== id);
+    return deleted;
+  }
+  return null;
+}
+
+// --- QUOTATION QUERIES ---
+export async function getQuotations() {
+  if (isDbConfigured()) {
+    try {
+      return await db.query.quotations.findMany({
+        orderBy: [desc(schema.quotations.createdAt)],
+        with: {
+          client: true
+        }
+      });
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return mockQuotations.map(q => ({
+    ...q,
+    client: mockClients.find(c => c.id === q.clientId)
+  })).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function createQuotation(data: schema.NewQuotation) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.quotations).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newQuotation: MockQuotation = {
+    id: crypto.randomUUID(),
+    clientId: data.clientId,
+    quotationNumber: data.quotationNumber,
+    subtotal: data.subtotal,
+    total: data.total,
+    discountType: (data.discountType || null) as 'percentage' | 'fixed' | null,
+    discountValue: data.discountValue !== undefined && data.discountValue !== null ? Number(data.discountValue) : 0,
+    status: data.status || 'draft',
+    itemsJson: data.itemsJson,
+    includedPagesJson: data.includedPagesJson || null,
+    sentAt: data.sentAt ? new Date(data.sentAt) : null,
+    validUntil: data.validUntil ? new Date(data.validUntil) : null,
+    convertedInvoiceId: data.convertedInvoiceId || null,
+    notes: data.notes || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockQuotations.push(newQuotation);
+  return newQuotation;
+}
+
+export async function updateQuotation(id: string, data: Partial<schema.NewQuotation>) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.update(schema.quotations)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.quotations.id, id))
+        .returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Update failed, running mock update: ", e);
+    }
+  }
+  const idx = mockQuotations.findIndex(q => q.id === id);
+  if (idx !== -1) {
+    mockQuotations[idx] = {
+      ...mockQuotations[idx],
+      ...data,
+      discountType: data.discountType !== undefined ? (data.discountType as 'percentage' | 'fixed' | null) : mockQuotations[idx].discountType,
+      discountValue: data.discountValue !== undefined && data.discountValue !== null ? Number(data.discountValue) : mockQuotations[idx].discountValue,
+      validUntil: data.validUntil !== undefined ? (data.validUntil ? new Date(data.validUntil) : null) : mockQuotations[idx].validUntil,
+      sentAt: data.sentAt !== undefined ? (data.sentAt ? new Date(data.sentAt) : null) : mockQuotations[idx].sentAt,
+      updatedAt: new Date()
+    } as MockQuotation;
+    return mockQuotations[idx];
+  }
+  return null;
+}
+
+export async function deleteQuotation(id: string) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.delete(schema.quotations)
+        .where(eq(schema.quotations.id, id))
+        .returning();
+      return results[0] || null;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  const idx = mockQuotations.findIndex(q => q.id === id);
+  if (idx !== -1) {
+    const deleted = mockQuotations[idx];
+    mockQuotations = mockQuotations.filter(q => q.id !== id);
     return deleted;
   }
   return null;

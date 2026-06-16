@@ -9,6 +9,7 @@ export const ticketPriorityEnum = pgEnum('ticket_priority', ['low', 'medium', 'h
 export const ticketCategoryEnum = pgEnum('ticket_category', ['billing', 'technical', 'general', 'feature_request']);
 export const subscriptionTypeEnum = pgEnum('subscription_type', ['static', 'dynamic']);
 export const clientTaskStatusEnum = pgEnum('client_task_status', ['to_prepare', 'in_progress', 'achieved']);
+export const quotationStatusEnum = pgEnum('quotation_status', ['draft', 'sent', 'accepted', 'declined', 'expired', 'converted']);
 
 
 // 1. Clients Table
@@ -33,6 +34,13 @@ export const clients = pgTable('clients', {
   tcSignedAt: timestamp('tc_signed_at'),
   tcCustomTerms: text('tc_custom_terms'),
   slaCustomTerms: text('sla_custom_terms'),
+  // Hosting & overage disclosure (rendered in the SLA so quotation/invoice/SLA stay consistent)
+  hostingPlanLabel: text('hosting_plan_label'), // e.g. "Standard E-Commerce Hosting & Maintenance"
+  hostingMonthlyFee: bigint('hosting_monthly_fee', { mode: 'number' }), // e.g. 450000
+  hostingIncludedHours: integer('hosting_included_hours'), // included support hours / month
+  hostingSupportOverageRate: bigint('hosting_support_overage_rate', { mode: 'number' }), // Rp / hour beyond included (support labor)
+  hostingFreeLaunch: boolean('hosting_free_launch').notNull().default(false), // free hosting during early-launch period
+  hostingOverageNotes: text('hosting_overage_notes'), // infrastructure overage pricing / trigger wording
   // Maintenance reminder intervals (in months) and last completion dates
   envRotationInterval: integer('env_rotation_interval').notNull().default(6),
   envRotationLastAt: timestamp('env_rotation_last_at'),
@@ -91,25 +99,6 @@ export const ticketMessages = pgTable('ticket_messages', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
-// Relations
-export const clientsRelations = relations(clients, ({ many }) => ({
-  invoices: many(invoices),
-  tickets: many(tickets),
-  tasks: many(clientTasks),
-}));
-
-export const invoicesRelations = relations(invoices, ({ one }) => ({
-  client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
-}));
-
-export const ticketsRelations = relations(tickets, ({ one, many }) => ({
-  client: one(clients, { fields: [tickets.clientId], references: [clients.id] }),
-  messages: many(ticketMessages),
-}));
-
-export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({
-  ticket: one(tickets, { fields: [ticketMessages.ticketId], references: [tickets.id] }),
-}));
 
 // 5. Expenses Table
 export const expenses = pgTable('expenses', {
@@ -166,6 +155,26 @@ export const invoicePagePresets = pgTable('invoice_page_presets', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// 9b. Quotations Table
+export const quotations = pgTable('quotations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  quotationNumber: text('quotation_number').notNull().unique(),
+  subtotal: bigint('subtotal', { mode: 'number' }).notNull(),
+  total: bigint('total', { mode: 'number' }).notNull(),
+  discountType: text('discount_type'), // 'percentage' | 'fixed' | null
+  discountValue: integer('discount_value').default(0),
+  status: quotationStatusEnum('status').notNull().default('draft'),
+  itemsJson: text('items_json').notNull(), // JSON string for line items
+  includedPagesJson: text('included_pages_json'), // JSON list of included page preset keys
+  sentAt: timestamp('sent_at'),
+  validUntil: timestamp('valid_until'),
+  convertedInvoiceId: uuid('converted_invoice_id'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // 10. Affiliate Partners Table
 export const partners = pgTable('partners', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -196,6 +205,31 @@ export const clientTasksRelations = relations(clientTasks, ({ one }) => ({
   client: one(clients, { fields: [clientTasks.clientId], references: [clients.id] }),
 }));
 
+// All Relations — defined after all tables to avoid temporal dead zone issues
+export const clientsRelations = relations(clients, ({ many }) => ({
+  invoices: many(invoices),
+  tickets: many(tickets),
+  tasks: many(clientTasks),
+  quotations: many(quotations),
+}));
+
+export const quotationsRelations = relations(quotations, ({ one }) => ({
+  client: one(clients, { fields: [quotations.clientId], references: [clients.id] }),
+}));
+
+export const invoicesRelations = relations(invoices, ({ one }) => ({
+  client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
+}));
+
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
+  client: one(clients, { fields: [tickets.clientId], references: [clients.id] }),
+  messages: many(ticketMessages),
+}));
+
+export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({
+  ticket: one(tickets, { fields: [ticketMessages.ticketId], references: [tickets.id] }),
+}));
+
 
 // Types
 export type Client = typeof clients.$inferSelect;
@@ -220,4 +254,6 @@ export type Partner = typeof partners.$inferSelect;
 export type NewPartner = typeof partners.$inferInsert;
 export type ClientTask = typeof clientTasks.$inferSelect;
 export type NewClientTask = typeof clientTasks.$inferInsert;
+export type Quotation = typeof quotations.$inferSelect;
+export type NewQuotation = typeof quotations.$inferInsert;
 
