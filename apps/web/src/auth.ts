@@ -60,7 +60,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        domain: process.env.NODE_ENV === 'production' ? '.scalasolutions.id' : undefined,
+        domain: (process.env.NODE_ENV === 'production' && !process.env.VERCEL_URL?.includes('vercel.app')) 
+          ? '.scalasolutions.id' 
+          : undefined,
       },
     },
   },

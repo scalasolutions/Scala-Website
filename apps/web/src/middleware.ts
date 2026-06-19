@@ -16,9 +16,10 @@ export default auth((req) => {
   // Define subdomains (including local testing subdomains)
   const isAdminSubdomain = host === 'admin.scalasolutions.id' || host === 'admin.localhost';
   const isClientsSubdomain = host === 'clients.scalasolutions.id' || host === 'clients.localhost';
+  const isVercelPreview = host.includes('vercel.app');
   
-  // 1. Handle main domain redirects to subdomains
-  if (!isAdminSubdomain && !isClientsSubdomain) {
+  // 1. Handle main domain redirects to subdomains (bypass for Vercel preview environments)
+  if (!isAdminSubdomain && !isClientsSubdomain && !isVercelPreview) {
     if (pathname.startsWith('/admin')) {
       const targetPath = pathname === '/admin' ? '/dashboard' : pathname.replace('/admin', '') || '/dashboard';
       const protocol = host.includes('localhost') ? 'http' : 'https';
@@ -74,6 +75,9 @@ export default auth((req) => {
       return NextResponse.redirect(new URL('/login', req.url));
     }
     if (role !== 'admin') {
+      if (isVercelPreview) {
+        return NextResponse.redirect(new URL('/portal', req.url));
+      }
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const redirectHost = host.includes('localhost') ? localClientsHost : 'clients.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}`, req.url));
@@ -86,6 +90,9 @@ export default auth((req) => {
       return NextResponse.redirect(new URL('/login', req.url));
     }
     if (role !== 'client') {
+      if (isVercelPreview) {
+        return NextResponse.redirect(new URL('/admin', req.url));
+      }
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const redirectHost = host.includes('localhost') ? localAdminHost : 'admin.scalasolutions.id';
       return NextResponse.redirect(new URL(`${protocol}://${redirectHost}`, req.url));
@@ -94,6 +101,10 @@ export default auth((req) => {
 
   // 5. Handle Login Page Redirections for Authenticated Users
   if (isAuthPage && isLoggedIn) {
+    if (isVercelPreview) {
+      const targetPath = role === 'admin' ? '/admin' : '/portal';
+      return NextResponse.redirect(new URL(targetPath, req.url));
+    }
     if (role === 'admin') {
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const redirectHost = host.includes('localhost') ? localAdminHost : 'admin.scalasolutions.id';
