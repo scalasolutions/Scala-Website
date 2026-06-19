@@ -80,8 +80,8 @@ export function getPaymentModel(key?: string | null, customStagesJson?: string |
 }
 
 /** One-line commercial summary for the Quotation (e.g. "50% to start · 30% after design · 20% before launch"). */
-export function paymentSummaryLine(key?: string | null): string {
-  const model = getPaymentModel(key);
+export function paymentSummaryLine(key?: string | null, customStagesJson?: string | null): string {
+  const model = getPaymentModel(key, customStagesJson);
   return model.stages.map((s) => `${s.percent}% ${s.stage.toLowerCase()}`).join(' · ');
 }
 
