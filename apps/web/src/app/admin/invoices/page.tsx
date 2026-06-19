@@ -860,7 +860,7 @@ export default function InvoicesPage() {
                 leftIcon={<Plus size={16} />}
                 onClick={() => {
                   const activeKeys = allPagePresets
-                    .filter((p) => p.sectionKey === 'full_page_html')
+                    .filter((p) => p.sectionKey === 'full_page_html' && p.pageKey !== 'cover')
                     .map((p) => p.pageKey);
                   setIncludedPages(['cover', ...activeKeys]);
                   setModalOpen(true);

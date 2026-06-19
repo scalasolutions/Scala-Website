@@ -320,7 +320,7 @@ export const ClientAgreementPreview: React.FC<ClientAgreementPreviewProps> = ({
     n != null ? `Rp ${n.toLocaleString('id-ID')}` : null;
   const hostingFee = fmtRp(client.hostingMonthlyFee);
   const supportOverageRate = fmtRp(client.hostingSupportOverageRate);
-  const paymentModel = getPaymentModel(client.paymentModel);
+  const paymentModel = getPaymentModel(client.paymentModel, client.paymentCustomStagesJson);
 
   if (!mounted) return null;
 

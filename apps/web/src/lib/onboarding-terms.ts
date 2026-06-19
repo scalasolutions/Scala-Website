@@ -58,7 +58,23 @@ export const PAYMENT_MODELS: Record<PaymentModelKey, PaymentModel> = {
 
 export const DEFAULT_PAYMENT_MODEL: PaymentModelKey = 'A';
 
-export function getPaymentModel(key?: string | null): PaymentModel {
+export function getPaymentModel(key?: string | null, customStagesJson?: string | null): PaymentModel {
+  if (key === 'CUSTOM' && customStagesJson) {
+    try {
+      const parsed = JSON.parse(customStagesJson) as { stages: PaymentStage[]; note?: string };
+      if (parsed.stages && parsed.stages.length > 0) {
+        return {
+          key: 'A' as PaymentModelKey,
+          name: 'Custom Payment Terms',
+          bestFor: 'Client-specific agreement',
+          stages: parsed.stages,
+          note: parsed.note,
+        };
+      }
+    } catch {
+      // Fall through to default
+    }
+  }
   if (key && (key === 'A' || key === 'B' || key === 'C')) return PAYMENT_MODELS[key];
   return PAYMENT_MODELS[DEFAULT_PAYMENT_MODEL];
 }

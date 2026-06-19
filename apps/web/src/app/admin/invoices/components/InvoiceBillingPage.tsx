@@ -30,6 +30,7 @@ interface InvoiceBillingPageProps {
   hostingPlanLabel?: string | null;
   dueDate?: Date | string | null;
   paymentModel?: string | null;
+  paymentCustomStagesJson?: string | null;
 }
 
 const renderBankDetailsTable = (bank: 'BCA' | 'BNI', amount: number) => {
@@ -98,9 +99,10 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   hostingPlanLabel,
   dueDate,
   paymentModel,
+  paymentCustomStagesJson,
 }) => {
   const paymentTermsText = (() => {
-    const model = getPaymentModel(paymentModel);
+    const model = getPaymentModel(paymentModel, paymentCustomStagesJson);
     const stages = model.stages.map((s) => `${s.percent}% ${s.stage.toLowerCase()} (${s.trigger.toLowerCase()})`).join('; ');
     return `${stages}. Work may be paused if payment is not received by the due date.`;
   })();

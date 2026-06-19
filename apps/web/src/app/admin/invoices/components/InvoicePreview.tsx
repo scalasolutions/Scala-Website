@@ -497,11 +497,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
   // 2. Cover is optional
   if (includedPageKeys.includes('cover')) {
-    activePages.push({ key: 'cover', label: 'Cover' });
+    const coverPreset = pagePresets.find(p => p.pageKey === 'cover');
+    activePages.push({
+      key: 'cover',
+      label: 'Cover',
+      content: coverPreset?.content,
+    });
   }
 
   // 3. Page Presets (Default + Custom) are optional
   pagePresets.forEach(preset => {
+    if (preset.pageKey === 'cover') return; // Skip cover since it's handled above
     if (includedPageKeys.includes(preset.pageKey)) {
       activePages.push({
         key: preset.pageKey,
@@ -755,10 +761,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   hostingPlanLabel={client?.hostingPlanLabel}
                   dueDate={invoice.dueDate}
                   paymentModel={client?.paymentModel}
+                  paymentCustomStagesJson={client?.paymentCustomStagesJson}
                 />
               );
             } else if (page.key === 'cover') {
-              pageComponent = (
+              pageComponent = page.content ? (
+                <InvoiceTCPage1
+                  {...sharedProps}
+                  htmlContent={page.content}
+                  title=""
+                />
+              ) : (
                 <InvoiceCoverPage
                   {...sharedProps}
                   preparedBy={preparedBy}

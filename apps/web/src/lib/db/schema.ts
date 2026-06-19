@@ -41,7 +41,8 @@ export const clients = pgTable('clients', {
   hostingSupportOverageRate: bigint('hosting_support_overage_rate', { mode: 'number' }), // Rp / hour beyond included (support labor)
   hostingFreeLaunch: boolean('hosting_free_launch').notNull().default(false), // free hosting during early-launch period
   hostingOverageNotes: text('hosting_overage_notes'), // infrastructure overage pricing / trigger wording
-  paymentModel: text('payment_model'), // 'A' | 'B' | 'C' — selected payment model (see onboarding-terms.ts)
+  paymentModel: text('payment_model'), // 'A' | 'B' | 'C' | 'CUSTOM' — selected payment model (see onboarding-terms.ts)
+  paymentCustomStagesJson: text('payment_custom_stages_json'), // JSON: { stages: [{stage,percent,trigger}], note? } — used when paymentModel === 'CUSTOM'
   // Maintenance reminder intervals (in months) and last completion dates
   envRotationInterval: integer('env_rotation_interval').notNull().default(6),
   envRotationLastAt: timestamp('env_rotation_last_at'),

@@ -212,6 +212,10 @@ export default function ClientDetailPage() {
     const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
     return cachedClient?.paymentModel || 'A';
   });
+  const [paymentCustomStagesJson, setPaymentCustomStagesJson] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.paymentCustomStagesJson || '';
+  });
   const [agreementPreviewOpen, setAgreementPreviewOpen] = useState(false);
 
   // Client tasks state & queries
@@ -633,6 +637,7 @@ export default function ClientDetailPage() {
         setHostingFreeLaunch(cCached.hostingFreeLaunch || false);
         setHostingOverageNotes(cCached.hostingOverageNotes || '');
         setPaymentModel(cCached.paymentModel || 'A');
+        setPaymentCustomStagesJson(cCached.paymentCustomStagesJson || '');
         setEnvRotationInterval(cCached.envRotationInterval !== undefined ? cCached.envRotationInterval : 6);
         setStabilityCheckInterval(cCached.stabilityCheckInterval !== undefined ? cCached.stabilityCheckInterval : 1);
         setExpectationsCheckInterval(cCached.expectationsCheckInterval !== undefined ? cCached.expectationsCheckInterval : 3);
@@ -696,6 +701,7 @@ export default function ClientDetailPage() {
         setHostingFreeLaunch(c.hostingFreeLaunch || false);
         setHostingOverageNotes(c.hostingOverageNotes || '');
         setPaymentModel(c.paymentModel || 'A');
+        setPaymentCustomStagesJson(c.paymentCustomStagesJson || '');
         setEnvRotationInterval(c.envRotationInterval !== undefined ? c.envRotationInterval : 6);
         setStabilityCheckInterval(c.stabilityCheckInterval !== undefined ? c.stabilityCheckInterval : 1);
         setExpectationsCheckInterval(c.expectationsCheckInterval !== undefined ? c.expectationsCheckInterval : 3);
@@ -1116,6 +1122,7 @@ export default function ClientDetailPage() {
         hostingFreeLaunch: hostingFreeLaunch,
         hostingOverageNotes: hostingOverageNotes.trim() || null,
         paymentModel: paymentModel || null,
+        paymentCustomStagesJson: paymentModel === 'CUSTOM' ? (paymentCustomStagesJson || null) : null,
       });
       if (updated) {
         setClient(updated as MockClient);
@@ -1558,6 +1565,7 @@ export default function ClientDetailPage() {
                     setHostingFreeLaunch(client.hostingFreeLaunch || false);
                     setHostingOverageNotes(client.hostingOverageNotes || '');
                     setPaymentModel(client.paymentModel || 'A');
+                    setPaymentCustomStagesJson(client.paymentCustomStagesJson || '');
                     setAgreementModalOpen(true);
                   }}
                   className="w-full text-center flex justify-center items-center"
@@ -2612,6 +2620,8 @@ export default function ClientDetailPage() {
           onHostingOverageNotesChange={setHostingOverageNotes}
           paymentModel={paymentModel}
           onPaymentModelChange={setPaymentModel}
+          paymentCustomStagesJson={paymentCustomStagesJson}
+          onPaymentCustomStagesJsonChange={setPaymentCustomStagesJson}
           onCancel={handleCancelAgreement}
           onSubmit={handleSaveAgreementTerms}
         />

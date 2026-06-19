@@ -43,6 +43,7 @@ export interface MockClient {
   hostingFreeLaunch: boolean;
   hostingOverageNotes: string | null;
   paymentModel: string | null;
+  paymentCustomStagesJson: string | null;
   envRotationInterval: number;
   envRotationLastAt: Date | null;
   stabilityCheckInterval: number;
@@ -219,6 +220,7 @@ export async function createClient(data: schema.NewClient) {
     hostingFreeLaunch: data.hostingFreeLaunch || false,
     hostingOverageNotes: data.hostingOverageNotes || null,
     paymentModel: data.paymentModel || null,
+    paymentCustomStagesJson: data.paymentCustomStagesJson || null,
     envRotationInterval: data.envRotationInterval !== undefined ? Number(data.envRotationInterval) : 6,
     envRotationLastAt: data.envRotationLastAt ? new Date(data.envRotationLastAt) : new Date(),
     stabilityCheckInterval: data.stabilityCheckInterval !== undefined ? Number(data.stabilityCheckInterval) : 1,
@@ -257,6 +259,7 @@ export async function updateClient(id: string, data: Partial<schema.NewClient>) 
       portalPassword: data.portalPassword !== undefined ? data.portalPassword : mockClients[idx].portalPassword,
       portalPasswordIsPrivate: data.portalPasswordIsPrivate !== undefined ? data.portalPasswordIsPrivate : mockClients[idx].portalPasswordIsPrivate,
       sourcedBy: data.sourcedBy !== undefined ? data.sourcedBy : mockClients[idx].sourcedBy,
+      paymentCustomStagesJson: data.paymentCustomStagesJson !== undefined ? (data.paymentCustomStagesJson || null) : mockClients[idx].paymentCustomStagesJson,
       tcSignedAt: data.tcSignedAt !== undefined ? (data.tcSignedAt ? new Date(data.tcSignedAt) : null) : mockClients[idx].tcSignedAt,
       envRotationLastAt: data.envRotationLastAt !== undefined ? (data.envRotationLastAt ? new Date(data.envRotationLastAt) : null) : mockClients[idx].envRotationLastAt,
       stabilityCheckLastAt: data.stabilityCheckLastAt !== undefined ? (data.stabilityCheckLastAt ? new Date(data.stabilityCheckLastAt) : null) : mockClients[idx].stabilityCheckLastAt,
@@ -1603,12 +1606,47 @@ let mockInvoicePagePresets: MockInvoicePagePreset[] = [
     sectionKey: 'full_page_html',
     content: `<h2>1. Service Level Agreement (SLA) & Scope</h2>\n<p>This Agreement governs the maintenance and hosting services provided by Scala. By paying the down payment on the associated invoice, the Client accepts all terms, conditions, and response times outlined below.</p>\n\n<h2>2. Support Response Tiers</h2>\n<ul>\n  <li><strong>Critical (website offline):</strong> Under 2 hours response time, 24/7.</li>\n  <li><strong>Urgent (major feature broken):</strong> Under 8 hours response time.</li>\n  <li><strong>Standard (general requests):</strong> Under 24 hours response time during business hours.</li>\n</ul>\n\n<h2>3. Hosting & Infrastructure</h2>\n<p>Scala provides secure hosting and maintenance monitoring. The client is allocated resources according to their contracted hosting plan. Any infrastructure usage (bandwidth, storage) exceeding normal allocations will be notified and may result in plan upgrades.</p>\n\n<h2>4. IP Ownership</h2>\n<p>Full Intellectual Property (IP) ownership of the custom developed code is transferred to the Client immediately upon receipt of the final project payment. Scala retains ownership of any pre-existing modules, libraries, or reusable tools used in the development.</p>\n\n<h2>5. Suspension of Service</h2>\n<p>Invoices are net-14. Unpaid invoices past the due date may result in temporary suspension of website hosting and maintenance services, with 7 days prior notice.</p>`,
     updatedAt: new Date(),
+  },
+  {
+    id: 'pp10',
+    pageKey: 'cover',
+    sectionKey: 'full_page_html',
+    content: `<div style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-family: 'Outfit', sans-serif; padding: 40px; margin-top: 100px;">
+  <div style="margin-bottom: 40px;">
+    <img src="/scala-logo-dark.svg" alt="Scala Logo" style="height: 48px; width: auto;" />
+  </div>
+  <h1 style="font-size: 38px; font-weight: 800; color: #0f172a; line-height: 1.25; margin-bottom: 12px; letter-spacing: -0.02em;">
+    PROJECT PROPOSAL & INVOICE
+  </h1>
+  <p style="font-size: 16px; color: #64748b; font-weight: 500; margin-bottom: 48px; max-width: 480px;">
+    Prepared for our valued client. Review terms, project specifications, and payment terms.
+  </p>
+  <div style="border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; py: 6px; padding: 16px 48px; display: inline-block;">
+    <p style="font-size: 13px; color: #475569; margin: 4px 0;"><strong>Prepared By:</strong> Scala Solutions</p>
+    <p style="font-size: 13px; color: #475569; margin: 4px 0;"><strong>Validity:</strong> 30 Days from issue</p>
+  </div>
+</div>`,
+    updatedAt: new Date(),
   }
 ];
 
 export async function getInvoiceLinePresets() {
   if (isDbConfigured()) {
     try {
+      const results = await db.query.invoiceLinePresets.findMany({
+        orderBy: [desc(schema.invoiceLinePresets.createdAt)]
+      });
+      if (results.length > 0) {
+        return results;
+      }
+      // Seeding empty database with default line presets
+      const seedData = mockInvoiceLinePresets.map(({ name, description, price, category }) => ({
+        name,
+        description,
+        price,
+        category,
+      }));
+      await db.insert(schema.invoiceLinePresets).values(seedData);
       return await db.query.invoiceLinePresets.findMany({
         orderBy: [desc(schema.invoiceLinePresets.createdAt)]
       });
@@ -1677,8 +1715,33 @@ export async function deleteInvoiceLinePreset(id: string) {
 }
 
 export async function getInvoicePagePresets() {
+  // Heal mock presets
+  mockInvoicePagePresets.forEach(preset => {
+    if (preset.pageKey === 'cover' && preset.content.includes('/logo-black.png')) {
+      preset.content = preset.content.replace('/logo-black.png', '/scala-logo-dark.svg');
+    }
+  });
+
   if (isDbConfigured()) {
     try {
+      const results = await db.query.invoicePagePresets.findMany();
+      if (results.length > 0) {
+        // Self-healing migration for logo path in existing DB records
+        for (const preset of results) {
+          if (preset.pageKey === 'cover' && preset.content.includes('/logo-black.png')) {
+            preset.content = preset.content.replace('/logo-black.png', '/scala-logo-dark.svg');
+            await db.update(schema.invoicePagePresets).set({ content: preset.content }).where(eq(schema.invoicePagePresets.id, preset.id));
+          }
+        }
+        return results;
+      }
+      // Seeding empty database with default page presets
+      const seedData = mockInvoicePagePresets.map(({ pageKey, sectionKey, content }) => ({
+        pageKey,
+        sectionKey,
+        content,
+      }));
+      await db.insert(schema.invoicePagePresets).values(seedData);
       return await db.query.invoicePagePresets.findMany();
     } catch (e) {
       console.warn("DB Query failed, falling back to mock data: ", e);

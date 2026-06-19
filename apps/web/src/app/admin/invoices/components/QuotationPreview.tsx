@@ -109,7 +109,7 @@ export const QuotationPreview: React.FC<QuotationPreviewProps> = ({ quotation, c
           recommended: true,
         }];
 
-  const paymentModel = getPaymentModel(client?.paymentModel);
+  const paymentModel = getPaymentModel(client?.paymentModel, client?.paymentCustomStagesJson);
   const title = sections.title || 'Project Quotation';
 
   // Build page list dynamically

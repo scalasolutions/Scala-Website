@@ -88,10 +88,12 @@ export const InvoiceTCPage1: React.FC<InvoiceTCPage1Props> = ({
       />
 
       <div style={{ marginTop: 18, paddingBottom: '70px' }}>
-        {/* Main T&C heading — only appears on page 2 */}
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#111111', marginBottom: 14 }}>
-          {title || 'Terms and Conditions'}
-        </div>
+        {/* Main T&C heading */}
+        {title !== "" && (
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#111111', marginBottom: 14 }}>
+            {title || 'Terms and Conditions'}
+          </div>
+        )}
 
         {htmlContent ? (
           <>
