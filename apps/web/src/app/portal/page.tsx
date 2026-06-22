@@ -3,35 +3,40 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { signOut } from 'next-auth/react';
 import { getSession } from 'next-auth/react';
-import { 
-  Sun, 
-  Moon, 
-  LogOut, 
-  Activity, 
-  Clock, 
-  ShieldCheck, 
-  Receipt, 
-  Ticket, 
-  Eye, 
+import {
+  Sun,
+  Moon,
+  LogOut,
+  Activity,
+  Clock,
+  ShieldCheck,
+  Receipt,
+  Ticket,
+  Eye,
   EyeOff,
-  Plus, 
-  Send, 
+  Plus,
+  Send,
   MessageSquare,
   AlertCircle,
-  Loader2, 
+  Loader2,
   FileText,
   UserCheck,
   X,
   CheckCircle2,
   AlertTriangle,
+  BarChart2,
+  Download,
+  TrendingUp,
 } from 'lucide-react';
-import { 
+import {
   getClientPortalData,
   getTicketDetails,
-  createTicket, 
+  createTicket,
   createTicketMessage,
-  updateClient
+  updateClient,
+  MockClientUsageReport
 } from '@/lib/db/queries';
+import { UsageReportPreview } from './components/UsageReportPreview';
 import Link from 'next/link';
 import { clearAllCache, getCachedSync, primeCache } from '@/lib/data-cache';
 import { formatCurrencyIDR as formatCurrency } from '@/lib/utils';
@@ -180,6 +185,10 @@ export default function ClientPortal() {
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // Usage reports
+  const [usageReports, setUsageReports] = useState<MockClientUsageReport[]>([]);
+  const [previewReport, setPreviewReport] = useState<MockClientUsageReport | null>(null);
+
   // Field refs for scroll-to-error anchoring
   const ticketTitleRef = useRef<HTMLInputElement>(null);
   const ticketDescRef = useRef<HTMLTextAreaElement>(null);
@@ -249,7 +258,8 @@ export default function ClientPortal() {
         setClient(data.client);
         setInvoices(data.invoices);
         setTickets(data.tickets);
-        
+        setUsageReports((data as any).usageReports || []);
+
         // Auto-select first ticket if none selected
         if (data.tickets.length > 0 && !selectedTicketId) {
           setSelectedTicketId(data.tickets[0].id);
@@ -1000,7 +1010,127 @@ export default function ClientPortal() {
 
         </div>
 
+      {/* ── USAGE & INFRASTRUCTURE ANALYTICS ── */}
+      <section className={`max-w-7xl mx-auto px-6 mt-8 border rounded-2xl p-6 relative transition-all duration-300 ${
+        theme === 'dark'
+          ? 'bg-[#11131E]/60 border-white/5 shadow-2xl'
+          : 'bg-white border-slate-200/80 shadow-md shadow-slate-100'
+      }`}>
+        <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${
+          theme === 'dark' ? 'from-primary/30 to-emerald-500/20' : 'from-primary/80 to-emerald-500/70'
+        }`}></div>
+
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Resource Analytics</p>
+            <h3 className="text-lg font-black tracking-tight mt-0.5">Usage &amp; Infrastructure Reports</h3>
+          </div>
+          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border ${
+            theme === 'dark' ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-primary/10 border-primary/30 text-slate-800'
+          }`}>
+            <BarChart2 size={12} />
+            {usageReports.length} {usageReports.length === 1 ? 'Report' : 'Reports'}
+          </span>
+        </div>
+
+        {usageReports.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/10 border border-dashed border-border/20 rounded-xl">
+            <TrendingUp size={32} className="text-muted-foreground opacity-30 mb-3" />
+            <h5 className="text-sm font-bold">Usage Statistics Pending</h5>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-sm">
+              Usage statistics are compiled by our team at the end of each billing cycle. Check back after your first month.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Simple bar-style trend indicators for latest report */}
+            {(() => {
+              const latest = usageReports[0];
+              const monthLabel = new Date(`${latest.month}-01`).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+              return (
+                <div className={`p-4 rounded-xl border mb-6 ${
+                  theme === 'dark' ? 'bg-[#151824]/40 border-white/5' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Latest Period — {monthLabel}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    {[
+                      { label: 'Visits', value: latest.visits.toLocaleString(), unit: 'requests' },
+                      { label: 'Bandwidth', value: `${latest.bandwidthGb.toFixed(2)}`, unit: 'GB transfer' },
+                      { label: 'Storage', value: `${latest.storageGb.toFixed(2)}`, unit: 'GB disk' },
+                      { label: 'Peak CPU', value: `${latest.peakCpuCores.toFixed(2)}`, unit: 'vCPU cores' },
+                      { label: 'Peak RAM', value: `${latest.peakRamMb}`, unit: 'MB memory' },
+                    ].map(stat => (
+                      <div key={stat.label}>
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">{stat.label}</p>
+                        <p className="text-lg font-black tabular-nums text-foreground mt-0.5">{stat.value}</p>
+                        <p className="text-[9px] text-muted-foreground">{stat.unit}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {latest.statusNote && (
+                    <div className="mt-3 pt-3 border-t border-border/30 flex items-center gap-2 text-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="text-muted-foreground">{latest.statusNote}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Report list with download buttons */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">All Monthly Reports</p>
+              {usageReports.map((report) => {
+                const monthLabel = new Date(`${report.month}-01`).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                return (
+                  <div
+                    key={report.id}
+                    className={`flex items-center justify-between gap-3 p-3.5 rounded-xl border transition-all duration-200 ${
+                      theme === 'dark'
+                        ? 'bg-[#151824]/20 border-white/5 hover:bg-[#151824]/40'
+                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100/60'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-black text-foreground flex items-center gap-2">
+                        <BarChart2 size={13} className="text-primary shrink-0" />
+                        {monthLabel} Usage Report
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {report.visits.toLocaleString()} visits · {report.bandwidthGb.toFixed(2)} GB transfer
+                        {report.statusNote && ` · ${report.statusNote}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPreviewReport(report)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-200 active-press cursor-pointer shrink-0 ${
+                        theme === 'dark'
+                          ? 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-200 hover:text-white'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <Download size={12} />
+                      <span>Download</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
+
       </main>
+
+      {/* ── USAGE REPORT PREVIEW / PRINT MODAL ── */}
+      {previewReport && client && (
+        <UsageReportPreview
+          report={previewReport}
+          client={client}
+          theme={theme}
+          onClose={() => setPreviewReport(null)}
+        />
+      )}
 
       {/* ── MODAL: CREATE SUPPORT TICKET ── */}
       {isModalOpen && (

@@ -29,6 +29,13 @@
       "when": 1782136629839,
       "tag": "0003_opposite_vanisher",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1750550400000,
+      "tag": "0004_monthly_usage_reports",
+      "breakpoints": true
     }
   ]
 }
