@@ -1142,7 +1142,7 @@ export default function ClientPortal() {
                     const limits = TIER_LIMITS[resolvedTier] || TIER_LIMITS.none;
                     return (
                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                        {renderMetricCell('Visits', latest.visits, limits.visits, (v) => v.toLocaleString())}
+                        {renderMetricCell('Visits', latest.visits, 0, (v) => v.toLocaleString())}
                         {renderMetricCell('Bandwidth', latest.bandwidthGb, limits.bandwidthGb, (v) => `${v.toFixed(2)} GB`)}
                         {renderMetricCell('Storage', latest.storageGb, limits.storageGb, (v) => `${v.toFixed(2)} GB`)}
                         {renderMetricCell('Peak CPU', latest.peakCpuCores, limits.cpuCores, (v) => `${v.toFixed(2)} vCPU`)}

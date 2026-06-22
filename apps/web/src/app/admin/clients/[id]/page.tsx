@@ -2451,7 +2451,7 @@ export default function ClientDetailPage() {
                               )}
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2.5 text-[11px] text-muted-foreground">
-                              {renderMetricCell('Visits', report.visits, limits.visits, (v) => v.toLocaleString())}
+                              {renderMetricCell('Visits', report.visits, 0, (v) => v.toLocaleString())}
                               {renderMetricCell('Bandwidth', report.bandwidthGb, limits.bandwidthGb, (v) => `${v.toFixed(2)} GB`)}
                               {renderMetricCell('Storage', report.storageGb, limits.storageGb, (v) => `${v.toFixed(2)} GB`)}
                               {renderMetricCell('Peak CPU', report.peakCpuCores, limits.cpuCores, (v) => `${v.toFixed(2)} vCPU`)}

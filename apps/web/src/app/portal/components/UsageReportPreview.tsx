@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Printer } from 'lucide-react';
 import { MockClientUsageReport } from '@/lib/db/queries';
 
@@ -67,13 +68,28 @@ interface UsageReportPreviewProps {
 }
 
 export function UsageReportPreview({ report, client, hostingTier, theme, onClose }: UsageReportPreviewProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const monthLabel = new Date(`${report.month}-01`).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
   });
 
   const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeClientName = client.name.replace(/[^a-z0-9]/gi, '_');
+    const safeMonth = monthLabel.replace(/[^a-z0-9]/gi, '_');
+    document.title = `Usage_Report_${safeMonth}_${safeClientName}`;
+    
     window.print();
+    
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 500);
   };
 
   const resolvedTier = hostingTier || (client.subscriptionType === 'static' ? 'static' : client.subscriptionType === 'dynamic' ? 'dynamic_basic' : 'none');
@@ -83,9 +99,9 @@ export function UsageReportPreview({ report, client, hostingTier, theme, onClose
     {
       label: 'Total Visits',
       value: report.visits,
-      limit: limits.visits,
+      limit: 0, // Visits should not have capacity/limit
       formattedValue: report.visits.toLocaleString(),
-      formattedLimit: limits.visits.toLocaleString(),
+      formattedLimit: '',
       unit: 'requests',
       note: 'Unique page requests served during this period'
     },
@@ -127,7 +143,9 @@ export function UsageReportPreview({ report, client, hostingTier, theme, onClose
     },
   ];
 
-  return (
+  if (!mounted) return null;
+
+  const modalContent = (
     <>
       {/* Print styles — A4, hides everything except the report */}
       <style>{`
@@ -161,7 +179,7 @@ export function UsageReportPreview({ report, client, hostingTier, theme, onClose
         />
 
         {/* Modal panel */}
-        <div className={`relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl print:rounded-none print:shadow-none print:max-h-none print:overflow-visible print:max-w-none print:w-full print:fixed print:inset-0 ${
+        <div className={`relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl print:rounded-none print:shadow-none print:max-h-none print:overflow-visible print:max-w-none print:w-full print:fixed print:inset-0 print:bg-white print:text-slate-900 ${
           theme === 'dark' ? 'bg-[#0e1117] text-white' : 'bg-white text-slate-900'
         }`}>
 
@@ -274,11 +292,7 @@ export function UsageReportPreview({ report, client, hostingTier, theme, onClose
                             />
                           </div>
                         </div>
-                      ) : (
-                        <div className="mt-4 pt-3 border-t border-border/10 text-[9px] text-muted-foreground/60 italic">
-                          No capacity limit (Unlimited)
-                        </div>
-                      )}
+                      ) : null}
                       
                       <p className="text-[9px] text-muted-foreground/60 mt-2 leading-relaxed">{m.note}</p>
                     </div>
@@ -326,4 +340,6 @@ export function UsageReportPreview({ report, client, hostingTier, theme, onClose
       </div>
     </>
   );
+
+  return createPortal(modalContent, document.body);
 }
