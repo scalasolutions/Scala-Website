@@ -4,14 +4,69 @@ import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { MockClientUsageReport } from '@/lib/db/queries';
 
+const TIER_LIMITS: Record<string, {
+  visits: number;
+  bandwidthGb: number;
+  storageGb: number;
+  cpuCores: number;
+  ramMb: number;
+}> = {
+  static: {
+    visits: 50000,
+    bandwidthGb: 50,
+    storageGb: 5,
+    cpuCores: 0,
+    ramMb: 0,
+  },
+  dynamic_basic: {
+    visits: 20000,
+    bandwidthGb: 50,
+    storageGb: 10,
+    cpuCores: 2,
+    ramMb: 2048,
+  },
+  dynamic_growth: {
+    visits: 100000,
+    bandwidthGb: 100,
+    storageGb: 20,
+    cpuCores: 4,
+    ramMb: 4096,
+  },
+  business: {
+    visits: 300000,
+    bandwidthGb: 250,
+    storageGb: 50,
+    cpuCores: 8,
+    ramMb: 8192,
+  },
+  none: {
+    visits: 0,
+    bandwidthGb: 0,
+    storageGb: 0,
+    cpuCores: 0,
+    ramMb: 0,
+  }
+};
+
+const formatTierName = (tier: string) => {
+  switch (tier) {
+    case 'static': return 'Static Hosting';
+    case 'dynamic_basic': return 'Dynamic Basic';
+    case 'dynamic_growth': return 'Dynamic Growth';
+    case 'business': return 'Business Hosting';
+    default: return 'No Hosting Tier';
+  }
+};
+
 interface UsageReportPreviewProps {
   report: MockClientUsageReport;
   client: { name: string; companyName?: string | null; subscriptionType?: string | null };
+  hostingTier?: string;
   theme: 'dark' | 'light';
   onClose: () => void;
 }
 
-export function UsageReportPreview({ report, client, theme, onClose }: UsageReportPreviewProps) {
+export function UsageReportPreview({ report, client, hostingTier, theme, onClose }: UsageReportPreviewProps) {
   const monthLabel = new Date(`${report.month}-01`).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -21,12 +76,55 @@ export function UsageReportPreview({ report, client, theme, onClose }: UsageRepo
     window.print();
   };
 
+  const resolvedTier = hostingTier || (client.subscriptionType === 'static' ? 'static' : client.subscriptionType === 'dynamic' ? 'dynamic_basic' : 'none');
+  const limits = TIER_LIMITS[resolvedTier] || TIER_LIMITS.none;
+
   const metrics = [
-    { label: 'Total Visits', value: report.visits.toLocaleString(), unit: 'requests', note: 'Unique page requests served during this period' },
-    { label: 'Bandwidth Used', value: `${report.bandwidthGb.toFixed(2)} GB`, unit: 'data transfer', note: 'Outbound data delivered to end users' },
-    { label: 'Storage Used', value: `${report.storageGb.toFixed(2)} GB`, unit: 'disk space', note: 'Files, assets, and database storage consumed' },
-    { label: 'Peak CPU Load', value: `${report.peakCpuCores.toFixed(2)} vCPU`, unit: 'cores', note: 'Highest recorded CPU allocation during peak hours' },
-    { label: 'Peak RAM Usage', value: `${report.peakRamMb} MB`, unit: 'memory', note: 'Maximum memory footprint observed during period' },
+    {
+      label: 'Total Visits',
+      value: report.visits,
+      limit: limits.visits,
+      formattedValue: report.visits.toLocaleString(),
+      formattedLimit: limits.visits.toLocaleString(),
+      unit: 'requests',
+      note: 'Unique page requests served during this period'
+    },
+    {
+      label: 'Bandwidth Used',
+      value: report.bandwidthGb,
+      limit: limits.bandwidthGb,
+      formattedValue: `${report.bandwidthGb.toFixed(2)} GB`,
+      formattedLimit: `${limits.bandwidthGb.toFixed(2)} GB`,
+      unit: 'data transfer',
+      note: 'Outbound data delivered to end users'
+    },
+    {
+      label: 'Storage Used',
+      value: report.storageGb,
+      limit: limits.storageGb,
+      formattedValue: `${report.storageGb.toFixed(2)} GB`,
+      formattedLimit: `${limits.storageGb.toFixed(2)} GB`,
+      unit: 'disk space',
+      note: 'Files, assets, and database storage consumed'
+    },
+    {
+      label: 'Peak CPU Load',
+      value: report.peakCpuCores,
+      limit: limits.cpuCores,
+      formattedValue: `${report.peakCpuCores.toFixed(2)} vCPU`,
+      formattedLimit: `${limits.cpuCores.toFixed(2)} vCPU`,
+      unit: 'cores',
+      note: 'Highest recorded CPU allocation during peak hours'
+    },
+    {
+      label: 'Peak RAM Usage',
+      value: report.peakRamMb,
+      limit: limits.ramMb,
+      formattedValue: `${report.peakRamMb} MB`,
+      formattedLimit: `${limits.ramMb} MB`,
+      unit: 'memory',
+      note: 'Maximum memory footprint observed during period'
+    },
   ];
 
   return (
@@ -47,6 +145,10 @@ export function UsageReportPreview({ report, client, theme, onClose }: UsageRepo
             font-family: system-ui, -apple-system, sans-serif;
           }
           @page { size: A4 portrait; margin: 0; }
+          .print-progress-bg { background-color: #f1f5f9 !important; border: 1px solid #cbd5e1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-progress-fill { background-color: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-progress-fill-amber { background-color: #d97706 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-progress-fill-rose { background-color: #dc2626 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
 
@@ -110,7 +212,7 @@ export function UsageReportPreview({ report, client, theme, onClose }: UsageRepo
                 <p className="text-sm font-black">{client.name}</p>
                 {client.companyName && <p className="text-xs text-muted-foreground">{client.companyName}</p>}
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Hosting: <span className="font-bold capitalize">{client.subscriptionType || 'Standard'}</span>
+                  Hosting: <span className="font-bold">{formatTierName(resolvedTier)}</span>
                 </p>
               </div>
             </div>
@@ -127,19 +229,61 @@ export function UsageReportPreview({ report, client, theme, onClose }: UsageRepo
             <div className="mb-8">
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Resource Utilization Summary</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {metrics.map((m) => (
-                  <div
-                    key={m.label}
-                    className={`p-5 rounded-xl border ${
-                      theme === 'dark' ? 'bg-[#151824]/40 border-white/10' : 'bg-slate-50 border-slate-200'
-                    } print:bg-gray-50 print:border-gray-200`}
-                  >
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{m.label}</p>
-                    <p className="text-2xl font-black tabular-nums text-foreground mt-1">{m.value}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{m.unit}</p>
-                    <p className="text-[10px] text-muted-foreground/70 mt-2 leading-relaxed">{m.note}</p>
-                  </div>
-                ))}
+                {metrics.map((m) => {
+                  const hasLimit = m.limit > 0;
+                  const ratio = hasLimit ? m.value / m.limit : 0;
+                  
+                  let textClass = 'text-foreground';
+                  let progressFillClass = 'bg-[#CEF84E] print-progress-fill';
+                  
+                  if (hasLimit) {
+                    if (ratio >= 1.0) {
+                      textClass = 'text-rose-500 font-extrabold print:text-rose-600';
+                      progressFillClass = 'bg-rose-500 print-progress-fill-rose';
+                    } else if (ratio >= 0.85) {
+                      textClass = 'text-amber-500 font-bold print:text-amber-600';
+                      progressFillClass = 'bg-amber-500 print-progress-fill-amber';
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={m.label}
+                      className={`p-5 rounded-xl border flex flex-col justify-between ${
+                        theme === 'dark' ? 'bg-[#151824]/40 border-white/10' : 'bg-slate-50 border-slate-200'
+                      } print:bg-gray-50 print:border-gray-200`}
+                    >
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{m.label}</p>
+                        <p className={`text-2xl font-black tabular-nums mt-1 ${textClass}`}>{m.formattedValue}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{m.unit}</p>
+                      </div>
+
+                      {hasLimit ? (
+                        <div className="mt-4 pt-3 border-t border-border/10">
+                          <div className="flex justify-between items-center text-[10px] mb-1.5">
+                            <span className="text-muted-foreground/80">Capacity Limit</span>
+                            <span className={`font-semibold ${textClass}`}>
+                              {Math.round(ratio * 100)}% of {m.formattedLimit}
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 print-progress-bg overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${progressFillClass}`}
+                              style={{ width: `${Math.min(100, ratio * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4 pt-3 border-t border-border/10 text-[9px] text-muted-foreground/60 italic">
+                          No capacity limit (Unlimited)
+                        </div>
+                      )}
+                      
+                      <p className="text-[9px] text-muted-foreground/60 mt-2 leading-relaxed">{m.note}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

@@ -129,6 +129,77 @@ function ConfirmDialog({ message, onConfirm, onCancel, theme }: ConfirmDialogPro
 // ─────────────────────────────────────────────
 // Main Portal Page
 // ─────────────────────────────────────────────
+const TIER_LIMITS: Record<string, {
+  visits: number;
+  bandwidthGb: number;
+  storageGb: number;
+  cpuCores: number;
+  ramMb: number;
+}> = {
+  static: {
+    visits: 50000,
+    bandwidthGb: 50,
+    storageGb: 5,
+    cpuCores: 0,
+    ramMb: 0,
+  },
+  dynamic_basic: {
+    visits: 20000,
+    bandwidthGb: 50,
+    storageGb: 10,
+    cpuCores: 2,
+    ramMb: 2048,
+  },
+  dynamic_growth: {
+    visits: 100000,
+    bandwidthGb: 100,
+    storageGb: 20,
+    cpuCores: 4,
+    ramMb: 4096,
+  },
+  business: {
+    visits: 300000,
+    bandwidthGb: 250,
+    storageGb: 50,
+    cpuCores: 8,
+    ramMb: 8192,
+  },
+  none: {
+    visits: 0,
+    bandwidthGb: 0,
+    storageGb: 0,
+    cpuCores: 0,
+    ramMb: 0,
+  }
+};
+
+const renderMetricCell = (label: string, value: number, limit: number, formatFn: (v: number) => string) => {
+  if (limit <= 0) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">{label}</span>
+        <span className="font-semibold text-foreground tabular-nums">{formatFn(value)}</span>
+      </div>
+    );
+  }
+  
+  const percentage = value / limit;
+  let colorClass = 'text-foreground';
+  if (percentage >= 1.0) {
+    colorClass = 'text-rose-500 font-extrabold';
+  } else if (percentage >= 0.85) {
+    colorClass = 'text-amber-500 font-bold';
+  }
+  
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">{label}</span>
+      <span className={`font-semibold tabular-nums ${colorClass}`}>{formatFn(value)}</span>
+      <span className="text-[8px] text-muted-foreground/40 font-normal">limit: {formatFn(limit)}</span>
+    </div>
+  );
+};
+
 export default function ClientPortal() {
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [isSubdomain, setIsSubdomain] = useState(false);
@@ -188,6 +259,20 @@ export default function ClientPortal() {
   // Usage reports
   const [usageReports, setUsageReports] = useState<MockClientUsageReport[]>([]);
   const [previewReport, setPreviewReport] = useState<MockClientUsageReport | null>(null);
+
+  const getActiveHostingTier = (): string => {
+    const recentHostingInvoice = invoices
+      .filter(inv => inv.hostingTier && inv.hostingTier !== 'none')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    
+    if (recentHostingInvoice?.hostingTier) {
+      return recentHostingInvoice.hostingTier;
+    }
+    
+    if (client?.subscriptionType === 'static') return 'static';
+    if (client?.subscriptionType === 'dynamic') return 'dynamic_basic';
+    return 'none';
+  };
 
   // Field refs for scroll-to-error anchoring
   const ticketTitleRef = useRef<HTMLInputElement>(null);
@@ -1052,21 +1137,19 @@ export default function ClientPortal() {
                   theme === 'dark' ? 'bg-[#151824]/40 border-white/5' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Latest Period — {monthLabel}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                    {[
-                      { label: 'Visits', value: latest.visits.toLocaleString(), unit: 'requests' },
-                      { label: 'Bandwidth', value: `${latest.bandwidthGb.toFixed(2)}`, unit: 'GB transfer' },
-                      { label: 'Storage', value: `${latest.storageGb.toFixed(2)}`, unit: 'GB disk' },
-                      { label: 'Peak CPU', value: `${latest.peakCpuCores.toFixed(2)}`, unit: 'vCPU cores' },
-                      { label: 'Peak RAM', value: `${latest.peakRamMb}`, unit: 'MB memory' },
-                    ].map(stat => (
-                      <div key={stat.label}>
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">{stat.label}</p>
-                        <p className="text-lg font-black tabular-nums text-foreground mt-0.5">{stat.value}</p>
-                        <p className="text-[9px] text-muted-foreground">{stat.unit}</p>
+                  {(() => {
+                    const resolvedTier = getActiveHostingTier();
+                    const limits = TIER_LIMITS[resolvedTier] || TIER_LIMITS.none;
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                        {renderMetricCell('Visits', latest.visits, limits.visits, (v) => v.toLocaleString())}
+                        {renderMetricCell('Bandwidth', latest.bandwidthGb, limits.bandwidthGb, (v) => `${v.toFixed(2)} GB`)}
+                        {renderMetricCell('Storage', latest.storageGb, limits.storageGb, (v) => `${v.toFixed(2)} GB`)}
+                        {renderMetricCell('Peak CPU', latest.peakCpuCores, limits.cpuCores, (v) => `${v.toFixed(2)} vCPU`)}
+                        {renderMetricCell('Peak RAM', latest.peakRamMb, limits.ramMb, (v) => `${v} MB`)}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                   {latest.statusNote && (
                     <div className="mt-3 pt-3 border-t border-border/30 flex items-center gap-2 text-xs">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
@@ -1127,6 +1210,7 @@ export default function ClientPortal() {
         <UsageReportPreview
           report={previewReport}
           client={client}
+          hostingTier={getActiveHostingTier()}
           theme={theme}
           onClose={() => setPreviewReport(null)}
         />

@@ -46,6 +46,7 @@ import { DeleteClientModal } from '../components/DeleteClientModal';
 import { MaintenanceIntervalsModal } from '../components/MaintenanceIntervalsModal';
 import { AgreementTermsModal } from '../components/AgreementTermsModal';
 import { TaskFormModal } from '../components/TaskFormModal';
+import { UsageReportPreview } from '@/app/portal/components/UsageReportPreview';
 import {
   updateClient,
   deleteClient,
@@ -86,6 +87,77 @@ import Textarea from '@/components/ui/Textarea';
 import SectionHeading from '@/components/ui/SectionHeading';
 import EmptyState from '@/components/ui/EmptyState';
 
+const TIER_LIMITS: Record<string, {
+  visits: number;
+  bandwidthGb: number;
+  storageGb: number;
+  cpuCores: number;
+  ramMb: number;
+}> = {
+  static: {
+    visits: 50000,
+    bandwidthGb: 50,
+    storageGb: 5,
+    cpuCores: 0,
+    ramMb: 0,
+  },
+  dynamic_basic: {
+    visits: 20000,
+    bandwidthGb: 50,
+    storageGb: 10,
+    cpuCores: 2,
+    ramMb: 2048,
+  },
+  dynamic_growth: {
+    visits: 100000,
+    bandwidthGb: 100,
+    storageGb: 20,
+    cpuCores: 4,
+    ramMb: 4096,
+  },
+  business: {
+    visits: 300000,
+    bandwidthGb: 250,
+    storageGb: 50,
+    cpuCores: 8,
+    ramMb: 8192,
+  },
+  none: {
+    visits: 0,
+    bandwidthGb: 0,
+    storageGb: 0,
+    cpuCores: 0,
+    ramMb: 0,
+  }
+};
+
+const renderMetricCell = (label: string, value: number, limit: number, formatFn: (v: number) => string) => {
+  if (limit <= 0) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">{label}</span>
+        <span className="font-semibold text-foreground tabular-nums">{formatFn(value)}</span>
+      </div>
+    );
+  }
+  
+  const percentage = value / limit;
+  let colorClass = 'text-foreground';
+  if (percentage >= 1.0) {
+    colorClass = 'text-rose-500 font-extrabold';
+  } else if (percentage >= 0.85) {
+    colorClass = 'text-amber-500 font-bold';
+  }
+  
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">{label}</span>
+      <span className={`font-semibold tabular-nums ${colorClass}`}>{formatFn(value)}</span>
+      <span className="text-[8px] text-muted-foreground/40 font-normal">limit: {formatFn(limit)}</span>
+    </div>
+  );
+};
+
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -104,6 +176,20 @@ export default function ClientDetailPage() {
     const allInvoices = getCachedSync<any[]>(CACHE_KEYS.INVOICES);
     return allInvoices ? allInvoices.filter(inv => inv.clientId === id) as MockInvoice[] : [];
   });
+
+  const getActiveHostingTier = (): string => {
+    const recentHostingInvoice = invoices
+      .filter(inv => inv.hostingTier && inv.hostingTier !== 'none')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    
+    if (recentHostingInvoice?.hostingTier) {
+      return recentHostingInvoice.hostingTier;
+    }
+    
+    if (client?.subscriptionType === 'static') return 'static';
+    if (client?.subscriptionType === 'dynamic') return 'dynamic_basic';
+    return 'none';
+  };
   const [tickets, setTickets] = useState<MockTicket[]>(() => {
     const allTickets = getCachedSync<any[]>(CACHE_KEYS.TICKETS);
     return allTickets ? allTickets.filter(t => t.clientId === id) as MockTicket[] : [];
@@ -251,6 +337,7 @@ export default function ClientDetailPage() {
   const [usagePeakRamMb, setUsagePeakRamMb] = useState('');
   const [usageStatusNote, setUsageStatusNote] = useState('');
   const [usageSaving, setUsageSaving] = useState(false);
+  const [previewUsageReport, setPreviewUsageReport] = useState<MockClientUsageReport | null>(null);
 
   // Form Refs & Error States for validation focus / anchoring
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -2349,6 +2436,8 @@ export default function ClientDetailPage() {
                 <div className="space-y-2 mt-2">
                   {usageReports.map((report) => {
                     const monthLabel = new Date(`${report.month}-01`).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                    const resolvedTier = getActiveHostingTier();
+                    const limits = TIER_LIMITS[resolvedTier] || TIER_LIMITS.none;
                     return (
                       <div key={report.id} className="p-3.5 rounded-xl border border-border bg-muted/10 hover:border-foreground/15 transition-colors">
                         <div className="flex justify-between items-start gap-3">
@@ -2362,29 +2451,22 @@ export default function ClientDetailPage() {
                               )}
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2.5 text-[11px] text-muted-foreground">
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Visits</span>
-                                <span className="font-semibold text-foreground tabular-nums">{report.visits.toLocaleString()}</span>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Bandwidth</span>
-                                <span className="font-semibold text-foreground tabular-nums">{report.bandwidthGb.toFixed(2)} GB</span>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Storage</span>
-                                <span className="font-semibold text-foreground tabular-nums">{report.storageGb.toFixed(2)} GB</span>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Peak CPU</span>
-                                <span className="font-semibold text-foreground tabular-nums">{report.peakCpuCores.toFixed(2)} vCPU</span>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Peak RAM</span>
-                                <span className="font-semibold text-foreground tabular-nums">{report.peakRamMb} MB</span>
-                              </div>
+                              {renderMetricCell('Visits', report.visits, limits.visits, (v) => v.toLocaleString())}
+                              {renderMetricCell('Bandwidth', report.bandwidthGb, limits.bandwidthGb, (v) => `${v.toFixed(2)} GB`)}
+                              {renderMetricCell('Storage', report.storageGb, limits.storageGb, (v) => `${v.toFixed(2)} GB`)}
+                              {renderMetricCell('Peak CPU', report.peakCpuCores, limits.cpuCores, (v) => `${v.toFixed(2)} vCPU`)}
+                              {renderMetricCell('Peak RAM', report.peakRamMb, limits.ramMb, (v) => `${v} MB`)}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewUsageReport(report)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                              title="Print Report"
+                            >
+                              <Printer size={13} />
+                            </button>
                             <button
                               type="button"
                               onClick={() => openEditUsageModal(report)}
@@ -2784,6 +2866,21 @@ export default function ClientDetailPage() {
         <ClientAgreementPreview
           client={client}
           onClose={() => setAgreementPreviewOpen(false)}
+        />
+      )}
+
+      {/* --- MONTHLY USAGE REPORT PREVIEW OVERLAY --- */}
+      {previewUsageReport && (
+        <UsageReportPreview
+          report={previewUsageReport}
+          client={{
+            name: client.name,
+            companyName: client.companyName,
+            subscriptionType: client.subscriptionType,
+          }}
+          hostingTier={getActiveHostingTier()}
+          theme={typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+          onClose={() => setPreviewUsageReport(null)}
         />
       )}
 
