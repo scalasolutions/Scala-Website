@@ -1,6 +1,6 @@
 import React from 'react';
 import { InvoicePageHeader, InvoicePageFooter } from './InvoicePageHeader';
-import { InvoiceLineItem, formatCurrencyIDR, formatDateClean } from './invoice-types';
+import { InvoiceLineItem, PaymentMilestone, formatCurrencyIDR, formatDateClean } from './invoice-types';
 
 interface InvoiceBillingPageProps {
   companyName: string;
@@ -23,6 +23,7 @@ interface InvoiceBillingPageProps {
   receivedBy?: 'company' | 'fredrick' | 'nicholas';
   invoiceSubtotal?: number;
   isDpCollection?: boolean;
+  paymentMilestonesJson?: string | null;
 }
 
 const renderBankDetailsTable = (bank: 'BCA' | 'BNI', amount: number) => {
@@ -86,7 +87,13 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
   receivedBy = 'company',
   invoiceSubtotal,
   isDpCollection = false,
+  paymentMilestonesJson,
 }) => {
+  const parsedMilestones: PaymentMilestone[] = (() => {
+    if (!paymentMilestonesJson) return [];
+    try { return JSON.parse(paymentMilestonesJson) as PaymentMilestone[]; } catch { return []; }
+  })();
+  const hasMilestones = isDpCollection && parsedMilestones.length > 0;
   const subtotal = invoiceSubtotal !== undefined ? invoiceSubtotal : lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   let discountAmount = 0;
   if (discountType === 'percentage' && discountValue) {
@@ -304,32 +311,78 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
               </div>
             )}
 
-            {/* UNPAID STATE (DP Collection): Side-by-side cards */}
+            {/* UNPAID STATE (DP Collection): Milestone schedule or legacy 50/50 */}
             {isDpCollection && status !== 'paid' && status !== 'written_off' && status !== 'partially_paid' && (() => {
+              if (hasMilestones) {
+                const activeMilestone = parsedMilestones.find(m => m.status === 'unpaid');
+                const activeAmount = activeMilestone ? Math.round(total * activeMilestone.percentage / 100) : 0;
+                return (
+                  <div style={{ display: 'flex', gap: 24, width: '100%', alignItems: 'stretch', justifyContent: 'center' }}>
+                    {/* Left: Bank details for active milestone */}
+                    <div style={{ flex: 7, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderTop: '4px solid #CEF84E', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 4 }}>
+                        Payment Instructions
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#475569', lineHeight: '1.5' }}>
+                        Please transfer to pay{activeMilestone ? ` the ${activeMilestone.label} (${activeMilestone.percentage}%)` : ''}:
+                      </div>
+                      {receivedBy === 'company' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                          {renderBankDetailsTable('BCA', activeAmount)}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
+                            <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.12em', textTransform: 'uppercase' }}>OR</span>
+                            <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
+                          </div>
+                          {renderBankDetailsTable('BNI', activeAmount)}
+                        </div>
+                      ) : (
+                        <div>{receivedBy === 'nicholas' ? renderBankDetailsTable('BCA', activeAmount) : renderBankDetailsTable('BNI', activeAmount)}</div>
+                      )}
+                    </div>
+                    {/* Right: Payment schedule */}
+                    <div style={{ flex: 5, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderTop: '4px solid #475569', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: 6 }}>
+                        Payment Schedule
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {parsedMilestones.map((m, idx) => {
+                          const isPaid = m.status === 'paid';
+                          const isDue = !isPaid && m.id === activeMilestone?.id;
+                          const amt = Math.round(total * m.percentage / 100);
+                          return (
+                            <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 12 }}>
+                              <span style={{ color: isPaid ? '#10b981' : isDue ? '#ef4444' : '#94a3b8', fontWeight: 600 }}>
+                                {idx + 1}. {m.label} ({m.percentage}%)
+                                <span style={{ display: 'block', fontSize: 9.5, fontWeight: 700, marginTop: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                  {isPaid ? '✓ Paid' : isDue ? 'Due Now' : 'Upcoming'}
+                                </span>
+                              </span>
+                              <span style={{ color: isPaid ? '#10b981' : isDue ? '#ef4444' : '#94a3b8', fontWeight: 700 }}>
+                                {formatCurrencyIDR(amt)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, borderTop: '1px solid #cbd5e1', paddingTop: 10, marginTop: 4 }}>
+                          <span style={{ color: '#1e293b', fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Amount Due Now</span>
+                          <span style={{ color: '#ef4444', fontWeight: 800, fontSize: 14 }}>{formatCurrencyIDR(activeAmount)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Legacy fallback: 50/50
               const dpAmount = Math.round(total * 0.5);
               const balanceDue = total - dpAmount;
-
               return (
                 <div style={{ display: 'flex', gap: 24, width: '100%', alignItems: 'stretch', justifyContent: 'center' }}>
-                  {/* Left Side: Bank Details Card */}
-                  <div
-                    style={{
-                      flex: 7,
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderTop: '4px solid #CEF84E',
-                      borderRadius: '12px',
-                      padding: '18px 20px',
-                      boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                    }}
-                  >
+                  <div style={{ flex: 7, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderTop: '4px solid #CEF84E', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 4 }}>
                       Payment Instructions
                     </div>
-
                     <div style={{ fontSize: 11.5, color: '#475569', lineHeight: '1.5' }}>
                       Please transfer to the following account to pay the required 50% Down Payment (DP):
                     </div>
@@ -344,75 +397,31 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
                         {renderBankDetailsTable('BNI', dpAmount)}
                       </div>
                     ) : (
-                      <div>
-                        {receivedBy === 'nicholas' ? renderBankDetailsTable('BCA', dpAmount) : renderBankDetailsTable('BNI', dpAmount)}
-                      </div>
+                      <div>{receivedBy === 'nicholas' ? renderBankDetailsTable('BCA', dpAmount) : renderBankDetailsTable('BNI', dpAmount)}</div>
                     )}
                   </div>
-
-                  {/* Right Side: Payment Details Card */}
-                  <div
-                    style={{
-                      flex: 5,
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderTop: '4px solid #475569',
-                      borderRadius: '12px',
-                      padding: '18px 20px',
-                      boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                    }}
-                  >
+                  <div style={{ flex: 5, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderTop: '4px solid #475569', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 8px -1px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: 6 }}>
                       Down Payment Breakdown
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {/* DP Required Row */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 12.5 }}>
                         <span style={{ color: '#334155', fontWeight: 600 }}>
                           Down Payment (50%)
-                          <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
-                            Required to start project
-                          </span>
+                          <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>Required to start project</span>
                         </span>
-                        <span style={{ color: '#1e293b', fontWeight: 700 }}>
-                          {formatCurrencyIDR(dpAmount)}
-                        </span>
+                        <span style={{ color: '#1e293b', fontWeight: 700 }}>{formatCurrencyIDR(dpAmount)}</span>
                       </div>
-
-                      {/* Remaining Balance Row */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 12.5 }}>
                         <span style={{ color: '#334155', fontWeight: 600 }}>
                           Remaining Balance
-                          <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
-                            Due upon completion
-                          </span>
+                          <span style={{ display: 'block', fontSize: 10, color: '#64748b', fontWeight: 400, marginTop: 2 }}>Due upon completion</span>
                         </span>
-                        <span style={{ color: '#64748b', fontWeight: 700 }}>
-                          {formatCurrencyIDR(balanceDue)}
-                        </span>
+                        <span style={{ color: '#64748b', fontWeight: 700 }}>{formatCurrencyIDR(balanceDue)}</span>
                       </div>
-
-                      {/* Amount Due Now Row */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontSize: 12.5,
-                          borderTop: '1px solid #cbd5e1',
-                          paddingTop: 10,
-                          marginTop: 4,
-                        }}
-                      >
-                        <span style={{ color: '#1e293b', fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>
-                          Amount Due Now
-                        </span>
-                        <span style={{ color: '#ef4444', fontWeight: 800, fontSize: 14 }}>
-                          {formatCurrencyIDR(dpAmount)}
-                        </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, borderTop: '1px solid #cbd5e1', paddingTop: 10, marginTop: 4 }}>
+                        <span style={{ color: '#1e293b', fontWeight: 800, textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Amount Due Now</span>
+                        <span style={{ color: '#ef4444', fontWeight: 800, fontSize: 14 }}>{formatCurrencyIDR(dpAmount)}</span>
                       </div>
                     </div>
                   </div>

@@ -42,7 +42,7 @@ import {
   getCachedLinePresets,
   getCachedPagePresets,
 } from '@/lib/data-cache';
-import { InvoiceLineItem, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
+import { InvoiceLineItem, PaymentMilestone, formatCurrencyIDR, getStatusBadge } from './components/invoice-types';
 import { InvoicePreview } from './components/InvoicePreview';
 import { RecordPaymentModal } from './components/RecordPaymentModal';
 import { RevertPaymentModal } from './components/RevertPaymentModal';
@@ -197,6 +197,10 @@ export default function InvoicesPage() {
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'none'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [isDpCollection, setIsDpCollection] = useState(false);
+  const [milestones, setMilestones] = useState<PaymentMilestone[]>([
+    { id: crypto.randomUUID(), label: 'Down Payment', percentage: 50, status: 'unpaid' },
+    { id: crypto.randomUUID(), label: 'Final Payment', percentage: 50, status: 'unpaid' },
+  ]);
 
   // Partially paid fields
   const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -312,6 +316,22 @@ export default function InvoicesPage() {
     }
 
     setIsDpCollection(invoice.isDpCollection || false);
+
+    if (invoice.paymentMilestonesJson) {
+      try {
+        setMilestones(JSON.parse(invoice.paymentMilestonesJson) as PaymentMilestone[]);
+      } catch {
+        setMilestones([
+          { id: crypto.randomUUID(), label: 'Down Payment', percentage: 50, status: 'unpaid' },
+          { id: crypto.randomUUID(), label: 'Final Payment', percentage: 50, status: 'unpaid' },
+        ]);
+      }
+    } else {
+      setMilestones([
+        { id: crypto.randomUUID(), label: 'Down Payment', percentage: 50, status: 'unpaid' },
+        { id: crypto.randomUUID(), label: 'Final Payment', percentage: 50, status: 'unpaid' },
+      ]);
+    }
 
     setPasteMode(false);
     setPastedText('');
@@ -552,6 +572,10 @@ export default function InvoicesPage() {
     setProofOfPaymentUrl('');
     setReceivedBy('company');
     setIsDpCollection(false);
+    setMilestones([
+      { id: crypto.randomUUID(), label: 'Down Payment', percentage: 50, status: 'unpaid' },
+      { id: crypto.randomUUID(), label: 'Final Payment', percentage: 50, status: 'unpaid' },
+    ]);
     setLineItems([
       {
         name: 'Starter Company Profile Package',
@@ -572,10 +596,12 @@ export default function InvoicesPage() {
   // ── Create or Edit invoice ─────────────────────────────────────────
   const handleCreateOrEditInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
+    const milestoneTotal = milestones.reduce((s, m) => s + m.percentage, 0);
     if (
       !selectedClientId ||
       !invoiceNumber ||
-      lineItems.some((i) => !i.name || i.price <= 0)
+      lineItems.some((i) => !i.name || i.price <= 0) ||
+      (isDpCollection && milestoneTotal !== 100)
     )
       return;
 
@@ -598,6 +624,7 @@ export default function InvoicesPage() {
             proofOfPaymentUrl: proofOfPaymentUrl || null,
             receivedBy,
             isDpCollection,
+            paymentMilestonesJson: isDpCollection ? JSON.stringify(milestones) : null,
           });
 
           if (updatedInv) {
@@ -637,6 +664,7 @@ export default function InvoicesPage() {
             proofOfPaymentUrl: proofOfPaymentUrl || null,
             receivedBy,
             isDpCollection,
+            paymentMilestonesJson: isDpCollection ? JSON.stringify(milestones) : null,
           });
 
           if (newInv) {
@@ -1231,22 +1259,88 @@ export default function InvoicesPage() {
                           <div className="sm:col-span-2 flex items-center justify-between p-3.5 rounded-xl border border-border bg-muted/10">
                             <div className="space-y-0.5">
                               <label className="text-xs font-semibold text-foreground">
-                                Down Payment (DP) Invoice
+                                Custom Payment Schedule
                               </label>
                               <p className="text-[10px] text-muted-foreground">
-                                Enable to automatically calculate 50% Down Payment (DP) collection details for the client.
+                                Enable to define a multi-stage payment schedule with custom milestones.
                               </p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={isDpCollection}
-                                onChange={(e) => setIsDpCollection(e.target.checked)}
+                                onChange={(e) => {
+                                  setIsDpCollection(e.target.checked);
+                                  if (e.target.checked && milestones.length === 0) {
+                                    setMilestones([
+                                      { id: crypto.randomUUID(), label: 'Down Payment', percentage: 50, status: 'unpaid' },
+                                      { id: crypto.randomUUID(), label: 'Final Payment', percentage: 50, status: 'unpaid' },
+                                    ]);
+                                  }
+                                }}
                                 className="sr-only peer"
                               />
                               <div className="w-9 h-5 bg-border rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"></div>
                             </label>
                           </div>
+
+                          {isDpCollection && (() => {
+                            const milestoneTotal = milestones.reduce((s, m) => s + m.percentage, 0);
+                            const totalOk = milestoneTotal === 100;
+                            return (
+                              <div className="sm:col-span-2 animate-fade-in-scale space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                    Payment Stages
+                                  </label>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${totalOk ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                                    Total: {milestoneTotal}%{totalOk ? ' ✓' : ' — must equal 100%'}
+                                  </span>
+                                </div>
+                                <div className="space-y-2">
+                                  {milestones.map((m, idx) => (
+                                    <div key={m.id} className="flex items-center gap-2">
+                                      <span className="text-[10px] text-muted-foreground w-4 shrink-0">{idx + 1}.</span>
+                                      <input
+                                        type="text"
+                                        value={m.label}
+                                        onChange={(e) => setMilestones(prev => prev.map(x => x.id === m.id ? { ...x, label: e.target.value } : x))}
+                                        placeholder="Stage label"
+                                        className="flex-1 h-8 rounded-lg bg-background border border-border px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 transition-colors"
+                                      />
+                                      <div className="relative flex items-center">
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={99}
+                                          value={m.percentage}
+                                          onChange={(e) => setMilestones(prev => prev.map(x => x.id === m.id ? { ...x, percentage: Number(e.target.value) || 0 } : x))}
+                                          className="w-16 h-8 rounded-lg bg-background border border-border px-2 pr-5 text-xs text-foreground font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 transition-colors text-right"
+                                        />
+                                        <span className="absolute right-2 text-[10px] text-muted-foreground pointer-events-none">%</span>
+                                      </div>
+                                      {milestones.length > 2 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setMilestones(prev => prev.filter(x => x.id !== m.id))}
+                                          className="text-muted-foreground hover:text-red-400 transition-colors shrink-0"
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setMilestones(prev => [...prev, { id: crypto.randomUUID(), label: '', percentage: 0, status: 'unpaid' }])}
+                                  className="flex items-center gap-1.5 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors mt-1"
+                                >
+                                  <PlusCircle size={12} /> Add Stage
+                                </button>
+                              </div>
+                            );
+                          })()}
 
                           {status === 'partially_paid' && (
                             <div className="sm:col-span-2 animate-fade-in-scale">

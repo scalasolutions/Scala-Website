@@ -4,6 +4,13 @@
 // importing it from here.
 export { formatCurrencyIDR } from '@/lib/utils';
 
+export interface PaymentMilestone {
+  id: string;
+  label: string;
+  percentage: number;
+  status: 'paid' | 'unpaid';
+}
+
 export interface InvoiceLineItem {
   name: string;
   description?: string;

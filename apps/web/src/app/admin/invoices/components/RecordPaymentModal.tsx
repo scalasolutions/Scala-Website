@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CreditCard, Loader2 } from 'lucide-react';
-import { MockInvoice, uploadReceiptAction, syncInvoicePayoutAction, updateInvoiceStatus } from '@/lib/db/queries';
+import { MockInvoice, uploadReceiptAction, syncInvoicePayoutAction, updateInvoiceStatus, updateInvoice } from '@/lib/db/queries';
+import { PaymentMilestone } from './invoice-types';
 import { formatCurrencyIDR } from './invoice-types';
 import { formatInputNumberIDR } from '@/lib/utils';
 import { performActualOCR, extractAmountFromFilename } from './ocr-utils';
@@ -29,6 +30,14 @@ export function RecordPaymentModal({
   const [isLoggingPayment, setIsLoggingPayment] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [paymentReceivedBy, setPaymentReceivedBy] = useState<'company' | 'fredrick' | 'nicholas'>('company');
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
+
+  const parsedMilestones: PaymentMilestone[] = (() => {
+    if (!invoice.paymentMilestonesJson) return [];
+    try { return JSON.parse(invoice.paymentMilestonesJson) as PaymentMilestone[]; } catch { return []; }
+  })();
+  const unpaidMilestones = parsedMilestones.filter(m => m.status === 'unpaid');
+  const hasMilestones = parsedMilestones.length > 0;
 
   // AI OCR States
   const [ocrScanning, setOcrScanning] = useState(false);
@@ -40,8 +49,22 @@ export function RecordPaymentModal({
 
   useEffect(() => {
     if (isOpen) {
-      setPaymentStatus(invoice.status === 'partially_paid' ? 'partially_paid' : 'paid');
-      setPaymentAmount(invoice.status === 'partially_paid' ? (invoice.amountPaid || Math.round(invoice.total * 0.5)) : invoice.total);
+      const milestones: PaymentMilestone[] = (() => {
+        if (!invoice.paymentMilestonesJson) return [];
+        try { return JSON.parse(invoice.paymentMilestonesJson) as PaymentMilestone[]; } catch { return []; }
+      })();
+      const unpaid = milestones.filter(m => m.status === 'unpaid');
+      if (unpaid.length > 0) {
+        const first = unpaid[0];
+        setSelectedMilestoneId(first.id);
+        const isLastUnpaid = unpaid.length === 1;
+        setPaymentStatus(isLastUnpaid ? 'paid' : 'partially_paid');
+        setPaymentAmount(Math.round(invoice.total * first.percentage / 100));
+      } else {
+        setSelectedMilestoneId(null);
+        setPaymentStatus(invoice.status === 'partially_paid' ? 'partially_paid' : 'paid');
+        setPaymentAmount(invoice.status === 'partially_paid' ? (invoice.amountPaid || Math.round(invoice.total * 0.5)) : invoice.total);
+      }
       setReceiptFileBase64('');
       setReceiptFileName('');
       setPaymentReceivedBy(invoice.receivedBy || 'company');
@@ -133,16 +156,27 @@ export function RecordPaymentModal({
         paymentReceivedBy
       );
 
+      // Update milestone status if a milestone was selected
+      let updatedMilestonesJson = invoice.paymentMilestonesJson ?? null;
+      if (updated && selectedMilestoneId && parsedMilestones.length > 0) {
+        const newMilestones = parsedMilestones.map(m =>
+          m.id === selectedMilestoneId ? { ...m, status: 'paid' as const } : m
+        );
+        updatedMilestonesJson = JSON.stringify(newMilestones);
+        await updateInvoice(invoice.id, { paymentMilestonesJson: updatedMilestonesJson });
+      }
+
       if (updated) {
         // Log smart payout if payment received by a founder personally (Self-healing auto-sync)
         await syncInvoicePayoutAction(invoice.invoiceNumber, paymentReceivedBy, finalAmountPaid, new Date());
-        
+
         onPaymentRecorded({
           ...invoice,
           status: paymentStatus,
           amountPaid: finalAmountPaid,
           proofOfPaymentUrl: receiptUrl || invoice.proofOfPaymentUrl,
           receivedBy: paymentReceivedBy,
+          paymentMilestonesJson: updatedMilestonesJson,
           paidAt: paymentStatus === 'paid' ? new Date() : null,
           updatedAt: new Date()
         });
@@ -184,39 +218,69 @@ export function RecordPaymentModal({
         </div>
 
         <div className="space-y-4">
-          {/* Payment Type selection */}
+          {/* Payment Type / Milestone selection */}
           <div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-              Payment Type
+              {hasMilestones ? 'Select Milestone' : 'Payment Type'}
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setPaymentStatus('paid');
-                  setPaymentAmount(invoice.total);
-                }}
-                className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${paymentStatus === 'paid'
-                  ? 'bg-primary/10 border-primary text-primary'
-                  : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'
-                  }`}
-              >
-                Full Payment (100%)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPaymentStatus('partially_paid');
-                  setPaymentAmount(Math.round(invoice.total * 0.5)); // Default to 50% Down Payment
-                }}
-                className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${paymentStatus === 'partially_paid'
-                  ? 'bg-primary/10 border-primary text-primary'
-                  : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'
-                  }`}
-              >
-                Partial Payment (Milestone)
-              </button>
-            </div>
+            {hasMilestones ? (
+              <div className="space-y-2">
+                {unpaidMilestones.map((m) => {
+                  const amt = Math.round(invoice.total * m.percentage / 100);
+                  const isLastUnpaid = unpaidMilestones.length === 1;
+                  const isSelected = selectedMilestoneId === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMilestoneId(m.id);
+                        setPaymentStatus(isLastUnpaid ? 'paid' : 'partially_paid');
+                        setPaymentAmount(amt);
+                      }}
+                      className={`w-full flex items-center justify-between py-2 px-3 border text-xs transition-all cursor-pointer font-bold rounded-lg ${isSelected ? 'bg-primary/10 border-primary text-primary' : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'}`}
+                    >
+                      <span>{m.label} ({m.percentage}%){isLastUnpaid ? ' — Full Settlement' : ''}</span>
+                      <span className="font-mono">{amt.toLocaleString('id-ID')}</span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMilestoneId(null);
+                    setPaymentStatus('paid');
+                    setPaymentAmount(invoice.total);
+                  }}
+                  className={`w-full py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${selectedMilestoneId === null && paymentStatus === 'paid' ? 'bg-primary/10 border-primary text-primary' : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'}`}
+                >
+                  Full Payment (100%) — Mark All Paid
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentStatus('paid');
+                    setPaymentAmount(invoice.total);
+                  }}
+                  className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${paymentStatus === 'paid' ? 'bg-primary/10 border-primary text-primary' : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'}`}
+                >
+                  Full Payment (100%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentStatus('partially_paid');
+                    setPaymentAmount(Math.round(invoice.total * 0.5));
+                  }}
+                  className={`py-2 px-3 border text-xs capitalize transition-all cursor-pointer font-bold rounded-lg ${paymentStatus === 'partially_paid' ? 'bg-primary/10 border-primary text-primary' : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted'}`}
+                >
+                  Partial Payment (Milestone)
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Amount input for partial payment */}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { InvoicePageHeader, InvoicePageFooter } from './InvoicePageHeader';
+import { PaymentMilestone } from './invoice-types';
 
 interface InvoiceTCPage2Props {
   companyName: string;
@@ -10,6 +11,7 @@ interface InvoiceTCPage2Props {
   totalPages: number;
   htmlContent?: string;
   websiteAddress?: string | null;
+  paymentMilestonesJson?: string | null;
 }
 
 const TcSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -71,7 +73,12 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
   totalPages,
   htmlContent,
   websiteAddress,
+  paymentMilestonesJson,
 }) => {
+  const parsedMilestones: PaymentMilestone[] = (() => {
+    if (!paymentMilestonesJson) return [];
+    try { return JSON.parse(paymentMilestonesJson) as PaymentMilestone[]; } catch { return []; }
+  })();
   return (
     <div className="invoice-print-page" style={pageStyle}>
       <InvoicePageHeader
@@ -169,12 +176,24 @@ export const InvoiceTCPage2: React.FC<InvoiceTCPage2Props> = ({
 
             {/* 6. Payment Terms */}
             <TcSection title="6. Payment Terms">
-              <TcBody>
-                50% Down Payment (DP) is required before project scheduling and development begins.
-              </TcBody>
-              <TcBody>
-                Remaining 50% payment must be completed before final handoff and website launch.
-              </TcBody>
+              {parsedMilestones.length > 0 ? (
+                <>
+                  {parsedMilestones.map((m, idx) => (
+                    <TcBody key={m.id}>
+                      {idx + 1}. {m.percentage}% {m.label} — {idx === 0 ? 'required before project scheduling and development begins' : idx === parsedMilestones.length - 1 ? 'must be completed before final handoff and website launch' : 'due upon reaching the agreed project milestone'}.
+                    </TcBody>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <TcBody>
+                    50% Down Payment (DP) is required before project scheduling and development begins.
+                  </TcBody>
+                  <TcBody>
+                    Remaining 50% payment must be completed before final handoff and website launch.
+                  </TcBody>
+                </>
+              )}
               <TcBody>Development can only begin after:</TcBody>
               <TcNumbered
                 items={[

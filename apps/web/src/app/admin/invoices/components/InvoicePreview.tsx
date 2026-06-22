@@ -499,14 +499,16 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     activePages.push({ key: 'cover', label: 'Cover' });
   }
 
-  // 3. Page Presets (Default + Custom) are optional
+  // 3. Page Presets (Default + Custom) are optional — skip keys already added (e.g. 'cover')
+  const usedPageKeys = new Set(activePages.map(p => p.key));
   pagePresets.forEach(preset => {
-    if (includedPageKeys.includes(preset.pageKey)) {
+    if (includedPageKeys.includes(preset.pageKey) && !usedPageKeys.has(preset.pageKey)) {
       activePages.push({
         key: preset.pageKey,
         label: getPageTitle(preset.pageKey),
         content: preset.content,
       });
+      usedPageKeys.add(preset.pageKey);
     }
   });
 
@@ -749,6 +751,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   showPayments={chunk.showPayments}
                   receivedBy={invoice.receivedBy}
                   isDpCollection={previewIsDpCollection}
+                  paymentMilestonesJson={invoice.paymentMilestonesJson ?? null}
                 />
               );
             } else if (page.key === 'cover') {
@@ -770,6 +773,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 <InvoiceTCPage2
                   {...sharedProps}
                   htmlContent={page.content}
+                  paymentMilestonesJson={invoice.paymentMilestonesJson ?? null}
                 />
               );
             } else {
