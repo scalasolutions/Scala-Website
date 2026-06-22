@@ -67,6 +67,7 @@ export interface MockInvoice {
   receivedBy: 'company' | 'fredrick' | 'nicholas';
   isDpCollection: boolean;
   paymentMilestonesJson?: string | null;
+  hostingTier?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -455,6 +456,7 @@ export async function createInvoice(data: schema.NewInvoice) {
     receivedBy: data.receivedBy as any || 'company',
     isDpCollection: data.isDpCollection || false,
     paymentMilestonesJson: data.paymentMilestonesJson || null,
+    hostingTier: data.hostingTier || null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -560,6 +562,7 @@ export async function updateInvoice(id: string, data: Partial<schema.NewInvoice>
       includedPagesJson: data.includedPagesJson !== undefined ? data.includedPagesJson : mockInvoices[idx].includedPagesJson,
       isDpCollection: data.isDpCollection !== undefined ? data.isDpCollection : mockInvoices[idx].isDpCollection,
       paymentMilestonesJson: data.paymentMilestonesJson !== undefined ? data.paymentMilestonesJson : mockInvoices[idx].paymentMilestonesJson,
+      hostingTier: data.hostingTier !== undefined ? data.hostingTier : mockInvoices[idx].hostingTier,
       updatedAt: new Date()
     } as MockInvoice;
     return mockInvoices[idx];

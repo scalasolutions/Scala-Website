@@ -66,6 +66,7 @@ export const invoices = pgTable('invoices', {
   receivedBy: text('received_by').notNull().default('company'), // 'company' | 'fredrick' | 'nicholas'
   isDpCollection: boolean('is_dp_collection').notNull().default(false),
   paymentMilestonesJson: text('payment_milestones_json'),
+  hostingTier: text('hosting_tier'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

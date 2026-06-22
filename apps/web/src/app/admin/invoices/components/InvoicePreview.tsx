@@ -21,6 +21,7 @@ import { InvoiceCoverPage } from './InvoiceCoverPage';
 import { InvoiceTCPage1 } from './InvoiceTCPage1';
 import { InvoiceTCPage2 } from './InvoiceTCPage2';
 import { InvoiceBillingPage } from './InvoiceBillingPage';
+import { InvoiceSLAHostingPage } from './InvoiceSLAHostingPage';
 
 // ── Layout constants ─────────────────────────────────────────
 const PAGE_W = 800;
@@ -469,6 +470,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
     if (key === 'tc1') return 'T&C Page 1';
     if (key === 'tc2') return 'T&C Page 2';
+    if (key === 'sla_hosting') return 'SLA & Hosting';
     if (key.startsWith('custom_')) {
       return key.replace('custom_', '').replace(/_/g, ' ');
     }
@@ -497,6 +499,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   // 2. Cover is optional
   if (includedPageKeys.includes('cover')) {
     activePages.push({ key: 'cover', label: 'Cover' });
+  }
+
+  // 2b. SLA & Hosting page (hardcoded, not from DB presets)
+  if (includedPageKeys.includes('sla_hosting')) {
+    activePages.push({ key: 'sla_hosting', label: 'SLA & Hosting' });
   }
 
   // 3. Page Presets (Default + Custom) are optional — skip keys already added (e.g. 'cover')
@@ -774,6 +781,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                   {...sharedProps}
                   htmlContent={page.content}
                   paymentMilestonesJson={invoice.paymentMilestonesJson ?? null}
+                />
+              );
+            } else if (page.key === 'sla_hosting') {
+              pageComponent = (
+                <InvoiceSLAHostingPage
+                  {...sharedProps}
+                  hostingTier={invoice.hostingTier ?? 'none'}
                 />
               );
             } else {

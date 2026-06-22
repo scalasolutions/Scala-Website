@@ -194,6 +194,7 @@ export default function InvoicesPage() {
   >('draft');
   const [dueDate, setDueDate] = useState('');
   const [hostingType, setHostingType] = useState<'static' | 'dynamic' | 'none'>('none');
+  const [hostingTier, setHostingTier] = useState<'none' | 'static' | 'dynamic_basic' | 'dynamic_growth' | 'business'>('none');
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'none'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [isDpCollection, setIsDpCollection] = useState(false);
@@ -302,6 +303,7 @@ export default function InvoicesPage() {
       setHostingType('none');
     }
 
+    setHostingTier((invoice.hostingTier as any) || 'none');
     setDiscountType(invoice.discountType || 'none');
     setDiscountValue(invoice.discountValue || 0);
 
@@ -566,6 +568,7 @@ export default function InvoicesPage() {
     setSelectedClientId('');
     setStatus('draft');
     setHostingType('none');
+    setHostingTier('none');
     setDiscountType('none');
     setDiscountValue(0);
     setAmountPaid(0);
@@ -625,6 +628,7 @@ export default function InvoicesPage() {
             receivedBy,
             isDpCollection,
             paymentMilestonesJson: isDpCollection ? JSON.stringify(milestones) : null,
+            hostingTier,
           });
 
           if (updatedInv) {
@@ -665,6 +669,7 @@ export default function InvoicesPage() {
             receivedBy,
             isDpCollection,
             paymentMilestonesJson: isDpCollection ? JSON.stringify(milestones) : null,
+            hostingTier,
           });
 
           if (newInv) {
@@ -1489,6 +1494,31 @@ export default function InvoicesPage() {
                           </p>
                         </div>
 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                          <Select
+                            label="Hosting tier (for SLA page)"
+                            value={hostingTier}
+                            onChange={(e) => {
+                              const tier = e.target.value as typeof hostingTier;
+                              setHostingTier(tier);
+                              if (tier !== 'none') {
+                                setIncludedPages((prev) =>
+                                  prev.includes('sla_hosting') ? prev : [...prev, 'sla_hosting']
+                                );
+                              }
+                            }}
+                          >
+                            <option value="none">None</option>
+                            <option value="static">Static Hosting · Rp150.000/mo</option>
+                            <option value="dynamic_basic">Dynamic Basic · Rp350.000/mo</option>
+                            <option value="dynamic_growth">Dynamic Growth · Rp750.000/mo</option>
+                            <option value="business">Business Hosting · Rp1.000.000/mo</option>
+                          </Select>
+                          <p className="text-xs text-muted-foreground leading-relaxed sm:mt-7">
+                            Sets the hosting tier displayed on the SLA &amp; Hosting Agreement page of the invoice PDF.
+                          </p>
+                        </div>
+
                         {hostingType !== 'none' && hostingItem && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start rounded-xl border border-border bg-muted/10 p-4 animate-fade-in-scale">
                             {/* Custom monthly price */}
@@ -1929,6 +1959,26 @@ export default function InvoicesPage() {
                                 />
                                 <span className="text-xs text-foreground">
                                   {getPageTitle('cover')}
+                                </span>
+                              </label>
+
+                              <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/40 cursor-pointer transition-colors select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={includedPages.includes('sla_hosting')}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setIncludedPages((prev) => [...prev, 'sla_hosting']);
+                                    } else {
+                                      setIncludedPages((prev) =>
+                                        prev.filter((p) => p !== 'sla_hosting')
+                                      );
+                                    }
+                                  }}
+                                  className="accent-primary"
+                                />
+                                <span className="text-xs text-foreground">
+                                  SLA &amp; Hosting
                                 </span>
                               </label>
 
