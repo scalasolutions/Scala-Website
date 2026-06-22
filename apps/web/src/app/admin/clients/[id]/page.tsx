@@ -33,7 +33,13 @@ import {
   MoreHorizontal,
   Plus,
   Trash2,
-  ClipboardList
+  ClipboardList,
+  BarChart2,
+  Info,
+  TrendingUp,
+  HardDrive,
+  Cpu,
+  MemoryStick
 } from 'lucide-react';
 import { ClientAgreementPreview } from '../components/ClientAgreementPreview';
 import { DeleteClientModal } from '../components/DeleteClientModal';
@@ -49,10 +55,15 @@ import {
   MockInvoice,
   MockTicket,
   MockPartner,
+  MockClientUsageReport,
   getClientTasks,
   createClientTask,
   updateClientTask,
-  deleteClientTask
+  deleteClientTask,
+  getClientUsageReports,
+  createClientUsageReport,
+  updateClientUsageReport,
+  deleteClientUsageReport
 } from '@/lib/db/queries';
 import {
   invalidateCache,
@@ -225,7 +236,21 @@ export default function ClientDetailPage() {
   const [activeTaskTab, setActiveTaskTab] = useState<'board' | 'timeline'>('board');
 
   // Main Navigation Tab State
-  const [activeMainTab, setActiveMainTab] = useState<'board' | 'maintenance' | 'hosting' | 'billing' | 'tickets'>('board');
+  const [activeMainTab, setActiveMainTab] = useState<'board' | 'maintenance' | 'hosting' | 'billing' | 'tickets' | 'usage'>('board');
+
+  // Usage Reports State
+  const [usageReports, setUsageReports] = useState<MockClientUsageReport[]>([]);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageModalOpen, setUsageModalOpen] = useState(false);
+  const [editingUsageReport, setEditingUsageReport] = useState<MockClientUsageReport | null>(null);
+  const [usageMonth, setUsageMonth] = useState('');
+  const [usageVisits, setUsageVisits] = useState('');
+  const [usageBandwidthGb, setUsageBandwidthGb] = useState('');
+  const [usageStorageGb, setUsageStorageGb] = useState('');
+  const [usagePeakCpuCores, setUsagePeakCpuCores] = useState('');
+  const [usagePeakRamMb, setUsagePeakRamMb] = useState('');
+  const [usageStatusNote, setUsageStatusNote] = useState('');
+  const [usageSaving, setUsageSaving] = useState(false);
 
   // Form Refs & Error States for validation focus / anchoring
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -665,10 +690,95 @@ export default function ClientDetailPage() {
     loadClientData();
   }, [id]);
 
+  // Load usage reports when usage tab is activated
+  useEffect(() => {
+    if (activeMainTab !== 'usage' || !id) return;
+    setUsageLoading(true);
+    getClientUsageReports(id).then((reports) => {
+      setUsageReports(reports as MockClientUsageReport[]);
+    }).catch(console.error).finally(() => setUsageLoading(false));
+  }, [activeMainTab, id]);
+
+  const openCreateUsageModal = () => {
+    setEditingUsageReport(null);
+    const now = new Date();
+    setUsageMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+    setUsageVisits('');
+    setUsageBandwidthGb('');
+    setUsageStorageGb('');
+    setUsagePeakCpuCores('');
+    setUsagePeakRamMb('');
+    setUsageStatusNote('');
+    setUsageModalOpen(true);
+  };
+
+  const openEditUsageModal = (report: MockClientUsageReport) => {
+    setEditingUsageReport(report);
+    setUsageMonth(report.month);
+    setUsageVisits(String(report.visits));
+    setUsageBandwidthGb(String(report.bandwidthGb));
+    setUsageStorageGb(String(report.storageGb));
+    setUsagePeakCpuCores(String(report.peakCpuCores));
+    setUsagePeakRamMb(String(report.peakRamMb));
+    setUsageStatusNote(report.statusNote || '');
+    setUsageModalOpen(true);
+  };
+
+  const handleSaveUsageReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usageMonth) return;
+    setUsageSaving(true);
+    try {
+      if (editingUsageReport) {
+        const updated = await updateClientUsageReport(editingUsageReport.id, {
+          month: usageMonth,
+          visits: Number(usageVisits) || 0,
+          bandwidthGb: parseFloat(usageBandwidthGb) || 0,
+          storageGb: parseFloat(usageStorageGb) || 0,
+          peakCpuCores: parseFloat(usagePeakCpuCores) || 0,
+          peakRamMb: Number(usagePeakRamMb) || 0,
+          statusNote: usageStatusNote || null,
+        });
+        if (updated) {
+          setUsageReports(prev => prev.map(r => r.id === editingUsageReport.id ? (updated as MockClientUsageReport) : r));
+        }
+      } else {
+        const created = await createClientUsageReport({
+          clientId: id,
+          month: usageMonth,
+          visits: Number(usageVisits) || 0,
+          bandwidthGb: parseFloat(usageBandwidthGb) || 0,
+          storageGb: parseFloat(usageStorageGb) || 0,
+          peakCpuCores: parseFloat(usagePeakCpuCores) || 0,
+          peakRamMb: Number(usagePeakRamMb) || 0,
+          statusNote: usageStatusNote || null,
+        });
+        if (created) {
+          setUsageReports(prev => [created as MockClientUsageReport, ...prev].sort((a, b) => b.month.localeCompare(a.month)));
+        }
+      }
+      setUsageModalOpen(false);
+    } catch (err) {
+      console.error('Failed to save usage report', err);
+    } finally {
+      setUsageSaving(false);
+    }
+  };
+
+  const handleDeleteUsageReport = async (reportId: string) => {
+    if (!confirm('Delete this usage report?')) return;
+    try {
+      await deleteClientUsageReport(reportId);
+      setUsageReports(prev => prev.filter(r => r.id !== reportId));
+    } catch (err) {
+      console.error('Failed to delete usage report', err);
+    }
+  };
+
   // Prevent background scrolling when any modal is open
   useEffect(() => {
     const mainEl = document.querySelector('main');
-    if (editModalOpen || deleteModalOpen || agreementModalOpen || maintenanceModalOpen || agreementPreviewOpen || taskModalOpen) {
+    if (editModalOpen || deleteModalOpen || agreementModalOpen || maintenanceModalOpen || agreementPreviewOpen || taskModalOpen || usageModalOpen) {
       if (mainEl) mainEl.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
     } else {
@@ -679,7 +789,7 @@ export default function ClientDetailPage() {
       if (mainEl) mainEl.style.overflow = '';
       document.body.style.overflow = '';
     };
-  }, [editModalOpen, deleteModalOpen, agreementModalOpen, maintenanceModalOpen, agreementPreviewOpen, taskModalOpen]);
+  }, [editModalOpen, deleteModalOpen, agreementModalOpen, maintenanceModalOpen, agreementPreviewOpen, taskModalOpen, usageModalOpen]);
 
   // Click-outside handler for password actions dropdown
   useEffect(() => {
@@ -1522,15 +1632,16 @@ export default function ClientDetailPage() {
                 { key: 'maintenance', label: 'Maintenance', icon: <RotateCcw size={14} />, badge: undefined as number | undefined, alert: isEnvOverdue || isStabOverdue || isExpOverdue },
                 { key: 'hosting', label: 'Hosting Plan', icon: <Layers size={14} />, badge: undefined as number | undefined, alert: false },
                 { key: 'billing', label: 'Invoices', icon: <Receipt size={14} />, badge: invoices.length, alert: false },
-                { key: 'tickets', label: 'Tickets', icon: <Ticket size={14} />, badge: tickets.length, alert: false }
+                { key: 'tickets', label: 'Tickets', icon: <Ticket size={14} />, badge: tickets.length, alert: false },
+                { key: 'usage', label: 'Usage Reports', icon: <BarChart2 size={14} />, badge: usageReports.length > 0 ? usageReports.length : undefined, alert: false }
               ]
             ).map((tab) => {
-              const isActive = activeMainTab === tab.key;
+              const isActive = activeMainTab === (tab.key as typeof activeMainTab);
               return (
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => setActiveMainTab(tab.key as any)}
+                  onClick={() => setActiveMainTab(tab.key as typeof activeMainTab)}
                   className={cn(
                     "flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer focus:outline-none",
                     isActive
@@ -2191,6 +2302,114 @@ export default function ClientDetailPage() {
               </div>
             </Card>
           )}
+          {/* Monthly Usage Reports Panel */}
+          {activeMainTab === 'usage' && (
+            <Card padding="md">
+              <SectionHeading
+                title="Monthly Resource Usage"
+                icon={<BarChart2 size={16} />}
+                action={
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<Plus size={12} />}
+                    onClick={openCreateUsageModal}
+                    className="!h-8 text-xs flex justify-center items-center"
+                  >
+                    Log Monthly Usage
+                  </Button>
+                }
+              />
+
+              {/* Admin Guide Callout */}
+              <div className="mt-4 mb-5 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-blue-400 mb-1">
+                  <Info size={14} />
+                  Where to find these metrics
+                </div>
+                <div className="space-y-1.5 text-muted-foreground leading-relaxed">
+                  <p><span className="font-semibold text-foreground/80">Railway:</span> Project dashboard → Metrics tab → Select service → Copy CPU peak, RAM peak, and outbound bandwidth.</p>
+                  <p><span className="font-semibold text-foreground/80">Vercel:</span> Project → Analytics or Monitoring tab → Copy total unique visits and data transfer (GB).</p>
+                  <p><span className="font-semibold text-foreground/80">Coolify:</span> Server dashboard → Server Monitoring graph → Read CPU/RAM peaks and storage usage.</p>
+                </div>
+              </div>
+
+              {usageLoading ? (
+                <div className="py-8 flex items-center justify-center gap-2 text-muted-foreground text-xs">
+                  <Loader2 size={14} className="animate-spin" />
+                  Loading reports…
+                </div>
+              ) : usageReports.length === 0 ? (
+                <EmptyState
+                  icon={<BarChart2 size={20} />}
+                  title="No usage reports logged"
+                  description="Click 'Log Monthly Usage' to record the first month of resource stats for this client."
+                />
+              ) : (
+                <div className="space-y-2 mt-2">
+                  {usageReports.map((report) => {
+                    const monthLabel = new Date(`${report.month}-01`).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                    return (
+                      <div key={report.id} className="p-3.5 rounded-xl border border-border bg-muted/10 hover:border-foreground/15 transition-colors">
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold text-foreground">{monthLabel}</p>
+                              {report.statusNote && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium truncate max-w-[200px]">
+                                  {report.statusNote}
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2.5 text-[11px] text-muted-foreground">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Visits</span>
+                                <span className="font-semibold text-foreground tabular-nums">{report.visits.toLocaleString()}</span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Bandwidth</span>
+                                <span className="font-semibold text-foreground tabular-nums">{report.bandwidthGb.toFixed(2)} GB</span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Storage</span>
+                                <span className="font-semibold text-foreground tabular-nums">{report.storageGb.toFixed(2)} GB</span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Peak CPU</span>
+                                <span className="font-semibold text-foreground tabular-nums">{report.peakCpuCores.toFixed(2)} vCPU</span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Peak RAM</span>
+                                <span className="font-semibold text-foreground tabular-nums">{report.peakRamMb} MB</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => openEditUsageModal(report)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                              title="Edit"
+                            >
+                              <Edit size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUsageReport(report.id)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          )}
         </div>
       </div>
 
@@ -2590,6 +2809,115 @@ export default function ClientDetailPage() {
           onCancel={handleCancelTask}
           onSubmit={handleSubmitTask}
         />
+      )}
+
+      {/* --- LOG / EDIT USAGE REPORT MODAL --- */}
+      {mounted && usageModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/85 backdrop-blur-md" onClick={() => !usageSaving && setUsageModalOpen(false)} />
+          <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
+            <div className="p-6">
+              <SectionHeading
+                title={editingUsageReport ? 'Edit Usage Report' : 'Log Monthly Usage'}
+                description="Record infrastructure resource metrics for this billing month."
+                action={
+                  <button onClick={() => !usageSaving && setUsageModalOpen(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer">
+                    <X size={16} />
+                  </button>
+                }
+              />
+              <form onSubmit={handleSaveUsageReport} className="space-y-4 mt-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Month *</label>
+                  <input
+                    type="month"
+                    required
+                    value={usageMonth}
+                    onChange={(e) => setUsageMonth(e.target.value)}
+                    className="h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Total Visits</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 5430"
+                      value={usageVisits}
+                      onChange={(e) => setUsageVisits(e.target.value)}
+                      className="h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Bandwidth Used (GB)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 12.5"
+                      value={usageBandwidthGb}
+                      onChange={(e) => setUsageBandwidthGb(e.target.value)}
+                      className="h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Storage Used (GB)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 8.2"
+                      value={usageStorageGb}
+                      onChange={(e) => setUsageStorageGb(e.target.value)}
+                      className="h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Peak CPU (vCPU)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 0.2"
+                      value={usagePeakCpuCores}
+                      onChange={(e) => setUsagePeakCpuCores(e.target.value)}
+                      className="h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Peak RAM (MB)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 380"
+                      value={usagePeakRamMb}
+                      onChange={(e) => setUsagePeakRamMb(e.target.value)}
+                      className="h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Status Note</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Optimal Performance - All resources within baseline limits"
+                    value={usageStatusNote}
+                    onChange={(e) => setUsageStatusNote(e.target.value)}
+                    className="h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:border-primary focus-visible:ring-primary/35 transition-colors"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end pt-4 border-t border-border">
+                  <Button type="button" variant="ghost" size="md" onClick={() => !usageSaving && setUsageModalOpen(false)}>Cancel</Button>
+                  <Button type="submit" variant="primary" size="md" disabled={usageSaving}>
+                    {usageSaving ? 'Saving…' : (editingUsageReport ? 'Save Changes' : 'Log Report')}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* --- TASK CARD CONTEXT MENU --- */}

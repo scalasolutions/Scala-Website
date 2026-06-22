@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, bigint, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, bigint, pgEnum, doublePrecision } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Enums
@@ -98,6 +98,7 @@ export const clientsRelations = relations(clients, ({ many }) => ({
   invoices: many(invoices),
   tickets: many(tickets),
   tasks: many(clientTasks),
+  usageReports: many(clientUsageReports),
 }));
 
 export const invoicesRelations = relations(invoices, ({ one }) => ({
@@ -198,6 +199,25 @@ export const clientTasksRelations = relations(clientTasks, ({ one }) => ({
   client: one(clients, { fields: [clientTasks.clientId], references: [clients.id] }),
 }));
 
+// 12. Client Usage Reports Table
+export const clientUsageReports = pgTable('client_usage_reports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  month: text('month').notNull(), // format 'YYYY-MM'
+  visits: integer('visits').notNull().default(0),
+  bandwidthGb: doublePrecision('bandwidth_gb').notNull().default(0),
+  storageGb: doublePrecision('storage_gb').notNull().default(0),
+  peakCpuCores: doublePrecision('peak_cpu_cores').notNull().default(0),
+  peakRamMb: integer('peak_ram_mb').notNull().default(0),
+  statusNote: text('status_note'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const clientUsageReportsRelations = relations(clientUsageReports, ({ one }) => ({
+  client: one(clients, { fields: [clientUsageReports.clientId], references: [clients.id] }),
+}));
+
 
 // Types
 export type Client = typeof clients.$inferSelect;
@@ -222,4 +242,6 @@ export type Partner = typeof partners.$inferSelect;
 export type NewPartner = typeof partners.$inferInsert;
 export type ClientTask = typeof clientTasks.$inferSelect;
 export type NewClientTask = typeof clientTasks.$inferInsert;
+export type ClientUsageReport = typeof clientUsageReports.$inferSelect;
+export type NewClientUsageReport = typeof clientUsageReports.$inferInsert;
 

@@ -1642,7 +1642,7 @@ export async function getClientPortalData() {
 
   if (isDbConfigured()) {
     try {
-      const [client, invoicesList, ticketsList] = await Promise.all([
+      const [client, invoicesList, ticketsList, usageReportsList] = await Promise.all([
         db.query.clients.findFirst({
           where: eq(schema.clients.id, clientId)
         }),
@@ -1660,13 +1660,17 @@ export async function getClientPortalData() {
             client: true,
             messages: true
           }
-        })
+        }),
+        db.select().from(schema.clientUsageReports)
+          .where(eq(schema.clientUsageReports.clientId, clientId))
+          .orderBy(desc(schema.clientUsageReports.month))
       ]);
 
       return {
         client: client || null,
         invoices: invoicesList,
-        tickets: ticketsList
+        tickets: ticketsList,
+        usageReports: usageReportsList
       };
     } catch (e) {
       console.warn("DB Query failed for getClientPortalData, falling back to mock data: ", e);
@@ -1682,7 +1686,7 @@ export async function getClientPortalData() {
       client: mockClientRecord
     }))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  
+
   const mockTicketsList = mockTickets
     .filter(t => t.clientId === clientId)
     .map(t => ({
@@ -1692,11 +1696,121 @@ export async function getClientPortalData() {
     }))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
+  const mockUsageReportsList = [...mockClientUsageReports]
+    .filter(r => r.clientId === clientId)
+    .sort((a, b) => b.month.localeCompare(a.month));
+
   return {
     client: mockClientRecord,
     invoices: mockInvoicesList,
-    tickets: mockTicketsList
+    tickets: mockTicketsList,
+    usageReports: mockUsageReportsList
   };
+}
+
+// ============================================================================
+// --- CLIENT USAGE REPORTS ---
+// ============================================================================
+
+export interface MockClientUsageReport {
+  id: string;
+  clientId: string;
+  month: string;
+  visits: number;
+  bandwidthGb: number;
+  storageGb: number;
+  peakCpuCores: number;
+  peakRamMb: number;
+  statusNote: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+let mockClientUsageReports: MockClientUsageReport[] = [];
+
+export async function getClientUsageReports(clientId: string) {
+  if (isDbConfigured()) {
+    try {
+      return await db.select().from(schema.clientUsageReports)
+        .where(eq(schema.clientUsageReports.clientId, clientId))
+        .orderBy(desc(schema.clientUsageReports.month));
+    } catch (e) {
+      console.warn("DB Query failed, falling back to mock data: ", e);
+    }
+  }
+  return [...mockClientUsageReports]
+    .filter(r => r.clientId === clientId)
+    .sort((a, b) => b.month.localeCompare(a.month));
+}
+
+export async function createClientUsageReport(data: schema.NewClientUsageReport) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.insert(schema.clientUsageReports).values(data).returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Insert failed, running mock insert: ", e);
+    }
+  }
+  const newReport: MockClientUsageReport = {
+    id: crypto.randomUUID(),
+    clientId: data.clientId,
+    month: data.month,
+    visits: data.visits ?? 0,
+    bandwidthGb: data.bandwidthGb ?? 0,
+    storageGb: data.storageGb ?? 0,
+    peakCpuCores: data.peakCpuCores ?? 0,
+    peakRamMb: data.peakRamMb ?? 0,
+    statusNote: data.statusNote ?? null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  mockClientUsageReports.push(newReport);
+  return newReport;
+}
+
+export async function updateClientUsageReport(id: string, data: Partial<schema.NewClientUsageReport>) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.update(schema.clientUsageReports)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.clientUsageReports.id, id))
+        .returning();
+      return results[0];
+    } catch (e) {
+      console.warn("DB Update failed, running mock update: ", e);
+    }
+  }
+  const idx = mockClientUsageReports.findIndex(r => r.id === id);
+  if (idx !== -1) {
+    mockClientUsageReports[idx] = {
+      ...mockClientUsageReports[idx],
+      ...data,
+      updatedAt: new Date(),
+    } as MockClientUsageReport;
+    return mockClientUsageReports[idx];
+  }
+  return null;
+}
+
+export async function deleteClientUsageReport(id: string) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.delete(schema.clientUsageReports)
+        .where(eq(schema.clientUsageReports.id, id))
+        .returning();
+      return results[0] || null;
+    } catch (e) {
+      console.warn("DB Delete failed, running mock delete: ", e);
+    }
+  }
+  const idx = mockClientUsageReports.findIndex(r => r.id === id);
+  if (idx !== -1) {
+    const deleted = mockClientUsageReports[idx];
+    mockClientUsageReports = mockClientUsageReports.filter(r => r.id !== id);
+    return deleted;
+  }
+  return null;
 }
 
 export async function getClientInvoiceDetail(invoiceId: string) {
