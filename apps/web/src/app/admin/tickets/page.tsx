@@ -27,6 +27,7 @@ import {
   MockClient,
   MockTicketMessage,
 } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import {
   invalidateCache,
   CACHE_KEYS,
@@ -218,7 +219,7 @@ export default function TicketsPage() {
           status: 'open',
         });
 
-        if (t) {
+        if (t && !isDbWriteError(t)) {
           // Immediately seed initial message inside the thread in database/mock state
           await createTicketMessage({
             ticketId: t.id,
@@ -267,7 +268,7 @@ export default function TicketsPage() {
         message: replyText.trim(),
       });
 
-      if (msg) {
+      if (msg && !isDbWriteError(msg)) {
         // Update active ticket state locally
         setActiveTicket((prev: any) => {
           if (!prev) return null;
@@ -301,7 +302,7 @@ export default function TicketsPage() {
     if (!selectedTicketId) return;
     try {
       const updated = await updateTicketStatus(selectedTicketId, status);
-      if (updated) {
+      if (updated && !isDbWriteError(updated)) {
         invalidateCache(CACHE_KEYS.TICKETS);
         // Update active ticket locally
         setActiveTicket((prev: any) => {

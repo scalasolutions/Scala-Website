@@ -56,6 +56,11 @@ export function RevertPaymentModal({
         paidAt: null, // clear paid date
       });
 
+      if (updated && 'error' in updated) {
+        console.error('Failed to revert invoice status:', updated.error);
+        return;
+      }
+
       if (updated) {
         await syncInvoicePayoutAction(invoice.invoiceNumber, invoice.receivedBy, finalAmountPaid, new Date());
         

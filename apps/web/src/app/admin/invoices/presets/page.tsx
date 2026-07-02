@@ -38,6 +38,7 @@ import {
   MockInvoiceLinePreset,
   MockInvoicePagePreset,
 } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import {
   type InvoiceLinePresetCategory,
   INVOICE_LINE_PRESET_CATEGORY_LABELS,
@@ -257,7 +258,12 @@ export default function InvoicesPresetsPage() {
 
     try {
       // 1. Save to Database/Memory state
-      await updateInvoicePagePreset(activeTab, 'full_page_html', editorHtml);
+      const saved = await updateInvoicePagePreset(activeTab, 'full_page_html', editorHtml);
+      if (isDbWriteError(saved)) {
+        console.error('Failed to save page preset:', saved.error);
+        setSaveStatus('error');
+        return;
+      }
 
       // 2. Mirror inside localStorage
       if (typeof window !== 'undefined') {
@@ -290,7 +296,12 @@ export default function InvoicesPresetsPage() {
 
     setSaving(true);
     try {
-      await deleteInvoicePagePreset(key);
+      const deleted = await deleteInvoicePagePreset(key);
+      if (isDbWriteError(deleted)) {
+        console.error('Failed to delete page preset:', deleted.error);
+        setSaveStatus('error');
+        return;
+      }
 
       if (typeof window !== 'undefined') {
         localStorage.removeItem(`scala_preset_${key}`);
@@ -341,9 +352,16 @@ export default function InvoicesPresetsPage() {
       
       // Save full HTML preset
       const newPage = await updateInvoicePagePreset(pageKey, 'full_page_html', defaultContent);
-      
+
       // Save page Title preset
       const newTitlePreset = await updateInvoicePagePreset(pageKey, 'page_title', newPageTitle.trim());
+
+      if (isDbWriteError(newPage) || isDbWriteError(newTitlePreset)) {
+        const failure = isDbWriteError(newPage) ? newPage : (newTitlePreset as { error: string });
+        console.error('Failed to create page preset:', failure.error);
+        setSaveStatus('error');
+        return;
+      }
 
       if (typeof window !== 'undefined') {
         localStorage.setItem(`scala_preset_${pageKey}`, defaultContent);
@@ -371,6 +389,11 @@ export default function InvoicesPresetsPage() {
     try {
       // 1. Update database / fallback memory state
       const updatedPreset = await updateInvoicePagePreset(renameTargetKey, 'page_title', renameTitle.trim());
+      if (isDbWriteError(updatedPreset)) {
+        console.error('Failed to rename page preset:', updatedPreset.error);
+        setSaveStatus('error');
+        return;
+      }
 
       // 2. Sync inside localStorage
       if (typeof window !== 'undefined') {
@@ -412,6 +435,11 @@ export default function InvoicesPresetsPage() {
           price: linePrice,
           description: lineDescription,
         });
+        if (isDbWriteError(newPreset)) {
+          console.error('Failed to create line preset:', newPreset.error);
+          setSaveStatus('error');
+          return;
+        }
         // TODO: persist `category` server-side once the schema migration lands.
         // For now we attach it locally so the UI can group correctly.
         const patched = { ...(newPreset as MockInvoiceLinePreset), category: lineCategory };
@@ -422,6 +450,11 @@ export default function InvoicesPresetsPage() {
           price: linePrice,
           description: lineDescription,
         });
+        if (isDbWriteError(updated)) {
+          console.error('Failed to update line preset:', updated.error);
+          setSaveStatus('error');
+          return;
+        }
         // TODO: persist `category` server-side once the schema migration lands.
         const patched = { ...(updated as MockInvoiceLinePreset), category: lineCategory };
         setLinePresets(prev => prev.map(p => (p.id === selectedLinePreset.id ? patched : p)));
@@ -436,7 +469,12 @@ export default function InvoicesPresetsPage() {
   const handleDeleteLine = async (id: string) => {
     if (!confirm('Are you sure you want to delete this line item preset?')) return;
     try {
-      await deleteInvoiceLinePreset(id);
+      const deleted = await deleteInvoiceLinePreset(id);
+      if (isDbWriteError(deleted)) {
+        console.error('Failed to delete line preset:', deleted.error);
+        setSaveStatus('error');
+        return;
+      }
       setLinePresets(prev => prev.filter(p => p.id !== id));
     } catch (e) {
       console.error('Failed to delete preset:', e);

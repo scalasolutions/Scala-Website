@@ -17,6 +17,7 @@ import {
   MockInvoice,
   MockClient,
 } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import {
   invalidateCache,
   CACHE_KEYS,
@@ -109,15 +110,20 @@ export const FinanceDashboard: React.FC = () => {
 
     startTransition(async () => {
       try {
+        let result: unknown = null;
         if (type === 'expense') {
-          await deleteExpense(id);
+          result = await deleteExpense(id);
           invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
         } else if (type === 'injection') {
-          await deleteCapitalInjection(id);
+          result = await deleteCapitalInjection(id);
           invalidateCache(CACHE_KEYS.INJECTIONS);
         } else if (type === 'payout') {
-          await deletePayout(id);
+          result = await deletePayout(id);
           invalidateCache(CACHE_KEYS.PAYOUTS);
+        }
+        if (isDbWriteError(result)) {
+          console.error(`Failed to delete ${type} entry:`, result.error);
+          return;
         }
         setConfirmDeleteOpen(false);
         setDeleteTarget(null);

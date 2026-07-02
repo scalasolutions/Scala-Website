@@ -43,6 +43,7 @@ import {
   getInvoices,
   getClientTasks,
 } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import {
   invalidateCache,
   CACHE_KEYS,
@@ -285,7 +286,7 @@ export default function ClientsPage() {
           expectationsCheckLastAt: new Date(),
         });
 
-        if (newClient) {
+        if (newClient && !isDbWriteError(newClient)) {
           mutateClients([newClient as MockClient, ...clients]);
           // Reset form fields
           setName('');
@@ -375,7 +376,7 @@ export default function ClientsPage() {
             referralRate: Number(partnerReferralRate),
             bankDetails: partnerBankDetails || null,
           });
-          if (updated) {
+          if (updated && !isDbWriteError(updated)) {
             mutatePartners(
               partners.map((p) => (p.id === updated.id ? (updated as MockPartner) : p))
             );
@@ -389,7 +390,7 @@ export default function ClientsPage() {
             referralRate: Number(partnerReferralRate),
             bankDetails: partnerBankDetails || null,
           });
-          if (created) {
+          if (created && !isDbWriteError(created)) {
             mutatePartners([created as MockPartner, ...partners]);
           }
         }
@@ -430,7 +431,11 @@ export default function ClientsPage() {
 
     startTransition(async () => {
       try {
-        await deletePartner(partnerId);
+        const deleted = await deletePartner(partnerId);
+        if (isDbWriteError(deleted)) {
+          console.error('Failed to delete partner:', deleted.error);
+          return;
+        }
         mutatePartners(partners.filter((p) => p.id !== partnerId));
         // Refresh clients — some may now show 'organic' sourcing in the background
         invalidateCache(CACHE_KEYS.CLIENTS);

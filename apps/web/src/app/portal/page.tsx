@@ -36,6 +36,7 @@ import {
   updateClient,
   MockClientUsageReport
 } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import { UsageReportPreview } from './components/UsageReportPreview';
 import Link from 'next/link';
 import { clearAllCache, getCachedSync, primeCache } from '@/lib/data-cache';
@@ -401,12 +402,16 @@ export default function ClientPortal() {
 
     setSendingMessage(true);
     try {
-      await createTicketMessage({
+      const sent = await createTicketMessage({
         ticketId: selectedTicketId,
         senderType: 'client',
         senderName: client.name,
         message: newMessage.trim(),
       });
+      if (isDbWriteError(sent)) {
+        addToast('error', 'Failed to send message. Please try again.');
+        return;
+      }
       setNewMessage('');
       
       const details = await getTicketDetails(selectedTicketId);
@@ -463,12 +468,17 @@ export default function ClientPortal() {
         priority: newTicketPriority,
         status: 'open',
       });
-      
+
+      if (isDbWriteError(newT)) {
+        addToast('error', 'Failed to create ticket. Please try again.');
+        return;
+      }
+
       setNewTicketTitle('');
       setNewTicketDesc('');
       setIsModalOpen(false);
       addToast('success', 'Support ticket created successfully!');
-      
+
       const freshData = await getClientPortalData();
       primeCache('portal:overview', freshData);
       setTickets(freshData.tickets);
@@ -507,6 +517,10 @@ export default function ClientPortal() {
         portalPassword: newPortalPassword.trim(),
         portalPasswordIsPrivate: true,
       });
+      if (isDbWriteError(updated)) {
+        addToast('error', 'Failed to change password. Please try again.');
+        return;
+      }
       if (updated) {
         setClient(updated);
         const currentCached = getCachedSync<any>('portal:overview');

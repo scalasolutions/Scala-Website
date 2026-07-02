@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { MockInvoice, deleteInvoice, syncInvoicePayoutAction } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import Button from '@/components/ui/Button';
 
 interface DeleteInvoiceModalProps {
@@ -42,6 +43,10 @@ export function DeleteInvoiceModal({
     setIsDeleting(true);
     try {
       const deleted = await deleteInvoice(invoice.id);
+      if (isDbWriteError(deleted)) {
+        console.error('Failed to delete invoice:', deleted.error);
+        return;
+      }
       if (deleted) {
         // Sync invoice payout action to company, 0
         await syncInvoicePayoutAction(invoice.invoiceNumber, 'company', 0);

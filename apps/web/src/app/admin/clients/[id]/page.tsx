@@ -47,6 +47,7 @@ import { MaintenanceIntervalsModal } from '../components/MaintenanceIntervalsMod
 import { AgreementTermsModal } from '../components/AgreementTermsModal';
 import { TaskFormModal } from '../components/TaskFormModal';
 import { UsageReportPreview } from '@/app/portal/components/UsageReportPreview';
+import { isDbWriteError } from '@/lib/db/errors';
 import {
   updateClient,
   deleteClient,
@@ -826,7 +827,7 @@ export default function ClientDetailPage() {
           peakRamMb: Number(usagePeakRamMb) || 0,
           statusNote: usageStatusNote || null,
         });
-        if (updated) {
+        if (updated && !isDbWriteError(updated)) {
           setUsageReports(prev => prev.map(r => r.id === editingUsageReport.id ? (updated as MockClientUsageReport) : r));
         }
       } else {
@@ -840,7 +841,7 @@ export default function ClientDetailPage() {
           peakRamMb: Number(usagePeakRamMb) || 0,
           statusNote: usageStatusNote || null,
         });
-        if (created) {
+        if (created && !isDbWriteError(created)) {
           setUsageReports(prev => [created as MockClientUsageReport, ...prev].sort((a, b) => b.month.localeCompare(a.month)));
         }
       }
@@ -855,7 +856,11 @@ export default function ClientDetailPage() {
   const handleDeleteUsageReport = async (reportId: string) => {
     if (!confirm('Delete this usage report?')) return;
     try {
-      await deleteClientUsageReport(reportId);
+      const deleted = await deleteClientUsageReport(reportId);
+      if (isDbWriteError(deleted)) {
+        console.error('Failed to delete usage report:', deleted.error);
+        return;
+      }
       setUsageReports(prev => prev.filter(r => r.id !== reportId));
     } catch (err) {
       console.error('Failed to delete usage report', err);
@@ -921,7 +926,7 @@ export default function ClientDetailPage() {
           category: 'technical',
           status: 'open',
         });
-        if (newT) {
+        if (newT && !isDbWriteError(newT)) {
           await createTicketMessage({
             ticketId: newT.id,
             senderType: 'client',
@@ -1068,7 +1073,7 @@ export default function ClientDetailPage() {
           sourcedBy: sourcedBy || 'organic',
         });
 
-        if (updated) {
+        if (updated && !isDbWriteError(updated)) {
           // Invalidate clients cache so next list view is fresh.
           invalidateCache(CACHE_KEYS.CLIENTS);
           setClient(updated as MockClient);
@@ -1086,7 +1091,12 @@ export default function ClientDetailPage() {
 
     setIsDeleting(true);
     try {
-      await deleteClient(client.id);
+      const deleted = await deleteClient(client.id);
+      if (isDbWriteError(deleted)) {
+        console.error('Failed to delete client account:', deleted.error);
+        setIsDeleting(false);
+        return;
+      }
       // Invalidate all related caches after deletion.
       invalidateCache(CACHE_KEYS.CLIENTS, CACHE_KEYS.INVOICES, CACHE_KEYS.TICKETS);
       setDeleteModalOpen(false);
@@ -1112,7 +1122,7 @@ export default function ClientDetailPage() {
         portalPassword: newPw,
         portalPasswordIsPrivate: false,
       });
-      if (updated) {
+      if (updated && !isDbWriteError(updated)) {
         invalidateCache(CACHE_KEYS.CLIENTS);
         setClient(updated as MockClient);
         setPortalPassword(newPw);
@@ -1138,7 +1148,7 @@ export default function ClientDetailPage() {
         portalPassword: newPasswordValue || null,
         portalPasswordIsPrivate: false,
       });
-      if (updated) {
+      if (updated && !isDbWriteError(updated)) {
         invalidateCache(CACHE_KEYS.CLIENTS);
         setClient(updated as MockClient);
         setPortalPassword(newPasswordValue);
@@ -1229,7 +1239,7 @@ export default function ClientDetailPage() {
       }
 
       const updated = await updateClient(client.id, updateData);
-      if (updated) {
+      if (updated && !isDbWriteError(updated)) {
         invalidateCache(CACHE_KEYS.CLIENTS);
         setClient(updated as MockClient);
       }
@@ -1246,7 +1256,7 @@ export default function ClientDetailPage() {
         stabilityCheckInterval: Number(stabilityCheckInterval),
         expectationsCheckInterval: Number(expectationsCheckInterval),
       });
-      if (updated) {
+      if (updated && !isDbWriteError(updated)) {
         setClient(updated as MockClient);
         setMaintenanceModalOpen(false);
       }
@@ -1264,7 +1274,7 @@ export default function ClientDetailPage() {
         tcCustomTerms: tcCustomTerms || null,
         slaCustomTerms: slaCustomTerms || null,
       });
-      if (updated) {
+      if (updated && !isDbWriteError(updated)) {
         setClient(updated as MockClient);
         setAgreementModalOpen(false);
       }

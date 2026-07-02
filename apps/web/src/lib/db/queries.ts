@@ -2,16 +2,20 @@
 
 import { db } from './index';
 import * as schema from './schema';
+import { dbWriteError, invoiceSaveError } from './errors';
 import { desc, eq, like } from 'drizzle-orm';
 import { put } from '@vercel/blob';
 import { auth } from '@/auth';
 
 // Check if a real database connection is available and configured
 const isDbConfigured = () => {
-  return typeof process !== 'undefined' && 
-         !!process.env.DATABASE_URL && 
+  return typeof process !== 'undefined' &&
+         !!process.env.DATABASE_URL &&
          process.env.DATABASE_URL !== '';
 };
+
+// Write failures return a structured { error } object instead of silently
+// falling back to the in-memory mock store — see ./errors.ts for the rationale.
 
 // ============================================================================
 // In-Memory Mock Data Fallback
@@ -163,7 +167,8 @@ export async function createClient(data: schema.NewClient) {
       const results = await db.insert(schema.clients).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newClient: MockClient = {
@@ -207,7 +212,8 @@ export async function updateClient(id: string, data: Partial<schema.NewClient>) 
         .returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockClients.findIndex(c => c.id === id);
@@ -240,7 +246,8 @@ export async function updateClientStatus(id: string, status: 'pending' | 'active
         .returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockClients.findIndex(c => c.id === id);
@@ -264,7 +271,8 @@ export async function deleteClient(id: string) {
       await db.delete(schema.clients).where(eq(schema.clients.id, id));
       return true;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   mockClientTasks = mockClientTasks.filter(t => t.clientId !== id);
@@ -325,7 +333,8 @@ export async function createClientTask(data: schema.NewClientTask) {
       const results = await db.insert(schema.clientTasks).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newRef: MockClientTask = {
@@ -358,7 +367,8 @@ export async function updateClientTask(id: string, data: Partial<schema.NewClien
         return results[0];
       }
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockClientTasks.findIndex(t => t.id === id);
@@ -394,7 +404,8 @@ export async function deleteClientTask(id: string) {
         return results[0];
       }
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockClientTasks.findIndex(t => t.id === id);
@@ -433,7 +444,8 @@ export async function createInvoice(data: schema.NewInvoice) {
       const results = await db.insert(schema.invoices).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return invoiceSaveError(e, data.invoiceNumber);
     }
   }
   const newInvoice: MockInvoice = {
@@ -495,7 +507,8 @@ export async function updateInvoiceStatus(id: string, status: 'draft' | 'issued'
         .returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockInvoices.findIndex(inv => inv.id === id);
@@ -540,7 +553,8 @@ export async function updateInvoice(id: string, data: Partial<schema.NewInvoice>
         .returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return invoiceSaveError(e, data.invoiceNumber);
     }
   }
   const idx = mockInvoices.findIndex(inv => inv.id === id);
@@ -578,7 +592,8 @@ export async function deleteInvoice(id: string) {
         .returning();
       return results[0] || null;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockInvoices.findIndex(inv => inv.id === id);
@@ -674,7 +689,8 @@ export async function createTicket(data: schema.NewTicket) {
       const results = await db.insert(schema.tickets).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newTicket: MockTicket = {
@@ -698,7 +714,8 @@ export async function createTicketMessage(data: schema.NewTicketMessage) {
       const results = await db.insert(schema.ticketMessages).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Message Insert failed, running mock insert: ", e);
+      console.error("DB Message Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newMessage: MockTicketMessage = {
@@ -731,7 +748,8 @@ export async function updateTicketStatus(id: string, status: 'open' | 'in_progre
         .returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockTickets.findIndex(t => t.id === id);
@@ -807,7 +825,8 @@ export async function createExpense(data: schema.NewExpense) {
       const results = await db.insert(schema.expenses).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newExpense: MockExpense = {
@@ -832,7 +851,8 @@ export async function deleteExpense(id: string) {
       const results = await db.delete(schema.expenses).where(eq(schema.expenses.id, id)).returning();
       return results[0] || null;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockExpenses.findIndex(exp => exp.id === id);
@@ -864,7 +884,8 @@ export async function createCapitalInjection(data: schema.NewCapitalInjection) {
       const results = await db.insert(schema.capitalInjections).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newInjection: MockCapitalInjection = {
@@ -886,7 +907,8 @@ export async function deleteCapitalInjection(id: string) {
       const results = await db.delete(schema.capitalInjections).where(eq(schema.capitalInjections.id, id)).returning();
       return results[0] || null;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockCapitalInjections.findIndex(inj => inj.id === id);
@@ -918,7 +940,8 @@ export async function createPayout(data: schema.NewPayout) {
       const results = await db.insert(schema.payouts).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newPayout: MockPayout = {
@@ -940,7 +963,8 @@ export async function deletePayout(id: string) {
       const results = await db.delete(schema.payouts).where(eq(schema.payouts.id, id)).returning();
       return results[0] || null;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockPayouts.findIndex(pay => pay.id === id);
@@ -976,7 +1000,8 @@ export async function syncInvoicePayoutAction(
       }
       return true;
     } catch (e) {
-      console.warn("DB sync payout failed, falling back to mock: ", e);
+      console.error("DB sync payout failed: ", e);
+      return dbWriteError(e);
     }
   }
 
@@ -1395,7 +1420,8 @@ export async function createInvoiceLinePreset(data: { name: string; description?
       const results = await db.insert(schema.invoiceLinePresets).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newPreset: MockInvoiceLinePreset = {
@@ -1417,7 +1443,8 @@ export async function updateInvoiceLinePreset(id: string, data: { name?: string;
       const results = await db.update(schema.invoiceLinePresets).set(data).where(eq(schema.invoiceLinePresets.id, id)).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockInvoiceLinePresets.findIndex(p => p.id === id);
@@ -1439,7 +1466,8 @@ export async function deleteInvoiceLinePreset(id: string) {
       await db.delete(schema.invoiceLinePresets).where(eq(schema.invoiceLinePresets.id, id));
       return true;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   mockInvoiceLinePresets = mockInvoiceLinePresets.filter(p => p.id !== id);
@@ -1471,7 +1499,8 @@ export async function updateInvoicePagePreset(pageKey: string, sectionKey: strin
         return results[0];
       }
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockInvoicePagePresets.findIndex(p => p.pageKey === pageKey && p.sectionKey === sectionKey);
@@ -1501,7 +1530,8 @@ export async function deleteInvoicePagePreset(pageKey: string) {
       await db.delete(schema.invoicePagePresets).where(eq(schema.invoicePagePresets.pageKey, pageKey));
       return true;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   mockInvoicePagePresets = mockInvoicePagePresets.filter(p => p.pageKey !== pageKey);
@@ -1528,7 +1558,8 @@ export async function createPartner(data: schema.NewPartner) {
       const results = await db.insert(schema.partners).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newPartner: MockPartner = {
@@ -1555,7 +1586,8 @@ export async function updatePartner(id: string, data: Partial<schema.NewPartner>
         .returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockPartners.findIndex(p => p.id === id);
@@ -1577,7 +1609,8 @@ export async function deletePartner(id: string) {
       await db.delete(schema.partners).where(eq(schema.partners.id, id));
       return true;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   // When deleting a partner, any clients referred by them are updated to 'organic'
@@ -1749,7 +1782,8 @@ export async function createClientUsageReport(data: schema.NewClientUsageReport)
       const results = await db.insert(schema.clientUsageReports).values(data).returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Insert failed, running mock insert: ", e);
+      console.error("DB Insert failed: ", e);
+      return dbWriteError(e);
     }
   }
   const newReport: MockClientUsageReport = {
@@ -1778,7 +1812,8 @@ export async function updateClientUsageReport(id: string, data: Partial<schema.N
         .returning();
       return results[0];
     } catch (e) {
-      console.warn("DB Update failed, running mock update: ", e);
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockClientUsageReports.findIndex(r => r.id === id);
@@ -1801,7 +1836,8 @@ export async function deleteClientUsageReport(id: string) {
         .returning();
       return results[0] || null;
     } catch (e) {
-      console.warn("DB Delete failed, running mock delete: ", e);
+      console.error("DB Delete failed: ", e);
+      return dbWriteError(e);
     }
   }
   const idx = mockClientUsageReports.findIndex(r => r.id === id);

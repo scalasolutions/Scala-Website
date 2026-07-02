@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { MockInvoice, uploadReceiptAction, syncInvoicePayoutAction, updateInvoiceStatus, updateInvoice } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import { PaymentMilestone } from './invoice-types';
 import { formatCurrencyIDR } from './invoice-types';
 import { formatInputNumberIDR } from '@/lib/utils';
@@ -148,13 +149,18 @@ export function RecordPaymentModal({
 
       const finalAmountPaid = paymentStatus === 'paid' ? invoice.total : paymentAmount;
 
-      const updated = await updateInvoiceStatus(
+      const statusResult = await updateInvoiceStatus(
         invoice.id,
         paymentStatus,
         finalAmountPaid,
         receiptUrl || undefined,
         paymentReceivedBy
       );
+      if (isDbWriteError(statusResult)) {
+        console.error('Failed to log client payment:', statusResult.error);
+        return;
+      }
+      const updated = statusResult;
 
       // Update milestone status if a milestone was selected
       let updatedMilestonesJson = invoice.paymentMilestonesJson ?? null;

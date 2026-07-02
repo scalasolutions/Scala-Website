@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { X, ArrowUpRight, ArrowDownRight, CreditCard, AlertTriangle, Loader2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { createExpense, createCapitalInjection, createPayout, uploadReceiptAction } from '@/lib/db/queries';
+import { isDbWriteError } from '@/lib/db/errors';
 import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
 import { formatInputNumberIDR, parseNumberInputIDR } from '@/lib/utils';
 import Input from '@/components/ui/Input';
@@ -209,6 +210,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [payer, setPayer] = useState('company');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Receipt & OCR states
   const [receiptFileBase64, setReceiptFileBase64] = useState<string>('');
@@ -294,13 +296,14 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     if (!title || amount <= 0) return;
 
     setIsSubmitting(true);
+    setSaveError(null);
     try {
       let receiptUrl = null;
       if (receiptFileBase64) {
         receiptUrl = await uploadReceiptAction(receiptFileName || 'expense-receipt.jpg', receiptFileBase64);
       }
 
-      await createExpense({
+      const created = await createExpense({
         title,
         category,
         amount,
@@ -310,14 +313,25 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
         receiptUrl,
       });
 
+      if (isDbWriteError(created)) {
+        setSaveError(created.error);
+        return;
+      }
+
       // If out-of-pocket, automatically create matching capital injection
       if (payer === 'fredrick' || payer === 'nicholas') {
-        await createCapitalInjection({
+        const injection = await createCapitalInjection({
           founderName: payer,
           amount,
           date: new Date(date),
           description: `Out-of-pocket expense payment: ${title}`,
         });
+        if (isDbWriteError(injection)) {
+          setSaveError(`Expense saved, but the matching capital injection failed: ${injection.error}`);
+          invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
+          onSuccess();
+          return;
+        }
       }
 
       invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
@@ -331,6 +345,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       setReceiptFileName('');
     } catch (err) {
       console.error('Failed to create expense', err);
+      setSaveError('Failed to save the expense. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -491,6 +506,12 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           </div>
         )}
 
+        {saveError && (
+          <p className="text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/25 rounded-xl p-3">
+            {saveError}
+          </p>
+        )}
+
         <div className="pt-4 border-t border-border flex justify-end gap-2">
           <Button type="button" variant="ghost" size="md" onClick={onClose}>
             Cancel
@@ -524,6 +545,7 @@ export const InjectionModal: React.FC<InjectionModalProps> = ({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -549,13 +571,18 @@ export const InjectionModal: React.FC<InjectionModalProps> = ({
     if (amount <= 0) return;
 
     setIsSubmitting(true);
+    setSaveError(null);
     try {
-      await createCapitalInjection({
+      const created = await createCapitalInjection({
         founderName,
         amount,
         date: new Date(date),
         description: description || 'Owner cash contribution injection',
       });
+      if (isDbWriteError(created)) {
+        setSaveError(created.error);
+        return;
+      }
       invalidateCache(CACHE_KEYS.INJECTIONS);
       onSuccess();
       onClose();
@@ -563,6 +590,7 @@ export const InjectionModal: React.FC<InjectionModalProps> = ({
       setDescription('');
     } catch (err) {
       console.error('Failed to record capital injection', err);
+      setSaveError('Failed to record the capital injection. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -625,6 +653,12 @@ export const InjectionModal: React.FC<InjectionModalProps> = ({
           />
         </div>
 
+        {saveError && (
+          <p className="text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/25 rounded-xl p-3">
+            {saveError}
+          </p>
+        )}
+
         <div className="pt-4 border-t border-border flex justify-end gap-2">
           <Button type="button" variant="ghost" size="md" onClick={onClose}>
             Cancel
@@ -660,6 +694,7 @@ export const PayoutModal: React.FC<PayoutModalProps> = ({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -685,13 +720,18 @@ export const PayoutModal: React.FC<PayoutModalProps> = ({
     if (amount <= 0) return;
 
     setIsSubmitting(true);
+    setSaveError(null);
     try {
-      await createPayout({
+      const created = await createPayout({
         founderName,
         amount,
         date: new Date(date),
         description: description || 'Founder profit share draw payout',
       });
+      if (isDbWriteError(created)) {
+        setSaveError(created.error);
+        return;
+      }
       invalidateCache(CACHE_KEYS.PAYOUTS);
       onSuccess();
       onClose();
@@ -699,6 +739,7 @@ export const PayoutModal: React.FC<PayoutModalProps> = ({
       setDescription('');
     } catch (err) {
       console.error('Failed to record profit draw', err);
+      setSaveError('Failed to record the payout. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -772,6 +813,12 @@ export const PayoutModal: React.FC<PayoutModalProps> = ({
               result in an overdrawn profit balance.
             </p>
           </div>
+        )}
+
+        {saveError && (
+          <p className="text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/25 rounded-xl p-3">
+            {saveError}
+          </p>
         )}
 
         <div className="pt-4 border-t border-border flex justify-end gap-2">

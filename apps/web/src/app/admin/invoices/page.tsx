@@ -133,6 +133,17 @@ const parsePastedItems = (text: string): InvoiceLineItem[] => {
   return parsedItems;
 };
 
+// Next invoice number = highest existing sequence + 1. Counting rows collides
+// with existing numbers once any invoice has been deleted (unique constraint).
+const nextInvoiceNumber = (existingNumbers: string[]): string => {
+  const year = new Date().getFullYear();
+  const maxSeq = existingNumbers.reduce((max, num) => {
+    const match = /^INV-\d{4}-(\d+)$/.exec(num.trim());
+    return match ? Math.max(max, parseInt(match[1], 10)) : max;
+  }, 0);
+  return `INV-${year}-${String(maxSeq + 1).padStart(3, '0')}`;
+};
+
 // ── Page component ────────────────────────────────────────────
 export default function InvoicesPage() {
   const getPageTitle = (key: string): string => {
@@ -175,6 +186,7 @@ export default function InvoicesPage() {
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<MockInvoice | null>(null);
   const [isPending, startTransition] = useTransition();
   const [mounted, setMounted] = useState(false);
@@ -337,6 +349,7 @@ export default function InvoicesPage() {
 
     setPasteMode(false);
     setPastedText('');
+    setSaveError(null);
     setModalOpen(true);
   };
 
@@ -450,7 +463,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (invoicesData && !invoiceNumber) {
-      setInvoiceNumber(`INV-2026-${String(invoicesData.length + 1).padStart(3, '0')}`);
+      setInvoiceNumber(nextInvoiceNumber(invoicesData.map((i) => i.invoiceNumber)));
     }
   }, [invoicesData, invoiceNumber]);
 
@@ -589,7 +602,10 @@ export default function InvoicesPage() {
     ]);
     setPasteMode(false);
     setPastedText('');
-    setInvoiceNumber(`INV-2026-${String(invoices.length + 2).padStart(3, '0')}`);
+    setSaveError(null);
+    // Include the number just used in the form: after a create, the new invoice
+    // may not be reflected in `invoices` yet within this closure.
+    setInvoiceNumber(nextInvoiceNumber([...invoices.map((i) => i.invoiceNumber), invoiceNumber]));
     const activeKeys = allPagePresets
       .filter((p) => p.sectionKey === 'full_page_html')
       .map((p) => p.pageKey);
@@ -608,6 +624,20 @@ export default function InvoicesPage() {
     )
       return;
 
+    // Catch duplicate numbers before hitting the DB unique constraint
+    const isDuplicateNumber = invoices.some(
+      (inv) =>
+        inv.invoiceNumber.trim() === invoiceNumber.trim() &&
+        inv.id !== editingInvoice?.id
+    );
+    if (isDuplicateNumber) {
+      setSaveError(
+        `Invoice number ${invoiceNumber} already exists. Use a different invoice number.`
+      );
+      return;
+    }
+
+    setSaveError(null);
     startTransition(async () => {
       try {
         if (editingInvoice) {
@@ -630,6 +660,11 @@ export default function InvoicesPage() {
             paymentMilestonesJson: isDpCollection ? JSON.stringify(milestones) : null,
             hostingTier,
           });
+
+          if (updatedInv && 'error' in updatedInv) {
+            setSaveError(updatedInv.error);
+            return;
+          }
 
           if (updatedInv) {
             const client = clients.find((c) => c.id === selectedClientId);
@@ -672,6 +707,11 @@ export default function InvoicesPage() {
             hostingTier,
           });
 
+          if (newInv && 'error' in newInv) {
+            setSaveError(newInv.error);
+            return;
+          }
+
           if (newInv) {
             const client = clients.find((c) => c.id === selectedClientId);
             mutateInvoices([{ ...newInv, client } as any, ...invoices]);
@@ -690,6 +730,7 @@ export default function InvoicesPage() {
         }
       } catch (err) {
         console.error('Failed to save invoice', err);
+        setSaveError('Failed to save the invoice. Please try again.');
       }
     });
   };
@@ -2037,6 +2078,14 @@ export default function InvoicesPage() {
                           </div>
                         </div>
                       </section>
+
+                      {/* Save error */}
+                      {saveError && (
+                        <div className="flex items-start gap-2 p-3 rounded-xl border border-red-500/25 bg-red-500/10 text-red-400 text-xs font-medium animate-fade-in-scale">
+                          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                          <span>{saveError}</span>
+                        </div>
+                      )}
 
                       {/* Form actions */}
                       <div className="flex gap-2 justify-end pt-5 border-t border-border">
