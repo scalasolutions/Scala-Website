@@ -1,9 +1,10 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import React, { useState } from 'react';
 import { X, ArrowUpRight, ArrowDownRight, CreditCard, AlertTriangle, Loader2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { createExpense, createCapitalInjection, createPayout, uploadReceiptAction } from '@/lib/db/queries';
+import { createExpense, createCapitalInjection, createPayout, uploadReceiptAction, updateExpense, MockExpense } from '@/lib/db/queries';
 import { isDbWriteError } from '@/lib/db/errors';
 import { invalidateCache, CACHE_KEYS } from '@/lib/data-cache';
 import { formatInputNumberIDR, parseNumberInputIDR } from '@/lib/utils';
@@ -195,12 +196,14 @@ interface ExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editingExpense?: MockExpense | null;
 }
 
 export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  editingExpense = null,
 }) => {
   const [mounted, setMounted] = useState(false);
   const [title, setTitle] = useState('');
@@ -211,6 +214,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Receipt & OCR states
   const [receiptFileBase64, setReceiptFileBase64] = useState<string>('');
@@ -225,6 +229,34 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     }, 0);
     return () => clearTimeout(timer);
   }, []);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (editingExpense) {
+        setTitle(editingExpense.title);
+        setCategory(editingExpense.category);
+        setAmountStr(formatNumberInputIDR(editingExpense.amount));
+        setDate(
+          editingExpense.date instanceof Date
+            ? editingExpense.date.toISOString().slice(0, 10)
+            : new Date(editingExpense.date).toISOString().slice(0, 10)
+        );
+        setPayer(editingExpense.payer);
+        setNotes(editingExpense.notes || '');
+        setReceiptFileBase64(editingExpense.receiptUrl || '');
+        setReceiptFileName(editingExpense.receiptUrl ? 'Current Receipt' : '');
+      } else {
+        setTitle('');
+        setCategory('Hosting & Cloud');
+        setAmountStr('');
+        setDate(new Date().toISOString().slice(0, 10));
+        setPayer('company');
+        setNotes('');
+        setReceiptFileBase64('');
+        setReceiptFileName('');
+      }
+    }
+  }, [editingExpense, isOpen]);
 
   const handleCompressAndSetFile = (file: File) => {
     if (!file) return;
@@ -295,48 +327,75 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     const amount = parseNumberInputIDR(amountStr);
     if (!title || amount <= 0) return;
 
+    if (editingExpense) {
+      setShowConfirmModal(true);
+    } else {
+      await executeSave();
+    }
+  };
+
+  const executeSave = async () => {
+    const amount = parseNumberInputIDR(amountStr);
     setIsSubmitting(true);
     setSaveError(null);
     try {
-      let receiptUrl = null;
-      if (receiptFileBase64) {
+      let receiptUrl = receiptFileBase64;
+      if (receiptFileBase64 && receiptFileBase64.startsWith('data:')) {
         receiptUrl = await uploadReceiptAction(receiptFileName || 'expense-receipt.jpg', receiptFileBase64);
       }
 
-      const created = await createExpense({
-        title,
-        category,
-        amount,
-        date: new Date(date),
-        payer,
-        notes: notes || null,
-        receiptUrl,
-      });
-
-      if (isDbWriteError(created)) {
-        setSaveError(created.error);
-        return;
-      }
-
-      // If out-of-pocket, automatically create matching capital injection
-      if (payer === 'fredrick' || payer === 'nicholas') {
-        const injection = await createCapitalInjection({
-          founderName: payer,
+      if (editingExpense) {
+        const updated = await updateExpense(editingExpense.id, {
+          title,
+          category,
           amount,
           date: new Date(date),
-          description: `Out-of-pocket expense payment: ${title}`,
+          payer: payer as any,
+          notes: notes || null,
+          receiptUrl,
         });
-        if (isDbWriteError(injection)) {
-          setSaveError(`Expense saved, but the matching capital injection failed: ${injection.error}`);
-          invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
-          onSuccess();
+
+        if (isDbWriteError(updated)) {
+          setSaveError(updated.error);
           return;
+        }
+      } else {
+        const created = await createExpense({
+          title,
+          category,
+          amount,
+          date: new Date(date),
+          payer,
+          notes: notes || null,
+          receiptUrl,
+        });
+
+        if (isDbWriteError(created)) {
+          setSaveError(created.error);
+          return;
+        }
+
+        // If out-of-pocket, automatically create matching capital injection
+        if (payer === 'fredrick' || payer === 'nicholas') {
+          const injection = await createCapitalInjection({
+            founderName: payer,
+            amount,
+            date: new Date(date),
+            description: `Out-of-pocket expense payment: ${title}`,
+          });
+          if (isDbWriteError(injection)) {
+            setSaveError(`Expense saved, but the matching capital injection failed: ${injection.error}`);
+            invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
+            onSuccess();
+            return;
+          }
         }
       }
 
       invalidateCache(CACHE_KEYS.EXPENSES, CACHE_KEYS.INJECTIONS);
       onSuccess();
       onClose();
+      // Reset fields
       setTitle('');
       setAmountStr('');
       setNotes('');
@@ -344,184 +403,236 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       setReceiptFileBase64('');
       setReceiptFileName('');
     } catch (err) {
-      console.error('Failed to create expense', err);
+      console.error('Failed to save expense', err);
       setSaveError('Failed to save the expense. Please try again.');
     } finally {
       setIsSubmitting(false);
+      setShowConfirmModal(false);
     }
   };
 
   return (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Record expense"
-      description="Log a new business expense, optionally paid out-of-pocket by a founder."
-      icon={<CreditCard size={16} />}
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Expense title *"
-          required
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Vercel Pro hosting"
-        />
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Category
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={selectClass}
-            >
-              <option value="Hosting & Cloud">Hosting & Cloud</option>
-              <option value="API & Software">API & Software</option>
-              <option value="Office & Admin">Office & Admin</option>
-              <option value="Contractor & Outsource">Contractor</option>
-              <option value="Marketing & Ads">Marketing & Ads</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
+    <>
+      <ModalShell
+        isOpen={isOpen}
+        onClose={onClose}
+        title={editingExpense ? "Edit expense" : "Record expense"}
+        description={editingExpense ? "Modify this historical business expense record." : "Log a new business expense, optionally paid out-of-pocket by a founder."}
+        icon={<CreditCard size={16} />}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Amount (IDR) *"
+            label="Expense title *"
             required
-            value={amountStr}
-            onChange={(e) => setAmountStr(formatNumberInputIDR(e.target.value))}
-            placeholder="0"
-            className="text-right tabular-nums"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Date"
-            type="date"
-            required
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Vercel Pro hosting"
           />
 
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Paid by
-            </label>
-            <select
-              value={payer}
-              onChange={(e) => setPayer(e.target.value)}
-              className={selectClass}
-            >
-              <option value="company">Company</option>
-              <option value="fredrick">Fredrick (out of pocket)</option>
-              <option value="nicholas">Nicholas (out of pocket)</option>
-            </select>
-          </div>
-        </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Category
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={selectClass}
+              >
+                <option value="Hosting & Cloud">Hosting & Cloud</option>
+                <option value="API & Software">API & Software</option>
+                <option value="Office & Admin">Office & Admin</option>
+                <option value="Contractor & Outsource">Contractor</option>
+                <option value="Marketing & Ads">Marketing & Ads</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
 
-        {/* Receipt Attachment Upload with Tesseract OCR */}
-        <div className="space-y-2">
-          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Attach Expense Receipt
-          </label>
-          <div className="p-4 rounded-xl border border-dashed border-border bg-muted/10 text-center space-y-2 relative">
-            <input
-              type="file"
-              id="expense-receipt-upload"
-              accept="image/*,application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleCompressAndSetFile(file);
-              }}
+            <Input
+              label="Amount (IDR) *"
+              required
+              value={amountStr}
+              onChange={(e) => setAmountStr(formatNumberInputIDR(e.target.value))}
+              placeholder="0"
+              className="text-right tabular-nums"
             />
-            <label
-              htmlFor="expense-receipt-upload"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-muted active-press transition-all cursor-pointer text-xs font-bold text-foreground shadow-xs"
-            >
-              Select Receipt Image
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Date"
+              type="date"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Paid by
+              </label>
+              <select
+                value={payer}
+                onChange={(e) => setPayer(e.target.value)}
+                className={selectClass}
+              >
+                <option value="company">Company</option>
+                <option value="fredrick">Fredrick (out of pocket)</option>
+                <option value="nicholas">Nicholas (out of pocket)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Receipt Attachment Upload with Tesseract OCR */}
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Attach Expense Receipt
             </label>
-            {uploadingReceipt && (
-              <p className="text-[10px] text-primary-ink dark:text-primary font-semibold animate-pulse">
-                ⌛ Compressing &amp; preparing image...
-              </p>
-            )}
-            {receiptFileName && !uploadingReceipt && (
-              <div className="space-y-1 mt-1">
-                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold truncate max-w-[280px] mx-auto">
-                  ✓ {receiptFileName} (Compressed!)
+            <div className="p-4 rounded-xl border border-dashed border-border bg-muted/10 text-center space-y-2 relative">
+              <input
+                type="file"
+                id="expense-receipt-upload"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCompressAndSetFile(file);
+                }}
+              />
+              <label
+                htmlFor="expense-receipt-upload"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-muted active-press transition-all cursor-pointer text-xs font-bold text-foreground shadow-xs"
+              >
+                Select Receipt Image
+              </label>
+              {uploadingReceipt && (
+                <p className="text-[10px] text-primary-ink dark:text-primary font-semibold animate-pulse">
+                  ⌛ Compressing &amp; preparing image...
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReceiptFileBase64('');
-                    setReceiptFileName('');
-                  }}
-                  className="text-[9px] text-red-500 dark:text-red-400 hover:underline cursor-pointer font-bold"
-                >
-                  Remove
-                </button>
-              </div>
-            )}
+              )}
+              {receiptFileName && !uploadingReceipt && (
+                <div className="space-y-1 mt-1">
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold truncate max-w-[280px] mx-auto">
+                    ✓ {receiptFileName} (Compressed!)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptFileBase64('');
+                      setReceiptFileName('');
+                    }}
+                    className="text-[9px] text-red-500 dark:text-red-400 hover:underline cursor-pointer font-bold"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
 
-            {ocrScanning && (
-              <div className="flex items-center justify-center gap-2 p-2 bg-primary-soft dark:bg-primary/10 border border-primary-ink/20 dark:border-primary/20 rounded-xl text-primary-ink dark:text-primary text-[10px] font-bold animate-pulse mt-2">
-                <Loader2 className="animate-spin text-primary-ink dark:text-primary shrink-0" size={12} />
-                <span>Running Local OCR: Extracting expense total from receipt...</span>
-              </div>
-            )}
-            {ocrSuccessMsg && (
-              <div className="flex items-center justify-center gap-2 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-[10px] font-bold animate-fade-in-scale mt-2">
-                <span>✨</span>
-                <span>{ocrSuccessMsg}</span>
-              </div>
-            )}
+              {ocrScanning && (
+                <div className="flex items-center justify-center gap-2 p-2 bg-primary-soft dark:bg-primary/10 border border-primary-ink/20 dark:border-primary/20 rounded-xl text-primary-ink dark:text-primary text-[10px] font-bold animate-pulse mt-2">
+                  <Loader2 className="animate-spin text-primary-ink dark:text-primary shrink-0" size={12} />
+                  <span>Running Local OCR: Extracting expense total from receipt...</span>
+                </div>
+              )}
+              {ocrSuccessMsg && (
+                <div className="flex items-center justify-center gap-2 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-[10px] font-bold animate-fade-in-scale mt-2">
+                  <span>✨</span>
+                  <span>{ocrSuccessMsg}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-            Notes (optional)
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Brief context…"
-            rows={2}
-            className="w-full rounded-xl bg-background border border-border px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors resize-none"
-          />
-        </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              Notes (optional)
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Brief context…"
+              rows={2}
+              className="w-full rounded-xl bg-background border border-border px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/60 transition-colors resize-none"
+            />
+          </div>
 
-        {(payer === 'fredrick' || payer === 'nicholas') && (
-          <div className="rounded-xl border border-border bg-muted/30 p-3.5">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              <span className="text-foreground font-medium">Smart split credit:</span>{' '}
-              Because this expense is marked as paid out-of-pocket, saving will also
-              register a matching capital contribution of{' '}
-              {amountStr ? `IDR ${amountStr}` : 'the equivalent value'} for the payer.
+          {(payer === 'fredrick' || payer === 'nicholas') && (
+            <div className="rounded-xl border border-border bg-muted/30 p-3.5">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="text-foreground font-medium">Smart split credit:</span>{' '}
+                Because this expense is marked as paid out-of-pocket, saving will also
+                register a matching capital contribution of{' '}
+                {amountStr ? `IDR ${amountStr}` : 'the equivalent value'} for the payer.
+              </p>
+            </div>
+          )}
+
+          {saveError && (
+            <p className="text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/25 rounded-xl p-3">
+              {saveError}
             </p>
+          )}
+
+          <div className="pt-4 border-t border-border flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="md" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" size="md" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : (editingExpense ? 'Update expense' : 'Save expense')}
+            </Button>
           </div>
-        )}
+        </form>
+      </ModalShell>
 
-        {saveError && (
-          <p className="text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/25 rounded-xl p-3">
-            {saveError}
-          </p>
-        )}
+      {showConfirmModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-background/85 backdrop-blur-md"
+            onClick={() => setShowConfirmModal(false)}
+          />
 
-        <div className="pt-4 border-t border-border flex justify-end gap-2">
-          <Button type="button" variant="ghost" size="md" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" size="md" disabled={isSubmitting}>
-            {isSubmitting ? 'Recording…' : 'Save expense'}
-          </Button>
-        </div>
-      </form>
-    </ModalShell>
+          <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card shadow-2xl animate-fade-in-scale relative z-50">
+            <div className="p-6">
+              <div className="flex items-start gap-3.5 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Confirm Changes
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                    Are you sure you want to update this expense record? This will modify the financial ledger and update all related treasury calculations.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowConfirmModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  className="!bg-amber-500 hover:!bg-amber-600 !text-white border-none shadow-sm shadow-amber-500/10 active-press animate-none"
+                  onClick={executeSave}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Saving...' : 'Yes, update record'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 };
 
@@ -808,7 +919,7 @@ export const PayoutModal: React.FC<PayoutModalProps> = ({
           <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3.5 flex items-start gap-2 animate-fade-in-scale">
             <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
             <p className="text-xs text-red-500 leading-relaxed">
-              This draw exceeds the founder's remaining allocated share. Available: Rp{' '}
+              This draw exceeds the founder&apos;s remaining allocated share. Available: Rp{' '}
               {new Intl.NumberFormat('id-ID').format(maxAllowedDraw)}. Continuing will
               result in an overdrawn profit balance.
             </p>

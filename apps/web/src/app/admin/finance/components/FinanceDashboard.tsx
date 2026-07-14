@@ -60,10 +60,16 @@ export const FinanceDashboard: React.FC = () => {
 
   // Modals state
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<MockExpense | null>(null);
   const [injectionModalOpen, setInjectionModalOpen] = useState(false);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [selectedFounder, setSelectedFounder] = useState<'fredrick' | 'nicholas'>('fredrick');
   const [guideOpen, setGuideOpen] = useState(false);
+
+  const triggerEditExpense = (expense: MockExpense) => {
+    setEditingExpense(expense);
+    setExpenseModalOpen(true);
+  };
 
   // Quick action modal trigger
   const handleFounderAction = (actionType: 'inject' | 'draw', founderKey: 'fredrick' | 'nicholas') => {
@@ -361,6 +367,7 @@ export const FinanceDashboard: React.FC = () => {
               injections={injections}
               payouts={payouts}
               onDeleteExpense={triggerDeleteExpense}
+              onEditExpense={triggerEditExpense}
               onDeleteInjection={triggerDeleteInjection}
               onDeletePayout={triggerDeletePayout}
             />
@@ -371,8 +378,12 @@ export const FinanceDashboard: React.FC = () => {
       {/* Transaction Modals components */}
       <ExpenseModal
         isOpen={expenseModalOpen}
-        onClose={() => setExpenseModalOpen(false)}
+        onClose={() => {
+          setExpenseModalOpen(false);
+          setEditingExpense(null);
+        }}
         onSuccess={() => {}}
+        editingExpense={editingExpense}
       />
       <InjectionModal
         isOpen={injectionModalOpen}

@@ -8,6 +8,7 @@ import {
   Trash2,
   Receipt,
   X,
+  Pencil,
 } from 'lucide-react';
 import { formatCurrencyIDR } from './FinanceOverviewCards';
 import Card from '@/components/ui/Card';
@@ -15,17 +16,7 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import FilterBar, { FilterOption } from '@/components/ui/FilterBar';
-
-interface ExpenseItem {
-  id: string;
-  title: string;
-  category: string;
-  amount: number;
-  date: string | Date;
-  payer: 'company' | 'fredrick' | 'nicholas';
-  notes: string | null;
-  receiptUrl?: string | null;
-}
+import { MockExpense } from '@/lib/db/queries';
 
 interface InjectionItem {
   id: string;
@@ -44,10 +35,11 @@ interface PayoutItem {
 }
 
 interface TransactionTabsProps {
-  expenses: ExpenseItem[];
+  expenses: MockExpense[];
   injections: InjectionItem[];
   payouts: PayoutItem[];
   onDeleteExpense: (id: string, title: string, amount: number) => void;
+  onEditExpense?: (expense: MockExpense) => void;
   onDeleteInjection?: (id: string, founderName: string, amount: number) => void;
   onDeletePayout?: (id: string, founderName: string, amount: number) => void;
 }
@@ -60,6 +52,7 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
   injections,
   payouts,
   onDeleteExpense,
+  onEditExpense,
   onDeleteInjection,
   onDeletePayout,
 }) => {
@@ -232,15 +225,29 @@ export const TransactionTabs: React.FC<TransactionTabsProps> = ({
                     </p>
                   </div>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="!p-0 !h-8 !w-8 hover:!text-red-500"
-                    aria-label="Delete expense"
-                    onClick={() => onDeleteExpense(exp.id, exp.title, exp.amount)}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {onEditExpense && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="!p-0 !h-8 !w-8 hover:!text-primary"
+                        aria-label="Edit expense"
+                        onClick={() => onEditExpense(exp)}
+                      >
+                        <Pencil size={14} />
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="!p-0 !h-8 !w-8 hover:!text-red-500"
+                      aria-label="Delete expense"
+                      onClick={() => onDeleteExpense(exp.id, exp.title, exp.amount)}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

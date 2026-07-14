@@ -312,7 +312,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
             )}
 
             {/* UNPAID STATE (DP Collection): Milestone schedule or legacy 50/50 */}
-            {isDpCollection && status !== 'paid' && status !== 'written_off' && status !== 'partially_paid' && (() => {
+            {isDpCollection && status !== 'paid' && status !== 'written_off' && (() => {
               if (hasMilestones) {
                 const activeMilestone = parsedMilestones.find(m => m.status === 'unpaid');
                 const activeAmount = activeMilestone ? Math.round(total * activeMilestone.percentage / 100) : 0;
@@ -476,7 +476,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
             )}
 
             {/* PARTIALLY PAID STATE: Side-by-side cards */}
-            {status === 'partially_paid' && (() => {
+            {status === 'partially_paid' && !hasMilestones && (() => {
               const dpAmount = amountPaid || Math.round(total * 0.5);
               const balanceDue = total - dpAmount;
               const dpDateStr = dpAt ? formatDateClean(dpAt) : (paidAt ? formatDateClean(paidAt) : formattedDate);

@@ -864,6 +864,34 @@ export async function deleteExpense(id: string) {
   return null;
 }
 
+export async function updateExpense(id: string, data: Partial<schema.NewExpense>) {
+  if (isDbConfigured()) {
+    try {
+      const results = await db.update(schema.expenses)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.expenses.id, id))
+        .returning();
+      return results[0];
+    } catch (e) {
+      console.error("DB Update failed: ", e);
+      return dbWriteError(e);
+    }
+  }
+  const idx = mockExpenses.findIndex(exp => exp.id === id);
+  if (idx !== -1) {
+    const original = mockExpenses[idx];
+    mockExpenses[idx] = {
+      ...original,
+      ...data,
+      date: data.date ? new Date(data.date) : original.date,
+      payer: (data.payer !== undefined ? data.payer : original.payer) as any,
+      updatedAt: new Date(),
+    };
+    return mockExpenses[idx];
+  }
+  return null;
+}
+
 // --- CAPITAL INJECTIONS ---
 export async function getCapitalInjections() {
   if (isDbConfigured()) {
