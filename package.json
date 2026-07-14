@@ -3,17 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "description": "Scala Workspaces Monorepo",
-  "workspaces": [
-    "apps/*"
-  ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=apps/web",
-    "start": "npm run start --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web",
-    "db:seed": "npm run db:seed --workspace=apps/web",
-    "db:backup": "npm run db:backup --workspace=apps/web",
-    "db:restore": "npm run db:restore --workspace=apps/web"
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm --filter web lint",
+    "db:seed": "pnpm --filter web db:seed",
+    "db:backup": "pnpm --filter web db:backup",
+    "db:restore": "pnpm --filter web db:restore"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.10"

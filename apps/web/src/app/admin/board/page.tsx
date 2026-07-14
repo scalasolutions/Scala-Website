@@ -1,27 +1,19 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import React, { useState, useEffect, useTransition, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Plus,
   Search,
-  Building,
-  X,
   AlertTriangle,
-  ArrowRight,
+  ChevronRight,
   ClipboardList,
   CheckCircle2,
   Clock,
-  Loader2,
   Pencil,
   Trash2,
-  Calendar,
-  ChevronRight,
-  Filter,
   Check,
-  MoreHorizontal
 } from 'lucide-react';
 import {
   getClients,
@@ -30,30 +22,29 @@ import {
   updateClientTask,
   deleteClientTask,
   MockClient,
-  MockClientTask
 } from '@/lib/db/queries';
 import {
   useAdminData,
   CACHE_KEYS,
-  invalidateCache
+  invalidateCache,
 } from '@/lib/data-cache';
 import { cn, isTaskUrgent } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import Skeleton from '@/components/ui/Skeleton';
-import Select from '@/components/ui/Select';
-import Textarea from '@/components/ui/Textarea';
-import EmptyState from '@/components/ui/EmptyState';
-import SectionHeading from '@/components/ui/SectionHeading';
-import ActionMenu from '@/components/ui/ActionMenu';
+import Button from '@/components/ui/Button';
+
+// Local modular board components
+import { ComponentErrorBoundary } from '../clients/components/ComponentErrorBoundary';
+import { BoardColumn } from './components/BoardColumn';
+import { TaskCard } from './components/TaskCard';
+import { DailyAchievements } from './components/DailyAchievements';
+import { CreateTaskModal } from './components/CreateTaskModal';
+import { ClientTaskWithClient } from './components/types';
 
 type TaskStatus = 'to_prepare' | 'in_progress' | 'achieved';
 
 export default function ClientBoardPage() {
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -61,7 +52,7 @@ export default function ClientBoardPage() {
 
   // Queries
   const { data: clientsData, loading: loadingClients } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
-  const { data: tasksData, loading: loadingTasks, mutate: mutateTasks } = useAdminData<any[]>(CACHE_KEYS.CLIENT_TASKS, getClientTasks);
+  const { data: tasksData, loading: loadingTasks, mutate: mutateTasks } = useAdminData<ClientTaskWithClient[]>(CACHE_KEYS.CLIENT_TASKS, getClientTasks);
 
   const clients = clientsData || [];
   const tasks = tasksData || [];
@@ -82,6 +73,7 @@ export default function ClientBoardPage() {
       }
     }
   }, []);
+
   const [filterSearch, setFilterSearch] = useState('');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
@@ -90,20 +82,8 @@ export default function ClientBoardPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Form Fields
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDescription, setTaskDescription] = useState('');
-  const [taskClientId, setTaskClientId] = useState('');
-  const [taskStatus, setTaskStatus] = useState<TaskStatus>('to_prepare');
-  const [taskTargetDate, setTaskTargetDate] = useState('');
-
-  // Searchable client dropdown states
-  const [clientSearch, setClientSearch] = useState('');
-  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
-  const clientDropdownRef = useRef<HTMLDivElement>(null);
-
   // Editing Task State
-  const [editingTask, setEditingTask] = useState<any | null>(null);
+  const [editingTask, setEditingTask] = useState<ClientTaskWithClient | null>(null);
 
   // Drag and Drop active states
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
@@ -112,7 +92,7 @@ export default function ClientBoardPage() {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    task: any;
+    task: ClientTaskWithClient;
   } | null>(null);
 
   // Mobile active tab & media state
@@ -139,7 +119,7 @@ export default function ClientBoardPage() {
       const diffX = touchStartX.current - endX;
       const diffY = touchStartY.current - endY;
 
-      // Swipe Left starting from the right edge region (right 100px of screen) opens drawer
+      // Swipe Left starting from the right edge region opens drawer
       if (diffX > 40 && Math.abs(diffY) < 40) {
         if (touchStartX.current > window.innerWidth - 100) {
           setDrawerOpen(true);
@@ -157,7 +137,6 @@ export default function ClientBoardPage() {
     const handleClickOutside = (e: MouseEvent) => {
       if (!drawerOpen) return;
       const target = e.target as HTMLElement;
-      // Close only if click is outside both drawer panel and floating pull tab handle
       if (!target.closest('[data-drawer]') && !target.closest('[data-pull-tab]')) {
         setDrawerOpen(false);
       }
@@ -178,7 +157,9 @@ export default function ClientBoardPage() {
     if (!mounted) return;
     const media = window.matchMedia('(min-width: 768px)');
     setIsDesktop(media.matches);
-    const listener = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    const listener = (e: MediaQueryListEvent) => {
+      setIsDesktop(e.matches);
+    };
     media.addEventListener('change', listener);
     return () => media.removeEventListener('change', listener);
   }, [mounted]);
@@ -186,9 +167,13 @@ export default function ClientBoardPage() {
   // Close context menu on scroll or escape
   useEffect(() => {
     if (!contextMenu) return;
-    const handleClose = () => setContextMenu(null);
+    const handleClose = () => {
+      setContextMenu(null);
+    };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null);
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+      }
     };
     window.addEventListener('scroll', handleClose, true);
     window.addEventListener('keydown', handleKeyDown);
@@ -198,35 +183,6 @@ export default function ClientBoardPage() {
     };
   }, [contextMenu]);
 
-  // Prevent background scrolling when modal is open
-  useEffect(() => {
-    const mainEl = document.querySelector('main');
-    if (modalOpen) {
-      if (mainEl) mainEl.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    } else {
-      if (mainEl) mainEl.style.overflow = '';
-      document.body.style.overflow = '';
-    }
-    return () => {
-      if (mainEl) mainEl.style.overflow = '';
-      document.body.style.overflow = '';
-    };
-  }, [modalOpen]);
-
-  // Click outside to close client dropdown
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
-        setClientDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
   // Click outside to close filter dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -234,26 +190,18 @@ export default function ClientBoardPage() {
         setFilterDropdownOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
-  // Get status column styling
-  const getColumnHeaderBg = (status: TaskStatus) => {
-    if (status === 'to_prepare') return 'border-t-2 border-t-zinc-400 bg-zinc-500/5 dark:bg-zinc-400/5';
-    if (status === 'in_progress') return 'border-t-2 border-t-blue-500 bg-blue-500/5 dark:bg-blue-400/5';
-    return 'border-t-2 border-t-emerald-500 bg-emerald-500/5 dark:bg-emerald-400/5';
-  };
-
   // Handle Right-click Context Menu
-  const handleContextMenu = (e: React.MouseEvent, task: any) => {
+  const handleContextMenu = (e: React.MouseEvent, task: ClientTaskWithClient) => {
     e.preventDefault();
     let x = e.clientX;
     let y = e.clientY;
-    
-    // Quick boundary adjustment if close to right/bottom of screen
+
     const menuWidth = 160;
     const menuHeight = 185;
     if (x + menuWidth > window.innerWidth) {
@@ -262,15 +210,14 @@ export default function ClientBoardPage() {
     if (y + menuHeight > window.innerHeight) {
       y -= menuHeight;
     }
-    
+
     setContextMenu({ x, y, task });
   };
 
   // Handle Card Click (Mobile context menu trigger)
-  const handleCardClick = (e: React.MouseEvent, task: any) => {
+  const handleCardClick = (e: React.MouseEvent, task: ClientTaskWithClient) => {
     if (isDesktop) return;
 
-    // Do not trigger context menu if clicking interactive elements
     const target = e.target as HTMLElement;
     if (
       target.closest('button') ||
@@ -286,11 +233,9 @@ export default function ClientBoardPage() {
     e.preventDefault();
     e.stopPropagation();
 
-    // Show context menu near the click/touch position
-    let x = e.clientX || (e as any).touches?.[0]?.clientX || window.innerWidth / 2 - 80;
-    let y = e.clientY || (e as any).touches?.[0]?.clientY || window.innerHeight / 2 - 45;
+    let x = e.clientX || window.innerWidth / 2 - 80;
+    let y = e.clientY || window.innerHeight / 2 - 45;
 
-    // Screen boundaries adjustment
     const menuWidth = 180;
     const menuHeight = 185;
     if (x + menuWidth > window.innerWidth) {
@@ -360,8 +305,8 @@ export default function ClientBoardPage() {
     // Persist Update
     try {
       await updateClientTask(taskId, { status: nextStatus });
-      invalidateCache(CACHE_KEYS.CLIENTS); // status updates could change dashboard indicators
-      mutateTasks(); // Re-validate cache from server
+      invalidateCache(CACHE_KEYS.CLIENTS);
+      mutateTasks();
     } catch (err) {
       console.error('Failed to update task status via drop', err);
       mutateTasks(); // rollback
@@ -397,39 +342,18 @@ export default function ClientBoardPage() {
   };
 
   // Handle Task Creation/Edit Form Submission
-  const handleSubmitTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskTitle || !taskClientId) return;
-
+  const handleFormSubmit = async (taskData: Parameters<typeof createClientTask>[0]) => {
     startTransition(async () => {
       try {
         if (editingTask) {
-          await updateClientTask(editingTask.id, {
-            title: taskTitle,
-            description: taskDescription || null,
-            clientId: taskClientId,
-            status: taskStatus,
-            targetDate: taskTargetDate ? new Date(taskTargetDate) : null,
-          });
+          await updateClientTask(editingTask.id, taskData);
         } else {
-          await createClientTask({
-            clientId: taskClientId,
-            title: taskTitle,
-            description: taskDescription || null,
-            status: taskStatus,
-            targetDate: taskTargetDate ? new Date(taskTargetDate) : null,
-          });
+          await createClientTask(taskData);
         }
-        
+
         invalidateCache(CACHE_KEYS.CLIENTS);
         mutateTasks();
-        
-        // Reset form fields
-        setTaskTitle('');
-        setTaskDescription('');
-        setTaskClientId('');
-        setTaskStatus('to_prepare');
-        setTaskTargetDate('');
+
         setEditingTask(null);
         setModalOpen(false);
       } catch (err) {
@@ -439,13 +363,8 @@ export default function ClientBoardPage() {
   };
 
   // Handle Edit Task Button Click
-  const handleEditClick = (task: any) => {
+  const handleEditClick = (task: ClientTaskWithClient) => {
     setEditingTask(task);
-    setTaskTitle(task.title);
-    setTaskDescription(task.description || '');
-    setTaskClientId(task.clientId);
-    setTaskStatus(task.status);
-    setTaskTargetDate(task.targetDate ? new Date(task.targetDate).toISOString().substring(0, 10) : '');
     setModalOpen(true);
   };
 
@@ -489,7 +408,7 @@ export default function ClientBoardPage() {
     .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
 
   // Group achieved tasks by day
-  const groupedAchievements = achievedTasks.reduce((groups: Record<string, any[]>, task) => {
+  const groupedAchievements = achievedTasks.reduce((groups: Record<string, ClientTaskWithClient[]>, task) => {
     const completedDate = new Date(task.completedAt!);
     const today = new Date();
     const yesterday = new Date();
@@ -630,11 +549,6 @@ export default function ClientBoardPage() {
               leftIcon={<Plus size={16} />}
               onClick={() => {
                 setEditingTask(null);
-                setTaskTitle('');
-                setTaskDescription('');
-                setTaskClientId('');
-                setTaskStatus('to_prepare');
-                setTaskTargetDate('');
                 setModalOpen(true);
               }}
             >
@@ -657,7 +571,7 @@ export default function ClientBoardPage() {
                 />
               </div>
 
-              {/* Client Filter Dropdown (Searchable Checklist) */}
+              {/* Client Filter Dropdown */}
               <div className="w-full sm:w-64 shrink-0 relative" ref={filterDropdownRef}>
                 <div
                   onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
@@ -696,14 +610,14 @@ export default function ClientBoardPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedClients([])}
-                        className="hover:text-primary transition-colors font-semibold"
+                        className="hover:text-primary transition-colors font-semibold cursor-pointer"
                       >
                         Reset (All)
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectedClients(clients.map(c => c.id))}
-                        className="hover:text-primary transition-colors font-semibold"
+                        className="hover:text-primary transition-colors font-semibold cursor-pointer"
                       >
                         Select All
                       </button>
@@ -779,8 +693,6 @@ export default function ClientBoardPage() {
           </div>
         </Card>
 
-
-
         {/* --- KANBAN BOARD GRID --- */}
         <div className="grid gap-6 grid-cols-1 md:grid-cols-3 items-start">
           {boardColumns.map((col) => {
@@ -794,463 +706,64 @@ export default function ClientBoardPage() {
               }
               return true;
             });
-            const isOver = dragOverColumn === col.id;
 
             return (
-              <div
-                key={col.id}
-                onDragOver={(e) => handleDragOver(e, col.id)}
-                onDrop={(e) => handleDrop(e, col.id)}
-                onDragLeave={() => setDragOverColumn(null)}
-                className={cn(
-                  'rounded-2xl border border-border bg-card/60 backdrop-blur-sm transition-all duration-300 min-h-[500px] flex flex-col',
-                  activeTab !== col.id ? 'hidden md:flex' : 'flex',
-                  isOver && 'border-primary ring-2 ring-primary/10 bg-primary/5',
-                  getColumnHeaderBg(col.id)
-                )}
-              >
-                {/* Column Header */}
-                <div className="p-4 border-b border-border/80 flex items-center justify-between shrink-0">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                      {col.label}
-                      <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold tabular-nums">
-                        {columnTasks.length}
-                      </span>
-                    </h3>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{col.description}</p>
+              <ComponentErrorBoundary key={col.id} componentName={`BoardColumn:${col.label}`}>
+                <BoardColumn
+                  col={col}
+                  columnTasks={columnTasks}
+                  activeTab={activeTab}
+                  dragOverColumn={dragOverColumn}
+                  loading={loading}
+                  handleDragOver={handleDragOver}
+                  handleDrop={handleDrop}
+                  setDragOverColumn={setDragOverColumn}
+                >
+                  <div className="space-y-3.5">
+                    {columnTasks.map((task) => (
+                      <ComponentErrorBoundary key={task.id} componentName={`TaskCard:${task.title}`}>
+                        <TaskCard
+                          task={task}
+                          colId={col.id}
+                          isDesktop={isDesktop}
+                          isContextMenuOpen={contextMenu?.task.id === task.id}
+                          modalOpen={modalOpen}
+                          handleDragStart={handleDragStart}
+                          handleContextMenu={handleContextMenu}
+                          handleCardClick={handleCardClick}
+                          handleStatusChange={handleStatusChange}
+                          handleEditClick={handleEditClick}
+                          handleDeleteClick={handleDeleteClick}
+                        />
+                      </ComponentErrorBoundary>
+                    ))}
                   </div>
-                </div>
-
-                {/* Column Body / Cards List */}
-                <div className="flex-1 p-3 overflow-y-auto space-y-3.5 max-h-[600px] min-h-[300px]">
-                  {loading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="bg-card border border-border rounded-xl p-4 space-y-3">
-                        <Skeleton className="h-4 w-2/3" />
-                        <Skeleton className="h-3 w-5/6" />
-                        <div className="flex justify-between items-center pt-2">
-                          <Skeleton className="h-5 w-16" rounded="lg" />
-                          <Skeleton className="h-5 w-12" rounded="lg" />
-                        </div>
-                      </div>
-                    ))
-                  ) : columnTasks.length === 0 ? (
-                    <div className="h-full flex items-center justify-center py-12 px-4 border border-dashed border-border/60 rounded-xl bg-muted/5">
-                      <p className="text-xs text-muted-foreground text-center italic">No tasks here</p>
-                    </div>
-                  ) : (
-                    columnTasks.map((task) => {
-                      const urgent = isTaskUrgent(task);
-                      
-                      // Calculate days remaining/overdue
-                      let dateLabel = '';
-                      let dateColorClass = 'text-muted-foreground bg-muted/20 border-border/60';
-                      if (task.targetDate) {
-                        const now = new Date();
-                        const due = new Date(task.targetDate);
-                        const days = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                        
-                        if (days < 0) {
-                          dateLabel = `Overdue by ${Math.abs(days)}d`;
-                          dateColorClass = 'text-red-500 dark:text-red-400 bg-red-500/10 border-red-500/20';
-                        } else if (days === 0) {
-                          dateLabel = 'Due Today';
-                          dateColorClass = 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20';
-                        } else if (days === 1) {
-                          dateLabel = 'Due Tomorrow';
-                          dateColorClass = 'text-amber-500 dark:text-amber-400 bg-amber-500/10 border-amber-500/20';
-                        } else {
-                          dateLabel = `Due in ${days}d`;
-                          dateColorClass = 'text-muted-foreground bg-muted/30 border-border/80';
-                        }
-                      }
-
-                      const isContextMenuOpen = contextMenu?.task.id === task.id;
-
-                      return (
-                        <div
-                          key={task.id}
-                          draggable={isDesktop && !contextMenu && !modalOpen}
-                          onDragStart={(e) => handleDragStart(e, task.id)}
-                          onContextMenu={(e) => handleContextMenu(e, task)}
-                          onClick={(e) => handleCardClick(e, task)}
-                          className={cn(
-                            'group relative bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 select-none',
-                            isDesktop ? 'cursor-grab active:cursor-grabbing active:scale-[0.98]' : 'cursor-pointer active:bg-muted/30',
-                            urgent && 'border-red-500/20 dark:border-red-500/30 ring-1 ring-red-500/10 dark:ring-red-500/20 bg-red-500/[0.01]',
-                            isContextMenuOpen && 'border-primary ring-1 ring-primary/20 bg-primary/[0.02]'
-                          )}
-                        >
-                          {/* Card header: client details */}
-                          <div className="flex items-center justify-between gap-2">
-                            {task.client && (
-                              <Link 
-                                href={`/admin/clients/${task.clientId}`}
-                                className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-                              >
-                                <Building size={9} />
-                                <span className="truncate max-w-[120px]">
-                                  {task.client.companyName || task.client.name}
-                                </span>
-                              </Link>
-                            )}
-
-                            {/* Urgent Flag badge */}
-                            {urgent && (
-                              <span className="inline-flex items-center gap-0.5 text-[8px] bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/20 px-1 rounded font-black uppercase tracking-wider animate-pulse-subtle">
-                                Urgent
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Task title & desc */}
-                          <h4 className="text-xs font-semibold text-foreground mt-1.5 leading-snug group-hover:text-primary transition-colors">
-                            {task.title}
-                          </h4>
-                          {task.description && (
-                            <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-                              {task.description}
-                            </p>
-                          )}
-
-                          {/* Card Footer: dates & actions */}
-                          <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-border/40 shrink-0">
-                            {/* Target/Due date indicator */}
-                            {task.targetDate ? (
-                              <span className={cn('inline-flex items-center gap-1 text-[9px] font-medium px-2 py-0.5 rounded-full border', dateColorClass)}>
-                                <Calendar size={9} />
-                                {dateLabel}
-                              </span>
-                            ) : (
-                              <span className="text-[9px] text-muted-foreground/50 italic">No deadline</span>
-                            )}
-
-                            {/* Dropdown/Quick Actions */}
-                            <div className="flex items-center gap-1">
-                              {col.id !== 'achieved' && (
-                                <button
-                                  onClick={() => handleStatusChange(task.id, 'achieved')}
-                                  title="Mark Achieved"
-                                  className="p-1 rounded text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors"
-                                >
-                                  <Check size={11} />
-                                </button>
-                              )}
-                              {col.id === 'to_prepare' && (
-                                <button
-                                  onClick={() => handleStatusChange(task.id, 'in_progress')}
-                                  title="Move to In Progress"
-                                  className="p-1 rounded text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
-                                >
-                                  <ChevronRight size={11} />
-                                </button>
-                              )}
-                              
-                              {/* 3-dot ActionMenu */}
-                              <div className="relative">
-                                <ActionMenu
-                                  ariaLabel="Task actions"
-                                  items={[
-                                    {
-                                      key: 'edit',
-                                      label: 'Edit details',
-                                      icon: <Pencil size={12} />,
-                                      onSelect: () => handleEditClick(task),
-                                    },
-                                    ...(task.status !== 'to_prepare' ? [{
-                                      key: 'to_prepare',
-                                      label: 'Move to To Prepare',
-                                      icon: <ClipboardList size={12} className="text-zinc-500" />,
-                                      onSelect: () => handleStatusChange(task.id, 'to_prepare'),
-                                    }] : []),
-                                    ...(task.status !== 'in_progress' ? [{
-                                      key: 'in_progress',
-                                      label: 'Move to In Progress',
-                                      icon: <Clock size={12} className="text-blue-500" />,
-                                      onSelect: () => handleStatusChange(task.id, 'in_progress'),
-                                    }] : []),
-                                    ...(task.status !== 'achieved' ? [{
-                                      key: 'achieved',
-                                      label: 'Move to Achieved',
-                                      icon: <Check size={12} className="text-emerald-500" />,
-                                      onSelect: () => handleStatusChange(task.id, 'achieved'),
-                                    }] : []),
-                                    {
-                                      key: 'delete',
-                                      label: 'Delete task',
-                                      icon: <Trash2 size={12} className="text-red-500" />,
-                                      onSelect: () => handleDeleteClick(task.id),
-                                      destructive: true,
-                                    },
-                                  ]}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+                </BoardColumn>
+              </ComponentErrorBoundary>
             );
           })}
         </div>
 
         {/* --- DAILY ACHIEVEMENT TIMELINE --- */}
-        <Card padding="md">
-          <SectionHeading
-            icon={<CheckCircle2 className="text-emerald-500" size={16} />}
-            title="Daily Achievement Timeline"
-            description="Timeline log of completed tasks and updates per client."
-          />
-
-          <div className="mt-6 space-y-6">
-            {Object.keys(groupedAchievements).length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground italic flex flex-col items-center gap-1.5">
-                <Clock size={16} className="text-muted-foreground/60" />
-                <span>No updates achieved yet. Start moving items to &apos;Achieved&apos;!</span>
-              </div>
-            ) : (
-              Object.keys(groupedAchievements).map((dateKey) => (
-                <div key={dateKey} className="relative pl-6 border-l border-border/80 space-y-3">
-                  {/* Timeline dot */}
-                  <span className="absolute -left-[5px] top-1.5 w-[9px] h-[9px] rounded-full bg-emerald-500 border border-background ring-4 ring-emerald-500/10" />
-
-                  {/* Group header */}
-                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                    {dateKey}
-                  </h4>
-
-                  {/* Tasks in group */}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {groupedAchievements[dateKey].map((task) => (
-                      <div
-                        key={task.id}
-                        className="p-3 bg-muted/20 border border-border/60 hover:border-border rounded-xl text-xs flex items-start justify-between gap-3 transition-colors"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground truncate">{task.title}</p>
-                          {task.description && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
-                              {task.description}
-                            </p>
-                          )}
-                          {task.client && (
-                            <p className="text-[10px] text-muted-foreground font-medium mt-1 flex items-center gap-1">
-                              <Building size={9} />
-                              {task.client.companyName || task.client.name}
-                            </p>
-                          )}
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <Badge variant="success" className="text-[8px] uppercase tracking-wider px-1.5">
-                            Achieved
-                          </Badge>
-                          {task.completedAt && (
-                            <p className="text-[9px] text-muted-foreground font-mono mt-1">
-                              {new Date(task.completedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
+        <ComponentErrorBoundary componentName="DailyAchievements">
+          <DailyAchievements groupedAchievements={groupedAchievements} />
+        </ComponentErrorBoundary>
       </div>
 
       {/* --- CREATE/EDIT TASK MODAL --- */}
-      {mounted &&
-        modalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={() => setModalOpen(false)}
-            />
-
-            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-              <div className="p-6 sm:p-8">
-                <SectionHeading
-                  title={editingTask ? 'Edit Task Details' : 'Create New Task'}
-                  description="Set updates, prepared tasks, or follow-ups for clients."
-                  action={
-                    <button
-                      onClick={() => setModalOpen(false)}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <X size={16} />
-                    </button>
-                  }
-                />
-
-                <form onSubmit={handleSubmitTask} className="space-y-5 mt-4">
-                  {/* Select Client (Searchable) */}
-                  <div className="relative" ref={clientDropdownRef}>
-                    <label className="block text-xs font-semibold text-foreground mb-2">
-                      Target Client *
-                    </label>
-                    <div
-                      onClick={() => setClientDropdownOpen(!clientDropdownOpen)}
-                      className={cn(
-                        "h-10 w-full rounded-xl bg-muted border border-border px-3.5 text-sm text-foreground flex items-center justify-between cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/35",
-                        clientDropdownOpen && "border-primary ring-2 ring-primary/35"
-                      )}
-                    >
-                      <span className={cn(!taskClientId && "text-muted-foreground/70")}>
-                        {taskClientId
-                          ? (clients.find((c) => c.id === taskClientId)?.companyName || clients.find((c) => c.id === taskClientId)?.name)
-                          : "Select a client..."}
-                      </span>
-                      <ChevronRight size={14} className={cn("transform transition-transform text-muted-foreground/70", clientDropdownOpen && "rotate-90")} />
-                    </div>
-
-                    {/* Hidden input for form integrity */}
-                    <input type="hidden" required value={taskClientId} readOnly />
-
-                    {clientDropdownOpen && (
-                      <div className="absolute z-[100] mt-1 w-full rounded-xl border border-border bg-card shadow-lg p-2.5 space-y-2 max-h-[260px] overflow-y-auto animate-fade-in-scale">
-                        <div className="relative">
-                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                          <input
-                            type="text"
-                            placeholder="Search client names..."
-                            value={clientSearch}
-                            onChange={(e) => setClientSearch(e.target.value)}
-                            className="h-9 w-full rounded-lg bg-muted border border-border pl-9 pr-3 text-xs text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/35"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="space-y-1 overflow-y-auto max-h-[160px] custom-scrollbar">
-                          {clients.filter(c => {
-                            const term = clientSearch.toLowerCase();
-                            return (
-                              c.name.toLowerCase().includes(term) ||
-                              (c.companyName && c.companyName.toLowerCase().includes(term))
-                            );
-                          }).length === 0 ? (
-                            <p className="text-center text-xs text-muted-foreground py-3 italic">No clients found</p>
-                          ) : (
-                            clients
-                              .filter(c => {
-                                const term = clientSearch.toLowerCase();
-                                return (
-                                  c.name.toLowerCase().includes(term) ||
-                                  (c.companyName && c.companyName.toLowerCase().includes(term))
-                                );
-                              })
-                              .map(c => {
-                                const isSelected = c.id === taskClientId;
-                                return (
-                                  <div
-                                    key={c.id}
-                                    onClick={() => {
-                                      setTaskClientId(c.id);
-                                      setClientSearch('');
-                                      setClientDropdownOpen(false);
-                                    }}
-                                    className={cn(
-                                      "flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer hover:bg-muted transition-colors",
-                                      isSelected && "bg-primary/10 text-primary hover:bg-primary/15 font-semibold"
-                                    )}
-                                  >
-                                    <span className="truncate">
-                                      {c.companyName ? `${c.companyName} (${c.name})` : c.name}
-                                    </span>
-                                    {isSelected && <Check size={12} className="text-primary shrink-0" />}
-                                  </div>
-                                );
-                              })
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Task Title */}
-                  <Input
-                    label="Task / Update Title *"
-                    required
-                    placeholder="e.g. Run NPM audits and fix vulnerabilities"
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                  />
-
-                  {/* Task Description */}
-                  <div>
-                    <label className="block text-xs font-semibold text-foreground mb-2">
-                      Description
-                    </label>
-                    <Textarea
-                      placeholder="Add details, notes, or preparation guidelines..."
-                      rows={3}
-                      value={taskDescription}
-                      onChange={(e) => setTaskDescription(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Status & Target Date */}
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-xs font-semibold text-foreground mb-2">
-                        Status / Column
-                      </label>
-                      <Select
-                        value={taskStatus}
-                        onChange={(e) => setTaskStatus(e.target.value as TaskStatus)}
-                      >
-                        <option value="to_prepare">To Prepare</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="achieved">Achieved</option>
-                      </Select>
-                    </div>
-
-                    <Input
-                      label="Target Date / Due Date"
-                      type="date"
-                      value={taskTargetDate}
-                      onChange={(e) => setTaskTargetDate(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 justify-end pt-4 border-t border-border mt-6">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="md"
-                      onClick={() => setModalOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      disabled={isPending}
-                    >
-                      {isPending ? (
-                        <>
-                          <Loader2 className="animate-spin mr-1.5" size={14} />
-                          Saving...
-                        </>
-                      ) : (
-                        editingTask ? 'Save Changes' : 'Create Task'
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      <ComponentErrorBoundary componentName="CreateTaskModal">
+        <CreateTaskModal
+          isOpen={mounted && modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+            setEditingTask(null);
+          }}
+          onSubmit={handleFormSubmit}
+          isPending={isPending}
+          clients={clients}
+          editingTask={editingTask}
+        />
+      </ComponentErrorBoundary>
 
       {/* --- TASK CARD CONTEXT MENU --- */}
       {mounted && contextMenu && createPortal(

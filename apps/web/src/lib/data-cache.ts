@@ -149,15 +149,23 @@ export async function getCached<T>(
   trace(`miss "${key}" (fetching)`);
   const promise = fetcher()
     .then((value) => {
-      const entry = { value, expiresAt: Date.now() + ttlMs };
-      cache.set(key, entry);
-      saveToLocalStorage(key, entry);
-      inFlight.delete(key);
-      notify(key);
+      // Only write to the cache if this promise is still the active in-flight request.
+      // If the cache was invalidated/primed during this request, discard the stale result.
+      if (inFlight.get(key) === promise) {
+        const entry = { value, expiresAt: Date.now() + ttlMs };
+        cache.set(key, entry);
+        saveToLocalStorage(key, entry);
+        inFlight.delete(key);
+        notify(key);
+      } else {
+        trace(`discard stale/invalidated in-flight request for "${key}"`);
+      }
       return value;
     })
     .catch((err) => {
-      inFlight.delete(key);
+      if (inFlight.get(key) === promise) {
+        inFlight.delete(key);
+      }
       throw err;
     });
 
@@ -182,6 +190,7 @@ export function invalidateCache(...keys: string[]): void {
       cache.set(key, entry);
       saveToLocalStorage(key, entry);
     }
+    inFlight.delete(key); // Cancel/discard any pending stale requests
     notify(key);
   }
 }
@@ -190,6 +199,7 @@ export function invalidateCache(...keys: string[]): void {
 export function clearAllCache(): void {
   trace('clear all');
   cache.clear();
+  inFlight.clear();
   if (typeof window === 'undefined') return;
   try {
     const toRemove: string[] = [];
@@ -209,6 +219,7 @@ export function primeCache(key: string, value: unknown, ttlMs: number = DEFAULT_
   const entry = { value, expiresAt: Date.now() + ttlMs };
   cache.set(key, entry);
   saveToLocalStorage(key, entry);
+  inFlight.delete(key); // Cancel/discard any pending stale requests
   notify(key);
 }
 

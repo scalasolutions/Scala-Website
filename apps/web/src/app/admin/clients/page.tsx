@@ -1,33 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import {
-  Plus,
-  Search,
-  Mail,
-  Phone,
-  Building,
-  X,
-  AlertTriangle,
-  ArrowRight,
-  Users,
-  Receipt,
-  Ticket,
-  Loader2,
-  Pencil,
-  Trash2,
-  Briefcase,
-  FileText,
-  RotateCcw,
-  ClipboardList,
-  Copy,
-  Eye,
-  EyeOff,
-  CheckCircle,
-} from 'lucide-react';
+import React, { useState, useEffect, useTransition } from 'react';
+import { Plus } from 'lucide-react';
 import { ClientAgreementPreview } from './components/ClientAgreementPreview';
 import {
   createClient,
@@ -43,44 +17,45 @@ import {
   getInvoices,
   getClientTasks,
 } from '@/lib/db/queries';
+import { NewClient, NewPartner } from '@/lib/db/schema';
 import { isDbWriteError } from '@/lib/db/errors';
 import {
   invalidateCache,
   CACHE_KEYS,
   useAdminData,
 } from '@/lib/data-cache';
-import { cn, getSubscriptionRemainingMonths, TABLE_ROW_HOVER, generateStrongPassword, isOutstandingInvoice } from '@/lib/utils';
-import { formatCurrencyIDR } from '@/app/admin/invoices/components/invoice-types';
+import { cn } from '@/lib/utils';
 import PageHeader from '@/components/ui/PageHeader';
-import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
-import Skeleton from '@/components/ui/Skeleton';
-import Select from '@/components/ui/Select';
-import Textarea from '@/components/ui/Textarea';
-import EmptyState from '@/components/ui/EmptyState';
-import SectionHeading from '@/components/ui/SectionHeading';
 import FilterBar, { FilterOption } from '@/components/ui/FilterBar';
-import ActionMenu from '@/components/ui/ActionMenu';
+
+// Local modular refactored components
+import { ComponentErrorBoundary } from './components/ComponentErrorBoundary';
+import { ClientsList } from './components/ClientsList';
+import { PartnersList } from './components/PartnersList';
+import { CreateClientModal } from './components/CreateClientModal';
+import { CreatePartnerModal } from './components/CreatePartnerModal';
 
 type TabValue = 'clients' | 'partners';
 type StatusFilter = 'all' | 'active' | 'pending' | 'inactive';
 
 export default function ClientsPage() {
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<TabValue>('clients');
 
-  // Clients Directory State & Queries
+  // Queries using admin cache hooks
   const { data: clientsData, loading: loadingClients, mutate: mutateClients } = useAdminData<MockClient[]>(CACHE_KEYS.CLIENTS, getClients);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: partnersData, loading: loadingPartners, mutate: mutatePartners } = useAdminData<MockPartner[]>(CACHE_KEYS.PARTNERS, getPartners as any);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: invoicesData } = useAdminData<MockInvoice[]>(CACHE_KEYS.INVOICES, getInvoices as any);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: tasksData } = useAdminData<MockClientTask[]>(CACHE_KEYS.CLIENT_TASKS, getClientTasks as any);
 
   const clients = clientsData || [];
@@ -88,199 +63,39 @@ export default function ClientsPage() {
   const invoices = invoicesData || [];
   const allTasks = tasksData || [];
 
-  const loading = loadingClients;
-  const partnersLoading = loadingPartners;
-
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [partnersSearch, setPartnersSearch] = useState('');
 
-  // Create/Edit Client Modal State
+  // Modals state
   const [modalOpen, setModalOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
-  // Client Form Fields
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [websiteAddress, setWebsiteAddress] = useState('');
-  const [status, setStatus] = useState<'pending' | 'active' | 'inactive'>('pending');
-  const [subscriptionType, setSubscriptionType] = useState<'static' | 'dynamic' | ''>('');
-  const [subscriptionMonths, setSubscriptionMonths] = useState<number>(12);
-  const [subscriptionStartDate, setSubscriptionStartDate] = useState<string>(
-    new Date().toISOString().substring(0, 10)
-  );  const [portalPassword, setPortalPassword] = useState('');
-  const [sourcedBy, setSourcedBy] = useState('organic');
-  const [modalShowPassword, setModalShowPassword] = useState(false);
-  const [modalPasswordCopied, setModalPasswordCopied] = useState(false);
-  const [modalEmailCopied, setModalEmailCopied] = useState(false);
-  // SLA Agreement & Maintenance Reminders configuration states
-  const [selectedAgreementClient, setSelectedAgreementClient] = useState<MockClient | null>(null);
-  const [envRotationInterval, setEnvRotationInterval] = useState<number>(6);
-  const [stabilityCheckInterval, setStabilityCheckInterval] = useState<number>(1);
-  const [expectationsCheckInterval, setExpectationsCheckInterval] = useState<number>(3);
-
-  // Create/Edit Partner Modal State
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [editingPartner, setEditingPartner] = useState<MockPartner | null>(null);
+  const [selectedAgreementClient, setSelectedAgreementClient] = useState<MockClient | null>(null);
 
-  // Partner Form Fields
-  const [partnerName, setPartnerName] = useState('');
-  const [partnerEmail, setPartnerEmail] = useState('');
-  const [partnerPhone, setPartnerPhone] = useState('');
-  const [partnerCompanyName, setPartnerCompanyName] = useState('');
-  const [partnerReferralRate, setPartnerReferralRate] = useState<number>(10);
-  const [partnerBankDetails, setPartnerBankDetails] = useState('');
+  const [isPending, startTransition] = useTransition();
 
-  // Form Refs & Error States for validation focus / anchoring
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const emailInputRef = useRef<HTMLInputElement>(null);
-  const [nameError, setNameError] = useState('');
-  const [emailError, setEmailError] = useState('');
-
-  const partnerNameInputRef = useRef<HTMLInputElement>(null);
-  const partnerEmailInputRef = useRef<HTMLInputElement>(null);
-  const [partnerNameError, setPartnerNameError] = useState('');
-  const [partnerEmailError, setPartnerEmailError] = useState('');
-
-  // Dirty state checks to prevent accidental modal discard/close
-  const isCreateClientDirty = () => {
-    return (
-      name !== '' ||
-      email !== '' ||
-      phone !== '' ||
-      companyName !== '' ||
-      websiteAddress !== '' ||
-      status !== 'pending' ||
-      subscriptionType !== '' ||
-      subscriptionMonths !== 12 ||
-      sourcedBy !== 'organic' ||
-      envRotationInterval !== 6 ||
-      stabilityCheckInterval !== 1 ||
-      expectationsCheckInterval !== 3
-    );
-  };
-
-  const isPartnerDirty = () => {
-    if (editingPartner) {
-      return (
-        partnerName !== (editingPartner.name || '') ||
-        partnerEmail !== (editingPartner.email || '') ||
-        partnerPhone !== (editingPartner.phone || '') ||
-        partnerCompanyName !== (editingPartner.companyName || '') ||
-        partnerReferralRate !== (editingPartner.referralRate || 10) ||
-        partnerBankDetails !== (editingPartner.bankDetails || '')
-      );
-    } else {
-      return (
-        partnerName !== '' ||
-        partnerEmail !== '' ||
-        partnerPhone !== '' ||
-        partnerCompanyName !== '' ||
-        partnerReferralRate !== 10 ||
-        partnerBankDetails !== ''
-      );
-    }
-  };
-
-  const handleCancelCreateClient = () => {
-    if (isCreateClientDirty()) {
-      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
-      if (!confirmClose) return;
-    }
-    setNameError('');
-    setEmailError('');
-    setModalOpen(false);
-  };
-
-  const handleCancelPartner = () => {
-    if (isPartnerDirty()) {
-      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
-      if (!confirmClose) return;
-    }
-    setPartnerNameError('');
-    setPartnerEmailError('');
-    setPartnerModalOpen(false);
-  };
-
+  // Auto-open new client modal if query param is set
   useEffect(() => {
-    // Check if redirect query string contains new=true to auto-open modal
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('new') === 'true') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setModalOpen(true);
       }
     }
   }, []);
 
-  // Pre-populate portal password with a secure generated password when modal opens
-  useEffect(() => {
-    if (modalOpen) {
-      setPortalPassword(generateStrongPassword());
-    } else {
-      setPortalPassword('');
-    }
-  }, [modalOpen]);
-
-  // Prevent background scrolling when Add Client or Partner modal is open
-  useEffect(() => {
-    const mainEl = document.querySelector('main');
-    if (modalOpen || partnerModalOpen) {
-      if (mainEl) mainEl.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    } else {
-      if (mainEl) mainEl.style.overflow = '';
-      document.body.style.overflow = '';
-    }
-    return () => {
-      if (mainEl) mainEl.style.overflow = '';
-      document.body.style.overflow = '';
-    };
-  }, [modalOpen, partnerModalOpen]);
-
-  const handleCreateClient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    let hasError = false;
-    setNameError('');
-    setEmailError('');
-
-    if (!name.trim()) {
-      setNameError('Full name is required');
-      nameInputRef.current?.focus();
-      nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      hasError = true;
-    }
-    if (!email.trim()) {
-      setEmailError('Email is required');
-      if (!hasError) {
-        emailInputRef.current?.focus();
-        emailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      hasError = true;
-    }
-    if (hasError) return;
-
+  // Form submit handlers
+  const handleCreateClientSubmit = async (
+    clientData: Omit<NewClient, 'logoUrl' | 'tcStatus' | 'envRotationLastAt' | 'stabilityCheckLastAt' | 'expectationsCheckLastAt'>
+  ) => {
     startTransition(async () => {
       try {
         const newClient = await createClient({
-          name,
-          email,
-          phone: phone || null,
-          companyName: companyName || null,
-          websiteAddress: websiteAddress || null,
-          status,
+          ...clientData,
           logoUrl: null,
-          subscriptionType: subscriptionType || null,
-          subscriptionMonths: subscriptionType ? Number(subscriptionMonths) : null,
-          subscriptionStartDate: subscriptionType ? new Date(subscriptionStartDate) : null,
-          portalPassword: portalPassword || generateStrongPassword(),
-          sourcedBy: sourcedBy || 'organic',
           tcStatus: 'pending',
-          envRotationInterval: Number(envRotationInterval),
-          stabilityCheckInterval: Number(stabilityCheckInterval),
-          expectationsCheckInterval: Number(expectationsCheckInterval),
           envRotationLastAt: new Date(),
           stabilityCheckLastAt: new Date(),
           expectationsCheckLastAt: new Date(),
@@ -288,24 +103,8 @@ export default function ClientsPage() {
 
         if (newClient && !isDbWriteError(newClient)) {
           mutateClients([newClient as MockClient, ...clients]);
-          // Reset form fields
-          setName('');
-          setEmail('');
-          setPhone('');
-          setCompanyName('');
-          setWebsiteAddress('');
-          setStatus('pending');
-          setSubscriptionType('');
-          setSubscriptionMonths(12);
-          setSubscriptionStartDate(new Date().toISOString().substring(0, 10));
-          setPortalPassword('');
-          setSourcedBy('organic');
-          setEnvRotationInterval(6);
-          setStabilityCheckInterval(1);
-          setExpectationsCheckInterval(3);
           setModalOpen(false);
 
-          // Clear query string
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, '', '/admin/clients');
           }
@@ -316,92 +115,22 @@ export default function ClientsPage() {
     });
   };
 
-  const generateSuggestedEmail = (company: string, clientName: string) => {
-    const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-    
-    const nameParts = clientName.trim().split(/\s+/);
-    const firstName = nameParts[0] ? nameParts[0].toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-    const lastName = nameParts[1] ? nameParts[1].toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-    
-    const cleanCompany = cleanString(company);
-    
-    // 1. If we have both name and business name
-    if (firstName && cleanCompany) {
-      return `${firstName}@${cleanCompany}.com`;
-    }
-    
-    // 2. If we only have name, use surname as domain + random suffix to prevent clashes
-    if (firstName) {
-      const rand = Math.floor(Math.random() * 900) + 100; // 3-digit random number
-      const domain = lastName || 'client';
-      return `${firstName}${rand}@${domain}.com`;
-    }
-    
-    // 3. Fallback: fully random email
-    const randVal = Math.floor(Math.random() * 9000) + 1000;
-    return `client${randVal}@example.com`;
-  };
-
-  const handleCreatePartner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    let hasError = false;
-    setPartnerNameError('');
-    setPartnerEmailError('');
-
-    if (!partnerName.trim()) {
-      setPartnerNameError('Partner name is required');
-      partnerNameInputRef.current?.focus();
-      partnerNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      hasError = true;
-    }
-    if (!partnerEmail.trim()) {
-      setPartnerEmailError('Partner email is required');
-      if (!hasError) {
-        partnerEmailInputRef.current?.focus();
-        partnerEmailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      hasError = true;
-    }
-    if (hasError) return;
-
+  const handleCreatePartnerSubmit = async (partnerData: Omit<NewPartner, 'id' | 'createdAt'>) => {
     startTransition(async () => {
       try {
         if (editingPartner) {
-          const updated = await updatePartner(editingPartner.id, {
-            name: partnerName,
-            email: partnerEmail,
-            phone: partnerPhone || null,
-            companyName: partnerCompanyName || null,
-            referralRate: Number(partnerReferralRate),
-            bankDetails: partnerBankDetails || null,
-          });
+          const updated = await updatePartner(editingPartner.id, partnerData);
           if (updated && !isDbWriteError(updated)) {
             mutatePartners(
               partners.map((p) => (p.id === updated.id ? (updated as MockPartner) : p))
             );
           }
         } else {
-          const created = await createPartner({
-            name: partnerName,
-            email: partnerEmail,
-            phone: partnerPhone || null,
-            companyName: partnerCompanyName || null,
-            referralRate: Number(partnerReferralRate),
-            bankDetails: partnerBankDetails || null,
-          });
+          const created = await createPartner(partnerData);
           if (created && !isDbWriteError(created)) {
             mutatePartners([created as MockPartner, ...partners]);
           }
         }
-
-        // Reset fields & close
-        setPartnerName('');
-        setPartnerEmail('');
-        setPartnerPhone('');
-        setPartnerCompanyName('');
-        setPartnerReferralRate(10);
-        setPartnerBankDetails('');
         setEditingPartner(null);
         setPartnerModalOpen(false);
       } catch (err) {
@@ -412,12 +141,6 @@ export default function ClientsPage() {
 
   const handleEditPartnerClick = (partner: MockPartner) => {
     setEditingPartner(partner);
-    setPartnerName(partner.name);
-    setPartnerEmail(partner.email);
-    setPartnerPhone(partner.phone || '');
-    setPartnerCompanyName(partner.companyName || '');
-    setPartnerReferralRate(partner.referralRate);
-    setPartnerBankDetails(partner.bankDetails || '');
     setPartnerModalOpen(true);
   };
 
@@ -437,7 +160,6 @@ export default function ClientsPage() {
           return;
         }
         mutatePartners(partners.filter((p) => p.id !== partnerId));
-        // Refresh clients — some may now show 'organic' sourcing in the background
         invalidateCache(CACHE_KEYS.CLIENTS);
       } catch (err) {
         console.error('Failed to delete partner', err);
@@ -445,59 +167,7 @@ export default function ClientsPage() {
     });
   };
 
-  const getSourcedByLabel = (sourcedByVal: string | null) => {
-    if (
-      !sourcedByVal ||
-      sourcedByVal === 'organic' ||
-      sourcedByVal === 'fredrick' ||
-      sourcedByVal === 'nicholas'
-    ) {
-      return 'Organic';
-    }
-    const partner = partners.find((p) => p.id === sourcedByVal);
-    if (partner) {
-      return partner.name;
-    }
-    if (sourcedByVal === 'affiliate') {
-      return 'Affiliate';
-    }
-    return sourcedByVal || 'Organic';
-  };
-
-  const filteredPartners = partners.filter((p) => {
-    return (
-      p.name.toLowerCase().includes(partnersSearch.toLowerCase()) ||
-      p.email.toLowerCase().includes(partnersSearch.toLowerCase()) ||
-      (p.companyName && p.companyName.toLowerCase().includes(partnersSearch.toLowerCase()))
-    );
-  });
-
-  const filteredClients = clients.filter((c) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      (c.companyName && c.companyName.toLowerCase().includes(search.toLowerCase()));
-
-    const matchesFilter = statusFilter === 'all' || c.status === statusFilter;
-
-    return matchesSearch && matchesFilter;
-  });
-
-  // Quick metrics for the clients tab
-  const totalClients = clients.length;
-  const activeClients = clients.filter((c) => c.status === 'active').length;
-  const pendingClients = clients.filter((c) => c.status === 'pending').length;
-  const inactiveClients = clients.filter((c) => c.status === 'inactive').length;
-
-  // Status filter options (with counts)
-  const statusOptions: FilterOption<StatusFilter>[] = [
-    { value: 'all', label: 'All', count: totalClients },
-    { value: 'active', label: 'Active', count: activeClients },
-    { value: 'pending', label: 'Pending', count: pendingClients },
-    { value: 'inactive', label: 'Inactive', count: inactiveClients },
-  ];
-
-  // Tab options
+  // Tab count metrics
   const tabOptions: FilterOption<TabValue>[] = [
     { value: 'clients', label: 'Clients', count: clients.length },
     { value: 'partners', label: 'Affiliate Partners', count: partners.length },
@@ -508,1018 +178,103 @@ export default function ClientsPage() {
   return (
     <>
       <div className={cn("space-y-8 animate-fade-up", selectedAgreementClient && "print:hidden")}>
-        {/* Tab switcher — calm FilterBar, not aggressive coloured tab strip */}
-      <FilterBar<TabValue>
-        options={tabOptions}
-        value={activeTab}
-        onChange={setActiveTab}
-        size="md"
-      />
+        {/* Tab switcher */}
+        <FilterBar<TabValue>
+          options={tabOptions}
+          value={activeTab}
+          onChange={setActiveTab}
+          size="md"
+        />
 
-      {/* Page header */}
-      <PageHeader
-        title={isClients ? 'Client Directory' : 'Affiliate Partners'}
-        description={
-          isClients
-            ? 'Manage client accounts, subscription billing, and hosting quotas.'
-            : 'Manage external entities that refer clients and build the pipeline.'
-        }
-        actions={
-          isClients ? (
-            <Button
-              variant="primary"
-              size="md"
-              leftIcon={<Plus size={16} />}
-              onClick={() => setModalOpen(true)}
-            >
-              New Client
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="md"
-              leftIcon={<Plus size={16} />}
-              onClick={() => {
-                setEditingPartner(null);
-                setPartnerName('');
-                setPartnerEmail('');
-                setPartnerPhone('');
-                setPartnerCompanyName('');
-                setPartnerReferralRate(10);
-                setPartnerBankDetails('');
-                setPartnerModalOpen(true);
-              }}
-            >
-              New Partner
-            </Button>
-          )
-        }
-      />
+        {/* Page header */}
+        <PageHeader
+          title={isClients ? 'Client Directory' : 'Affiliate Partners'}
+          description={
+            isClients
+              ? 'Manage client accounts, subscription billing, and hosting quotas.'
+              : 'Manage external entities that refer clients and build the pipeline.'
+          }
+          actions={
+            isClients ? (
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<Plus size={16} />}
+                onClick={() => setModalOpen(true)}
+              >
+                New Client
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<Plus size={16} />}
+                onClick={() => {
+                  setEditingPartner(null);
+                  setPartnerModalOpen(true);
+                }}
+              >
+                New Partner
+              </Button>
+            )
+          }
+        />
 
-      {/* --- CLIENTS TAB --- */}
-      {isClients && (
-        <>
-          {/* Toolbar: search + status filter */}
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <div className="flex-1 max-w-md">
-              <Input
-                placeholder="Search clients by name, email, or company…"
-                leftIcon={<Search size={16} />}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <FilterBar<StatusFilter>
-              options={statusOptions}
-              value={statusFilter}
-              onChange={setStatusFilter}
+        {/* List Content with Isolated Error Boundaries */}
+        {isClients ? (
+          <ComponentErrorBoundary componentName="ClientsList">
+            <ClientsList
+              clients={clients}
+              partners={partners}
+              invoices={invoices}
+              allTasks={allTasks}
+              loading={loadingClients}
+              search={search}
+              setSearch={setSearch}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              setSelectedAgreementClient={setSelectedAgreementClient}
+              setModalOpen={setModalOpen}
             />
-          </div>
-
-          {loading ? (
-            <Card padding="sm">
-              <div className="divide-y divide-border">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between gap-4 py-4 px-4 border-b border-border last:border-0">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <Skeleton className="h-10 w-10 shrink-0" rounded="xl" />
-                      <div className="flex-1 space-y-2 min-w-0">
-                        <Skeleton className="h-4 w-24 sm:w-36" />
-                        <Skeleton className="h-3 w-32 sm:w-48" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <div className="text-right space-y-2 hidden sm:block">
-                        <Skeleton className="h-3.5 w-16" />
-                        <Skeleton className="h-3 w-12" />
-                      </div>
-                      <Skeleton className="h-6 w-16" rounded="lg" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : filteredClients.length === 0 ? (
-            <Card padding="lg">
-              <EmptyState
-                icon={<Building size={20} />}
-                title="No clients found"
-                description="Try adjusting your search or filters, or add a new client account."
-                action={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    leftIcon={<Plus size={14} />}
-                    onClick={() => setModalOpen(true)}
-                  >
-                    New Client
-                  </Button>
-                }
-              />
-            </Card>
-          ) : (
-            <Card padding="sm">
-              <div className="divide-y divide-border">
-                {filteredClients.map((client) => {
-                  const remaining = getSubscriptionRemainingMonths(client);
-                  const isExpiring = remaining !== null && remaining < 3;
-
-                  // Calculate outstanding invoices
-                  const clientInvoices = invoices.filter(inv => inv.clientId === client.id);
-                  const hasOutstanding = clientInvoices.some(isOutstandingInvoice);
-
-                  // Calculate if any maintenance task is overdue
-                  const isMaintenanceOverdue = (() => {
-                    if (client.status !== 'active') return false; // only alert for active clients
-                    
-                    const now = new Date();
-                    
-                    // Env rotation overdue check
-                    if (client.envRotationLastAt) {
-                      const envDue = new Date(client.envRotationLastAt);
-                      envDue.setMonth(envDue.getMonth() + (client.envRotationInterval || 6));
-                      if (now > envDue) return true;
-                    } else if (client.createdAt) {
-                      const envDue = new Date(client.createdAt);
-                      envDue.setMonth(envDue.getMonth() + (client.envRotationInterval || 6));
-                      if (now > envDue) return true;
-                    }
-
-                    // Stability check overdue check
-                    if (client.stabilityCheckLastAt) {
-                      const stabDue = new Date(client.stabilityCheckLastAt);
-                      stabDue.setMonth(stabDue.getMonth() + (client.stabilityCheckInterval || 1));
-                      if (now > stabDue) return true;
-                    } else if (client.createdAt) {
-                      const stabDue = new Date(client.createdAt);
-                      stabDue.setMonth(stabDue.getMonth() + (client.stabilityCheckInterval || 1));
-                      if (now > stabDue) return true;
-                    }
-
-                    // Expectations check overdue check
-                    if (client.expectationsCheckLastAt) {
-                      const expDue = new Date(client.expectationsCheckLastAt);
-                      expDue.setMonth(expDue.getMonth() + (client.expectationsCheckInterval || 3));
-                      if (now > expDue) return true;
-                    } else if (client.createdAt) {
-                      const expDue = new Date(client.createdAt);
-                      expDue.setMonth(expDue.getMonth() + (client.expectationsCheckInterval || 3));
-                      if (now > expDue) return true;
-                    }
-
-                    return false;
-                  })();
-
-                  const statusVariant:
-                    | 'success'
-                    | 'warning'
-                    | 'neutral' =
-                    client.status === 'active'
-                      ? 'success'
-                      : client.status === 'pending'
-                      ? 'warning'
-                      : 'neutral';
-
-                  const sourcedLabel = getSourcedByLabel(client.sourcedBy);
-                  const isOrganic = sourcedLabel === 'Organic';
-
-                  const clDomain = client.websiteAddress ? client.websiteAddress.replace(/https?:\/\/(www\.)?/, '').split('/')[0] : null;
-                  const clFavicon = clDomain ? `https://www.google.com/s2/favicons?domain=${clDomain}&sz=64` : null;
-
-                  return (
-                    <div
-                      key={client.id}
-                      className={cn(
-                        'group flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg border border-transparent',
-                        TABLE_ROW_HOVER,
-                      )}
-                    >
-                      {/* Left + Middle Clickable Region */}
-                      <div
-                        onClick={() => router.push(`/admin/clients/${client.id}`)}
-                        className="min-w-0 flex-1 flex items-center justify-between gap-4 cursor-pointer active-press"
-                      >
-                        {/* Logo avatar */}
-                        <div className="w-9 h-9 rounded-full border border-border bg-muted flex items-center justify-center shrink-0 overflow-hidden self-start mt-0.5">
-                          {clFavicon ? (
-                            <>
-                              <img
-                                src={clFavicon}
-                                alt={client.name}
-                                className="w-5 h-5 object-contain"
-                                onLoad={(e) => {
-                                  const img = e.target as HTMLImageElement;
-                                  if (img.naturalWidth <= 16) {
-                                    img.style.display = 'none';
-                                    img.nextElementSibling?.removeAttribute('style');
-                                  }
-                                }}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                  (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style');
-                                }}
-                              />
-                              <span className="text-xs font-bold text-muted-foreground" style={{ display: 'none' }}>
-                                {client.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-xs font-bold text-muted-foreground">
-                              {client.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-col gap-1.5">
-                            {/* Line 1: Client Name */}
-                            <p className="text-sm font-semibold text-foreground truncate">
-                              {client.name}
-                            </p>
-
-                            {/* Line 2: Badges Row in specific order: Outstanding, Status, Tasks, Partner */}
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {/* 1. Outstanding Badge */}
-                              {hasOutstanding && (
-                                <span
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/admin/invoices?client=${client.id}`);
-                                  }}
-                                  className="relative group/badge cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse-subtle hover:bg-red-500/25 active:scale-95 transition-all select-none shrink-0"
-                                >
-                                  Outstanding
-                                  {/* Custom Tooltip on Hover */}
-                                  <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/badge:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-52 leading-relaxed normal-case select-none text-left">
-                                    <div className="text-[10px] uppercase tracking-wider text-red-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
-                                      <span>⚠️ Unpaid Bills</span>
-                                      <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 rounded">Click to View</span>
-                                    </div>
-                                    <div className="space-y-1 font-mono font-medium max-h-[120px] overflow-y-auto">
-                                      {clientInvoices.filter(isOutstandingInvoice).map(inv => (
-                                        <div key={inv.id} className="flex justify-between items-center gap-2">
-                                          <span className="text-zinc-400 truncate">{inv.invoiceNumber}</span>
-                                          <span className="text-zinc-100 shrink-0">{formatCurrencyIDR(inv.total - (inv.amountPaid || 0))}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </span>
-                                </span>
-                              )}
-                              {isMaintenanceOverdue && (
-                                <span
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/admin/clients/${client.id}?focus=maintenance`);
-                                  }}
-                                  className="relative group/maint cursor-pointer inline-flex items-center gap-0.5 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-black uppercase tracking-wider transition-all select-none shrink-0 hover:bg-amber-500/25 active:scale-95 animate-pulse-subtle"
-                                >
-                                  ⚠️ Maint. Due
-                                  {/* Custom Tooltip on Hover */}
-                                  <span className="absolute bottom-full left-0 mb-2 p-3 bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 text-zinc-100 text-[10px] font-bold rounded-xl opacity-0 pointer-events-none group-hover/maint:opacity-100 transition-opacity duration-200 shadow-2xl z-50 w-56 leading-relaxed normal-case select-none text-left">
-                                    <div className="text-[10px] uppercase tracking-wider text-amber-400 font-extrabold pb-1 border-b border-zinc-800 mb-1.5 flex justify-between items-center">
-                                      <span>⚠️ Maintenance Alert</span>
-                                      <span className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 rounded">Click to Resolve</span>
-                                    </div>
-                                    <div className="space-y-1 text-zinc-400 text-[10px] font-medium leading-relaxed">
-                                      Environment variables, stability checkups, or client reviews are overdue. Click to open operations panel.
-                                    </div>
-                                  </span>
-                                </span>
-                              )}
-
-                              {/* 2. Status Badge */}
-                              <Badge variant={statusVariant} className="capitalize shrink-0 text-[10px] py-0.5 leading-none">
-                                {client.status === 'pending'
-                                  ? `Pending | ${Math.floor((Date.now() - new Date(client.createdAt).getTime()) / (1000 * 60 * 60 * 24))}D`
-                                  : client.status}
-                              </Badge>
-
-                              {/* 3. Tasks Badge */}
-                              {(() => {
-                                const taskCount = allTasks.filter(
-                                  t => t.clientId === client.id && t.status !== 'achieved'
-                                ).length;
-                                if (taskCount === 0) return null;
-                                return (
-                                  <span
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/admin/board?client=${client.id}`);
-                                    }}
-                                    className="inline-flex items-center gap-1 text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold cursor-pointer hover:bg-primary/20 active:scale-95 transition-all select-none shrink-0"
-                                    title={`${taskCount} active task${taskCount !== 1 ? 's' : ''}`}
-                                  >
-                                    <ClipboardList size={9} />
-                                    {taskCount}
-                                  </span>
-                                );
-                              })()}
-
-                              {/* 4. Partner Badge */}
-                              {!isOrganic && (
-                                <Badge variant="neutral" className="text-[9px] py-0.5 leading-none shrink-0">via {sourcedLabel}</Badge>
-                              )}
-                            </div>
-
-                            {/* Line 3: Company Name / details */}
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
-                              <span className="inline-flex items-center gap-1 truncate font-medium">
-                                <Building size={11} className="shrink-0 text-muted-foreground/70" />
-                                {client.companyName || 'No company'}
-                              </span>
-                              {client.subscriptionType && (
-                                <span className="inline-flex items-center gap-1 capitalize">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/35" />
-                                  {client.subscriptionType} hosting
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Middle: quota */}
-                        <div className="hidden md:flex flex-col items-end shrink-0 min-w-[140px]">
-                          {remaining !== null ? (
-                            <>
-                              <div className="flex items-center gap-2">
-                                {isExpiring && (
-                                  <AlertTriangle
-                                    size={12}
-                                    className={
-                                      remaining === 0 ? 'text-red-500' : 'text-amber-500'
-                                    }
-                                  />
-                                )}
-                                <span className="text-sm font-medium text-foreground tabular-nums">
-                                  {remaining}
-                                  <span className="text-muted-foreground font-normal">
-                                    {' '}/ {client.subscriptionMonths} mo
-                                  </span>
-                                </span>
-                              </div>
-                              <div className="mt-1.5 w-24 h-1 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-500 ${
-                                    remaining === 0
-                                      ? 'bg-red-500'
-                                      : isExpiring
-                                      ? 'bg-amber-500'
-                                      : 'bg-foreground/30'
-                                  }`}
-                                  style={{
-                                    width: `${Math.min(
-                                      100,
-                                      (remaining / (client.subscriptionMonths || 12)) * 100
-                                    )}%`,
-                                  }}
-                                />
-                              </div>
-                            </>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No plan</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Right: actions — single 3-dot menu with labeled items */}
-                      <div className="shrink-0">
-                        <ActionMenu
-                          ariaLabel="Client actions"
-                          items={[
-                            {
-                              key: 'view',
-                              label: 'View profile',
-                              icon: <ArrowRight size={14} />,
-                              href: `/admin/clients/${client.id}`,
-                            },
-                            {
-                              key: 'invoices',
-                              label: 'View invoices',
-                              icon: <Receipt size={14} />,
-                              href: `/admin/invoices?client=${client.id}`,
-                            },
-                            {
-                              key: 'support',
-                              label: 'Support tickets',
-                              icon: <Ticket size={14} />,
-                              href: `/admin/tickets?client=${client.id}`,
-                            },
-                            {
-                              key: 'agreement',
-                              label: 'Download T&C / SLA',
-                              icon: <FileText size={14} />,
-                              onSelect: () => setSelectedAgreementClient(client),
-                            },
-                          ]}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* --- AFFILIATE PARTNERS TAB --- */}
-      {!isClients && (
-        <>
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <div className="flex-1 max-w-md">
-              <Input
-                placeholder="Search partners by name, email, or company…"
-                leftIcon={<Search size={16} />}
-                value={partnersSearch}
-                onChange={(e) => setPartnersSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {partnersLoading ? (
-            <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
-              <Loader2 className="animate-spin text-muted-foreground" size={20} />
-              <p className="text-sm text-muted-foreground">Loading partners…</p>
-            </div>
-          ) : filteredPartners.length === 0 ? (
-            <Card padding="lg">
-              <EmptyState
-                icon={<Users size={20} />}
-                title="No affiliate partners found"
-                description="Try adjusting your search, or register a new external referrer."
-                action={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    leftIcon={<Plus size={14} />}
-                    onClick={() => {
-                      setEditingPartner(null);
-                      setPartnerName('');
-                      setPartnerEmail('');
-                      setPartnerPhone('');
-                      setPartnerCompanyName('');
-                      setPartnerReferralRate(10);
-                      setPartnerBankDetails('');
-                      setPartnerModalOpen(true);
-                    }}
-                  >
-                    New Partner
-                  </Button>
-                }
-              />
-            </Card>
-          ) : (
-            <Card padding="sm">
-              <div className="divide-y divide-border">
-                {filteredPartners.map((partner) => {
-                  const referralsCount = clients.filter(
-                    (c) => c.sourcedBy === partner.id
-                  ).length;
-
-                  return (
-                    <div
-                      key={partner.id}
-                      className={cn(
-                        'group flex items-start justify-between gap-4 py-4 px-3 -mx-3 rounded-lg border border-transparent',
-                        TABLE_ROW_HOVER,
-                      )}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {partner.name}
-                          </p>
-                          <Badge variant="neutral">
-                            {partner.referralRate}% commission
-                          </Badge>
-                          <Badge
-                            variant={referralsCount > 0 ? 'success' : 'neutral'}
-                            dot={referralsCount > 0}
-                          >
-                            {referralsCount} {referralsCount === 1 ? 'referral' : 'referrals'}
-                          </Badge>
-                        </div>
-                        <div className="mt-1.5 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1 truncate">
-                            <Briefcase size={11} className="shrink-0" />
-                            {partner.companyName || 'Freelance / Individual'}
-                          </span>
-                          <span className="inline-flex items-center gap-1 truncate">
-                            <Mail size={11} className="shrink-0" />
-                            {partner.email}
-                          </span>
-                          {partner.phone && (
-                            <span className="inline-flex items-center gap-1 truncate">
-                              <Phone size={11} className="shrink-0" />
-                              {partner.phone}
-                            </span>
-                          )}
-                        </div>
-                        {partner.bankDetails && (
-                          <p
-                            className="mt-1.5 text-xs text-muted-foreground truncate max-w-md"
-                            title={partner.bankDetails}
-                          >
-                            Payout: {partner.bankDetails}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="!p-0 !h-8 !w-8"
-                          aria-label="Edit partner"
-                          onClick={() => handleEditPartnerClick(partner)}
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="!p-0 !h-8 !w-8 hover:!text-red-500"
-                          aria-label="Delete partner"
-                          onClick={() => handleDeletePartnerClick(partner.id)}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* --- CREATE CLIENT MODAL --- */}
-      {mounted && modalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={handleCancelCreateClient}
+          </ComponentErrorBoundary>
+        ) : (
+          <ComponentErrorBoundary componentName="PartnersList">
+            <PartnersList
+              partners={partners}
+              clients={clients}
+              partnersLoading={loadingPartners}
+              partnersSearch={partnersSearch}
+              setPartnersSearch={setPartnersSearch}
+              handleEditPartnerClick={handleEditPartnerClick}
+              handleDeletePartnerClick={handleDeletePartnerClick}
+              setPartnerModalOpen={setPartnerModalOpen}
             />
-
-            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-              <div className="p-6 sm:p-8">
-                <SectionHeading
-                  title="New client"
-                  description="Create a new client account and optional subscription."
-                  action={
-                    <button
-                      onClick={handleCancelCreateClient}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <X size={16} />
-                    </button>
-                  }
-                />
-
-                <form onSubmit={handleCreateClient} className="space-y-8">
-                  {/* ── 1. Contact details ── */}
-                  <section className="space-y-4">
-                    <SectionHeading
-                      eyebrow="01 · Contact"
-                      title="Contact details"
-                      className="!mb-0"
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Input
-                        ref={nameInputRef}
-                        label="Full name *"
-                        required
-                        placeholder="e.g. Fredrick Yang"
-                        value={name}
-                        onChange={(e) => {
-                          setName(e.target.value);
-                          if (nameError) setNameError('');
-                        }}
-                        error={nameError || undefined}
-                      />
-                      <div className="space-y-1.5 w-full">
-                        <label className="text-xs font-semibold text-muted-foreground block">
-                          Email *
-                        </label>
-                        <div className="relative flex items-center">
-                          <input
-                            ref={emailInputRef}
-                            type="email"
-                            required
-                            placeholder="e.g. fredrick@anakweb.com"
-                            value={email}
-                            onChange={(e) => {
-                              setEmail(e.target.value);
-                              if (emailError) setEmailError('');
-                            }}
-                            className={cn(
-                              "h-10 w-full rounded-xl bg-muted border pl-3.5 pr-20 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 transition-colors",
-                              emailError
-                                ? "border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/25"
-                                : "border-border focus-visible:border-primary focus-visible:ring-primary/35"
-                            )}
-                          />
-                          <div className="absolute right-2 flex items-center gap-1 bg-muted/80 backdrop-blur-sm pl-1 py-0.5 rounded-lg">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(email);
-                                setModalEmailCopied(true);
-                                setTimeout(() => setModalEmailCopied(false), 2000);
-                              }}
-                              disabled={!email}
-                              title="Copy email"
-                              className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                            >
-                              {modalEmailCopied ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEmail(generateSuggestedEmail(companyName, name));
-                                if (emailError) setEmailError('');
-                              }}
-                              title="Generate suggested email"
-                              className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-card flex items-center justify-center"
-                            >
-                              <RotateCcw size={13} />
-                            </button>
-                          </div>
-                        </div>
-                        {emailError && (
-                          <p className="text-xs text-red-500 mt-1">
-                            {emailError}
-                          </p>
-                        )}
-                        {modalEmailCopied && (
-                          <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1 animate-fade-in font-medium">
-                            <CheckCircle size={12} />
-                            Email copied!
-                          </p>
-                        )}
-                      </div>
-                      <Input
-                        label="Phone number"
-                        placeholder="e.g. +628123456789"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        containerClassName="sm:col-span-2"
-                      />
-                    </div>
-                  </section>
-
-                  <hr className="border-border" />
-
-                  {/* ── 2. Business ── */}
-                  <section className="space-y-4">
-                    <SectionHeading
-                      eyebrow="02 · Business"
-                      title="Business"
-                      className="!mb-0"
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Input
-                        label="Company name"
-                        placeholder="e.g. Anak Web"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                      />
-                      <Input
-                        label="Website address"
-                        type="url"
-                        placeholder="https://anakweb.com"
-                        value={websiteAddress}
-                        onChange={(e) => setWebsiteAddress(e.target.value)}
-                      />
-                      <Select
-                        label="Sourced by"
-                        value={sourcedBy}
-                        onChange={(e) => setSourcedBy(e.target.value)}
-                        containerClassName="sm:col-span-2"
-                      >
-                        <option value="organic">Organic / Direct</option>
-                        {partners.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.referralRate}% commission)
-                          </option>
-                        ))}
-                        <option value="affiliate">External affiliate (10%)</option>
-                      </Select>
-                    </div>
-                  </section>
-
-                  <hr className="border-border" />
-
-                  {/* ── 3. Subscription & access ── */}
-                  <section className="space-y-4">
-                    <SectionHeading
-                      eyebrow="03 · Subscription"
-                      title="Subscription & access"
-                      className="!mb-0"
-                    />
-
-                    {/* Initial status — segmented control */}
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                        Initial status
-                      </label>
-                      <div className="flex gap-2">
-                        {(['pending', 'active', 'inactive'] as const).map((stat) => (
-                          <button
-                            key={stat}
-                            type="button"
-                            onClick={() => setStatus(stat)}
-                            className={cn(
-                              'flex-1 px-3 py-2 rounded-lg border text-xs font-medium capitalize transition-colors cursor-pointer',
-                              status === stat
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                            )}
-                          >
-                            {stat}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Subscription type — segmented control */}
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                        Hosting plan
-                      </label>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        {(
-                          [
-                            { key: '', label: 'No plan' },
-                            { key: 'static', label: 'Static · 200k/mo' },
-                            { key: 'dynamic', label: 'Dynamic · 350k/mo' },
-                          ] as const
-                        ).map((type) => (
-                          <button
-                            key={type.key}
-                            type="button"
-                            onClick={() =>
-                              setSubscriptionType(type.key as 'static' | 'dynamic' | '')
-                            }
-                            className={cn(
-                              'flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-colors cursor-pointer',
-                              subscriptionType === type.key
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                            )}
-                          >
-                            {type.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {subscriptionType !== '' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in-scale">
-                        <Input
-                          label="Quota (months)"
-                          type="number"
-                          min="1"
-                          max="120"
-                          required
-                          value={subscriptionMonths}
-                          onChange={(e) => setSubscriptionMonths(Number(e.target.value))}
-                        />
-                        <Input
-                          label="Start date"
-                          type="date"
-                          required
-                          value={subscriptionStartDate}
-                          onChange={(e) => setSubscriptionStartDate(e.target.value)}
-                        />
-                      </div>
-                    )}
-
-                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                        Operations & Maintenance (Interval in Months)
-                      </p>
-                      <div className="grid grid-cols-3 gap-3">
-                        <Input
-                          label="Env Rotation"
-                          type="number"
-                          min="1"
-                          required
-                          value={envRotationInterval}
-                          onChange={(e) => setEnvRotationInterval(Number(e.target.value))}
-                        />
-                        <Input
-                          label="Stability Check"
-                          type="number"
-                          min="1"
-                          required
-                          value={stabilityCheckInterval}
-                          onChange={(e) => setStabilityCheckInterval(Number(e.target.value))}
-                        />
-                        <Input
-                          label="Client Review"
-                          type="number"
-                          min="1"
-                          required
-                          value={expectationsCheckInterval}
-                          onChange={(e) => setExpectationsCheckInterval(Number(e.target.value))}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground">Portal password</label>
-                      <div className="relative flex items-center">
-                        <input
-                          type={modalShowPassword ? 'text' : 'password'}
-                          placeholder="Password"
-                          value={portalPassword}
-                          onChange={(e) => setPortalPassword(e.target.value)}
-                          className="w-full bg-background border border-border pl-3 pr-24 py-2 rounded-xl text-xs font-mono focus:outline-none focus:border-primary/50 text-foreground"
-                        />
-                        <div className="absolute right-2 flex items-center gap-1 bg-background/80 backdrop-blur-sm pl-1 py-0.5 rounded-lg">
-                          <button
-                            type="button"
-                            onClick={() => setModalShowPassword(!modalShowPassword)}
-                            title={modalShowPassword ? 'Hide password' : 'Show password'}
-                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
-                          >
-                            {modalShowPassword ? <EyeOff size={13} /> : <Eye size={13} />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(portalPassword);
-                              setModalPasswordCopied(true);
-                              setTimeout(() => setModalPasswordCopied(false), 2000);
-                            }}
-                            disabled={!portalPassword}
-                            title="Copy password"
-                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                          >
-                            {modalPasswordCopied ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPortalPassword(generateStrongPassword());
-                              setModalShowPassword(true);
-                            }}
-                            title="Generate strong password"
-                            className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-lg hover:bg-muted/50 flex items-center justify-center"
-                          >
-                            <RotateCcw size={13} />
-                          </button>
-                        </div>
-                      </div>
-                      {modalPasswordCopied && (
-                        <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1 animate-fade-in font-medium">
-                          <CheckCircle size={12} />
-                          Password copied!
-                        </p>
-                      )}
-                    </div>
-                  </section>
-
-                  <div className="flex gap-2 justify-end pt-5 border-t border-border">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="md"
-                      onClick={handleCancelCreateClient}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      disabled={isPending}
-                    >
-                      {isPending ? 'Saving…' : 'Create client'}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>,
-          document.body
+          </ComponentErrorBoundary>
         )}
 
-      {/* --- CREATE / EDIT PARTNER MODAL --- */}
-      {mounted && partnerModalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="fixed inset-0 bg-background/85 backdrop-blur-md"
-              onClick={handleCancelPartner}
-            />
+        {/* Modals with isolated Error Boundaries */}
+        <ComponentErrorBoundary componentName="CreateClientModal">
+          <CreateClientModal
+            isOpen={mounted && modalOpen}
+            onClose={() => setModalOpen(false)}
+            onSubmit={handleCreateClientSubmit}
+            isPending={isPending}
+            partners={partners}
+          />
+        </ComponentErrorBoundary>
 
-            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl animate-fade-in-scale">
-              <div className="p-6 sm:p-8">
-                <SectionHeading
-                  title={editingPartner ? 'Edit affiliate partner' : 'New affiliate partner'}
-                  description="External referrer details and commission rate."
-                  action={
-                    <button
-                      onClick={handleCancelPartner}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <X size={16} />
-                    </button>
-                  }
-                />
-
-                <form onSubmit={handleCreatePartner} className="space-y-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Input
-                      ref={partnerNameInputRef}
-                      label="Name *"
-                      required
-                      placeholder="e.g. Alex Kim"
-                      value={partnerName}
-                      onChange={(e) => {
-                        setPartnerName(e.target.value);
-                        if (partnerNameError) setPartnerNameError('');
-                      }}
-                      error={partnerNameError || undefined}
-                    />
-                    <Input
-                      ref={partnerEmailInputRef}
-                      label="Email *"
-                      type="email"
-                      required
-                      placeholder="e.g. alex@marketingventures.com"
-                      value={partnerEmail}
-                      onChange={(e) => {
-                        setPartnerEmail(e.target.value);
-                        if (partnerEmailError) setPartnerEmailError('');
-                      }}
-                      error={partnerEmailError || undefined}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Input
-                      label="Company name"
-                      placeholder="e.g. Marketing Ventures Ltd"
-                      value={partnerCompanyName}
-                      onChange={(e) => setPartnerCompanyName(e.target.value)}
-                    />
-                    <Input
-                      label="Phone number"
-                      placeholder="e.g. +6281999888777"
-                      value={partnerPhone}
-                      onChange={(e) => setPartnerPhone(e.target.value)}
-                    />
-                  </div>
-
-                  <Input
-                    label="Referral commission rate (%)"
-                    type="number"
-                    min="1"
-                    max="100"
-                    required
-                    value={partnerReferralRate}
-                    onChange={(e) => setPartnerReferralRate(Number(e.target.value))}
-                  />
-
-                  <Textarea
-                    label="Payment / bank details"
-                    placeholder="e.g. BCA Account 1234567890 (a.n. Alex Kim)"
-                    value={partnerBankDetails}
-                    onChange={(e) => setPartnerBankDetails(e.target.value)}
-                    rows={3}
-                  />
-
-                  <div className="flex gap-2 justify-end pt-4 border-t border-border">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="md"
-                      onClick={handleCancelPartner}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      disabled={isPending}
-                    >
-                      {isPending ? 'Saving…' : editingPartner ? 'Save changes' : 'Create partner'}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-
+        <ComponentErrorBoundary componentName="CreatePartnerModal">
+          <CreatePartnerModal
+            isOpen={mounted && partnerModalOpen}
+            onClose={() => {
+              setPartnerModalOpen(false);
+              setEditingPartner(null);
+            }}
+            onSubmit={handleCreatePartnerSubmit}
+            isPending={isPending}
+            editingPartner={editingPartner}
+          />
+        </ComponentErrorBoundary>
       </div>
 
       {/* SLA / T&C Print Modal */}
