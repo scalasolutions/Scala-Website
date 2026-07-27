@@ -28,6 +28,7 @@ export interface MockClient {
   phone: string | null;
   companyName: string | null;
   websiteAddress: string | null;
+  description: string | null;
   logoUrl: string | null;
   status: 'pending' | 'active' | 'inactive';
   subscriptionType: 'static' | 'dynamic' | null;
@@ -178,6 +179,7 @@ export async function createClient(data: schema.NewClient) {
     phone: data.phone || null,
     companyName: data.companyName || null,
     websiteAddress: data.websiteAddress || null,
+    description: data.description || null,
     logoUrl: data.logoUrl || null,
     status: data.status || 'pending',
     subscriptionType: data.subscriptionType || null,
@@ -221,6 +223,7 @@ export async function updateClient(id: string, data: Partial<schema.NewClient>) 
     mockClients[idx] = {
       ...mockClients[idx],
       ...data,
+      description: data.description !== undefined ? data.description : mockClients[idx].description,
       subscriptionStartDate: data.subscriptionStartDate ? new Date(data.subscriptionStartDate) : mockClients[idx].subscriptionStartDate,
       subscriptionMonths: data.subscriptionMonths !== undefined && data.subscriptionMonths !== null ? Number(data.subscriptionMonths) : mockClients[idx].subscriptionMonths,
       portalPassword: data.portalPassword !== undefined ? data.portalPassword : mockClients[idx].portalPassword,

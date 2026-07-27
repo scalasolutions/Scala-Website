@@ -41,6 +41,7 @@ async function seed() {
         phone: '+628123456789',
         companyName: 'Anak Web',
         websiteAddress: 'https://anakweb.com',
+        description: 'Digital agency specializing in high-performance web applications and cloud infrastructure.',
         status: 'active'
       },
       {
@@ -50,6 +51,7 @@ async function seed() {
         phone: '+14159998888',
         companyName: 'Cyberdyne Systems',
         websiteAddress: 'https://cyberdyne.co',
+        description: 'Next-generation neural network research and defense hardware systems.',
         status: 'active'
       },
       {
@@ -59,6 +61,7 @@ async function seed() {
         phone: '+12128889999',
         companyName: 'Stark Industries',
         websiteAddress: 'https://starkindustries.com',
+        description: 'Clean arc reactor energy innovation, defense tech, and AI robotics.',
         status: 'inactive'
       },
       {
@@ -68,6 +71,7 @@ async function seed() {
         phone: '+13125550100',
         companyName: 'Wayne Enterprises',
         websiteAddress: 'https://wayneenterprises.com',
+        description: 'Global conglomerate with divisions in aerospace, bio-tech, and urban infrastructure.',
         status: 'pending'
       },
       {
@@ -77,6 +81,7 @@ async function seed() {
         phone: '+8221234567',
         companyName: 'Aspire Premier Korea',
         websiteAddress: 'https://aspirepremier.kr',
+        description: 'Luxury lifestyle management and premium concierge platform in East Asia.',
         status: 'active'
       }
     ]).returning();

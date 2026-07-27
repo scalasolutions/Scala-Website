@@ -84,7 +84,8 @@ export function ClientsList({
     const matchesSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.email.toLowerCase().includes(search.toLowerCase()) ||
-      (c.companyName && c.companyName.toLowerCase().includes(search.toLowerCase()));
+      (c.companyName && c.companyName.toLowerCase().includes(search.toLowerCase())) ||
+      (c.description && c.description.toLowerCase().includes(search.toLowerCase()));
 
     const matchesFilter = statusFilter === 'all' || c.status === statusFilter;
 
@@ -379,6 +380,12 @@ export function ClientsList({
                             </span>
                           )}
                         </div>
+
+                        {client.description && (
+                          <p className="text-[11px] text-muted-foreground/80 line-clamp-1 mt-0.5 max-w-md">
+                            {client.description}
+                          </p>
+                        )}
                       </div>
                     </div>
 

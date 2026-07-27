@@ -226,6 +226,10 @@ export default function ClientDetailPage() {
     const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
     return cachedClient?.websiteAddress || '';
   });
+  const [description, setDescription] = useState(() => {
+    const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
+    return cachedClient?.description || '';
+  });
   const [status, setStatus] = useState<'pending' | 'active' | 'inactive'>(() => {
     const cachedClient = getCachedSync<MockClient[]>(CACHE_KEYS.CLIENTS)?.find(c => c.id === id);
     return (cachedClient?.status as 'pending' | 'active' | 'inactive') || 'pending';
@@ -365,6 +369,7 @@ export default function ClientDetailPage() {
       phone !== (client.phone || '') ||
       companyName !== (client.companyName || '') ||
       websiteAddress !== (client.websiteAddress || '') ||
+      description !== (client.description || '') ||
       status !== (client.status || 'pending') ||
       subscriptionType !== (client.subscriptionType || '') ||
       Number(subscriptionMonths) !== (client.subscriptionMonths || 12) ||
@@ -692,6 +697,7 @@ export default function ClientDetailPage() {
         setPhone(cCached.phone || '');
         setCompanyName(cCached.companyName || '');
         setWebsiteAddress(cCached.websiteAddress || '');
+        setDescription(cCached.description || '');
         setStatus(cCached.status);
         setSubscriptionType(cCached.subscriptionType || '');
         setSubscriptionMonths(cCached.subscriptionMonths || 12);
@@ -746,6 +752,7 @@ export default function ClientDetailPage() {
         setPhone(c.phone || '');
         setCompanyName(c.companyName || '');
         setWebsiteAddress(c.websiteAddress || '');
+        setDescription(c.description || '');
         setStatus(c.status);
         setSubscriptionType(c.subscriptionType || '');
         setSubscriptionMonths(c.subscriptionMonths || 12);
@@ -1065,6 +1072,7 @@ export default function ClientDetailPage() {
           phone: phone || null,
           companyName: companyName || null,
           websiteAddress: websiteAddress || null,
+          description: description || null,
           status,
           subscriptionType: subscriptionType || null,
           subscriptionMonths: subscriptionType ? Number(subscriptionMonths) : null,
@@ -1446,6 +1454,23 @@ export default function ClientDetailPage() {
                     </a>
                   ) : (
                     <span className="text-muted-foreground italic">No domain</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <FileText
+                  className="text-muted-foreground shrink-0 mt-0.5"
+                  size={16}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Description</p>
+                  {client.description ? (
+                    <p className="text-foreground text-xs whitespace-pre-line leading-relaxed">
+                      {client.description}
+                    </p>
+                  ) : (
+                    <span className="text-muted-foreground italic text-xs">No description added</span>
                   )}
                 </div>
               </div>
@@ -2670,6 +2695,13 @@ export default function ClientDetailPage() {
                     placeholder="https://anakweb.com"
                     value={websiteAddress}
                     onChange={(e) => setWebsiteAddress(e.target.value)}
+                  />
+                  <Textarea
+                    label="Description"
+                    placeholder="Brief overview of the client, project goals, or business scope..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
                   />
                   <div className="space-y-1.5 w-full">
                     <label className="text-xs font-medium text-muted-foreground block">

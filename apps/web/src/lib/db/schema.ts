@@ -19,6 +19,7 @@ export const clients = pgTable('clients', {
   phone: text('phone'),
   companyName: text('company_name'),
   websiteAddress: text('website_address'),
+  description: text('description'),
   logoUrl: text('logo_url'),
   status: clientStatusEnum('status').notNull().default('pending'),
   // Subscription fields

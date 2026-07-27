@@ -9,6 +9,7 @@ import SectionHeading from '@/components/ui/SectionHeading';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
+import Textarea from '@/components/ui/Textarea';
 
 interface CreateClientModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface CreateClientModalProps {
     phone: string | null;
     companyName: string | null;
     websiteAddress: string | null;
+    description: string | null;
     status: 'pending' | 'active' | 'inactive';
     subscriptionType: 'static' | 'dynamic' | null;
     subscriptionMonths: number | null;
@@ -48,6 +50,7 @@ export function CreateClientModal({
   const [phone, setPhone] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [websiteAddress, setWebsiteAddress] = useState('');
+  const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'pending' | 'active' | 'inactive'>('pending');
   const [subscriptionType, setSubscriptionType] = useState<'static' | 'dynamic' | ''>('');
   const [subscriptionMonths, setSubscriptionMonths] = useState<number>(12);
@@ -78,6 +81,7 @@ export function CreateClientModal({
     setPhone('');
     setCompanyName('');
     setWebsiteAddress('');
+    setDescription('');
     setStatus('pending');
     setSubscriptionType('');
     setSubscriptionMonths(12);
@@ -199,6 +203,7 @@ export function CreateClientModal({
       phone: phone || null,
       companyName: companyName || null,
       websiteAddress: websiteAddress || null,
+      description: description || null,
       status,
       subscriptionType: subscriptionType || null,
       subscriptionMonths: subscriptionType ? Number(subscriptionMonths) : null,
@@ -366,6 +371,14 @@ export function CreateClientModal({
                   ))}
                   <option value="affiliate">External affiliate (10%)</option>
                 </Select>
+                <Textarea
+                  label="Description"
+                  placeholder="Brief overview of the client, project goals, or business scope..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  containerClassName="sm:col-span-2"
+                  rows={3}
+                />
               </div>
             </section>
 
