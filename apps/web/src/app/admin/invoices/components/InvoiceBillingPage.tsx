@@ -33,32 +33,32 @@ const renderBankDetailsTable = (bank: 'BCA' | 'BNI', amount: number) => {
   const accountNumber = isBCA ? '0828222280' : '1934433334';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Bank Row */}
-      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 8, borderBottom: '1px dashed #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #e2e8f0' }}>
         <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bank:</span>
         <span style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-          <img src={logoUrl} alt={bank} style={{ height: 22, width: 'auto', objectFit: 'contain' }} />
+          <img src={logoUrl} alt={bank} style={{ height: 20, width: 'auto', objectFit: 'contain' }} />
         </span>
       </div>
       {/* Nama Row */}
-      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 8, borderBottom: '1px dashed #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #e2e8f0' }}>
         <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name:</span>
         <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
           {accountName}
         </span>
       </div>
       {/* Rekening Row */}
-      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 8, borderBottom: '1px dashed #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 6, borderBottom: '1px dashed #e2e8f0' }}>
         <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Account:</span>
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: '#1e293b', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#1e293b', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
           {accountNumber}
         </span>
       </div>
       {/* Nominal Row */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span style={{ width: 80, fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount:</span>
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: '#16a34a' }}>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#16a34a' }}>
           {formatCurrencyIDR(amount)}
         </span>
       </div>
@@ -111,7 +111,7 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
         websiteAddress={websiteAddress}
       />
 
-      <div style={{ marginTop: 32, paddingBottom: '80px' }}>
+      <div style={{ marginTop: 32, paddingBottom: '32px' }}>
 
         {/* Table header bar — black rounded pill */}
         {lineItems.length > 0 && (
@@ -580,12 +580,12 @@ export const InvoiceBillingPage: React.FC<InvoiceBillingPageProps> = ({
             })()}
 
             {/* Contact Support Note */}
-            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center', marginTop: 20, marginBottom: -10, fontWeight: 500 }}>
+            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center', marginTop: 14, fontWeight: 500 }}>
               If you have any issues, you can contact our <strong style={{ fontWeight: 700 }}>Finance Team (+62818815037)</strong>.
             </div>
 
             {/* Footnotes */}
-            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: 24 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', marginTop: 12 }}>
               * Hosting & maintenance subscriptions are billed in advance on an annual basis.
             </div>
           </div>

@@ -212,11 +212,33 @@ interface BillingPageChunk {
 }
 
 // Splits the billing items into chunks that fit on A4 pages without overlapping the footer
-const splitBillingItems = (lineItems: InvoiceLineItem[], hasPayments: boolean): BillingPageChunk[] => {
+const splitBillingItems = (
+  lineItems: InvoiceLineItem[],
+  hasPayments: boolean,
+  isDpCollection: boolean = false,
+  status?: string,
+  receivedBy: string = 'company',
+  milestoneCount: number = 0
+): BillingPageChunk[] => {
   const chunks: BillingPageChunk[] = [];
-  const USABLE_HEIGHT = 750; // safe A4 content vertical space (increased to fit more on a single page)
-  const TOTALS_HEIGHT = 110; // realistic space allocation for subtotal, discount, and total pill
-  const PAYMENTS_HEIGHT = 350; // space allocation for payments card section (unpaid/paid card + centered texts + footnotes)
+  const USABLE_HEIGHT = 710; // safe A4 content vertical space below header before footer
+  const TOTALS_HEIGHT = 110; // space allocation for subtotal, discount, and total pill
+
+  // Dynamic height for payments section based on mode and bank details layout
+  let PAYMENTS_HEIGHT = 350;
+  if (hasPayments) {
+    if (status === 'paid') {
+      PAYMENTS_HEIGHT = 220;
+    } else if (isDpCollection || status === 'partially_paid') {
+      // DP collection & partially paid cards stack BCA + BNI vertically when receivedBy === 'company'
+      const baseCardHeight = receivedBy === 'company' ? 340 : 210;
+      const extraMilestoneHeight = milestoneCount > 2 ? (milestoneCount - 2) * 24 : 0;
+      PAYMENTS_HEIGHT = 130 + baseCardHeight + extraMilestoneHeight; // header text + cards + support/footnotes
+    } else {
+      // Standard unpaid
+      PAYMENTS_HEIGHT = receivedBy === 'company' ? 370 : 310;
+    }
+  }
 
   let currentPageItems: InvoiceLineItem[] = [];
   let currentHeight = 0;
@@ -261,7 +283,7 @@ const splitBillingItems = (lineItems: InvoiceLineItem[], hasPayments: boolean): 
     });
   } else {
     // Totals block fits! Let's check if the payments section also fits on this page
-    if (currentHeight + TOTALS_HEIGHT + PAYMENTS_HEIGHT > USABLE_HEIGHT) {
+    if (currentHeight + TOTALS_HEIGHT + (hasPayments ? PAYMENTS_HEIGHT : 0) > USABLE_HEIGHT) {
       // Payments section doesn't fit, but totals block does.
       // So render totals here, but NOT payments.
       chunks.push({
@@ -486,7 +508,22 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   
   // 1. Billing is always included (split into pages dynamically if needed to prevent overlap)
   const hasPayments = invoice.status === 'paid' || invoice.status === 'partially_paid' || previewIsDpCollection;
-  const billingChunks = splitBillingItems(parsedItems, hasPayments);
+  const milestoneCount = (() => {
+    if (!invoice.paymentMilestonesJson) return 0;
+    try {
+      return (JSON.parse(invoice.paymentMilestonesJson) as any[]).length;
+    } catch {
+      return 0;
+    }
+  })();
+  const billingChunks = splitBillingItems(
+    parsedItems,
+    hasPayments,
+    previewIsDpCollection,
+    invoice.status,
+    invoice.receivedBy,
+    milestoneCount
+  );
   
   billingChunks.forEach(chunk => {
     activePages.push({
